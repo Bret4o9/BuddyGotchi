@@ -756,9 +756,7 @@ fun ClockWidget(
 
                 ClockStage.CATEGORY -> {
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState()),
+                        modifier = Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -776,7 +774,7 @@ fun ClockWidget(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
                                     .clickable { stage = ClockStage.OFFSET }
-                                    .padding(vertical = 4.dp, horizontal = 2.dp)
+                                    .padding(vertical = 2.dp, horizontal = 2.dp)
                             )
                             Text(
                                 text = "$displayedTime • -${selectedOffsetMinutes}m",
@@ -787,17 +785,15 @@ fun ClockWidget(
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // 1. Above Category: Recurrence Selector (One-Off vs Recurring)
+                        // 1. Recurrence Selector (One-Off vs Recurring)
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 text = "TASK TYPE",
-                                fontSize = 9.5.sp,
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.5.sp,
+                                letterSpacing = 1.sp,
                                 color = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                                modifier = Modifier.padding(start = 2.dp, bottom = 2.dp)
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -807,26 +803,26 @@ fun ClockWidget(
                                 Surface(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(RoundedCornerShape(10.dp))
                                         .clickable {
                                             if (isRecurring) {
                                                 isRecurring = false
                                                 triggerTick()
                                             }
                                         },
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     color = if (!isRecurring) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                                     border = if (!isRecurring) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
                                 ) {
                                     Box(
-                                        modifier = Modifier.padding(vertical = 8.dp),
+                                        modifier = Modifier.padding(vertical = 6.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             text = "ONE-OFF",
-                                            fontSize = 11.sp,
+                                            fontSize = 10.5.sp,
                                             fontWeight = FontWeight.Bold,
-                                            letterSpacing = 1.sp,
+                                            letterSpacing = 0.8.sp,
                                             color = if (!isRecurring) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
@@ -836,26 +832,26 @@ fun ClockWidget(
                                 Surface(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(RoundedCornerShape(10.dp))
                                         .clickable {
                                             if (!isRecurring) {
                                                 isRecurring = true
                                                 triggerTick()
                                             }
                                         },
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     color = if (isRecurring) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                                     border = if (isRecurring) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
                                 ) {
                                     Box(
-                                        modifier = Modifier.padding(vertical = 8.dp),
+                                        modifier = Modifier.padding(vertical = 6.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             text = "↻ RECURRING",
-                                            fontSize = 11.sp,
+                                            fontSize = 10.5.sp,
                                             fontWeight = FontWeight.Bold,
-                                            letterSpacing = 1.sp,
+                                            letterSpacing = 0.8.sp,
                                             color = if (isRecurring) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
@@ -863,17 +859,15 @@ fun ClockWidget(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // 2. Middle: Category Selector (Work, Personal, Other)
+                        // 2. Category Selector (Work, Personal, Other)
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 text = "CATEGORY",
-                                fontSize = 9.5.sp,
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.5.sp,
+                                letterSpacing = 1.sp,
                                 color = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                                modifier = Modifier.padding(start = 2.dp, bottom = 2.dp)
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -883,12 +877,12 @@ fun ClockWidget(
                                 TaskCategory.entries.forEach { category ->
                                     val isSelected = category == selectedCategory
                                     Surface(
-                                        shape = RoundedCornerShape(12.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                                         border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
                                         modifier = Modifier
                                             .weight(1f)
-                                            .clip(RoundedCornerShape(12.dp))
+                                            .clip(RoundedCornerShape(10.dp))
                                             .clickable {
                                                 if (selectedCategory != category) {
                                                     selectedCategory = category
@@ -897,14 +891,14 @@ fun ClockWidget(
                                             }
                                     ) {
                                         Box(
-                                            modifier = Modifier.padding(vertical = 8.dp),
+                                            modifier = Modifier.padding(vertical = 6.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
                                                 text = category.label,
-                                                fontSize = 11.sp,
+                                                fontSize = 10.5.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                letterSpacing = 1.sp,
+                                                letterSpacing = 0.8.sp,
                                                 color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
@@ -913,35 +907,33 @@ fun ClockWidget(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // 3. Below Category: Task Description Input Field
+                        // 3. Task Description Input Field
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 text = "DESCRIPTION",
-                                fontSize = 9.5.sp,
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.5.sp,
+                                letterSpacing = 1.sp,
                                 color = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                                modifier = Modifier.padding(start = 2.dp, bottom = 2.dp)
                             )
                             BasicTextField(
                                 value = taskDescription,
                                 onValueChange = { if (it.length <= 60) taskDescription = it },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(RoundedCornerShape(10.dp))
                                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                     .border(
                                         width = 1.dp,
                                         color = if (taskDescription.isNotBlank()) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                                                 else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-                                        shape = RoundedCornerShape(12.dp)
+                                        shape = RoundedCornerShape(10.dp)
                                     )
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
                                 textStyle = TextStyle(
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Medium
                                 ),
                                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
@@ -963,7 +955,7 @@ fun ClockWidget(
                                                 Text(
                                                     text = "e.g. Finish report, workout...",
                                                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
-                                                    fontSize = 11.5.sp,
+                                                    fontSize = 11.sp,
                                                     fontWeight = FontWeight.Normal
                                                 )
                                             }
@@ -989,13 +981,11 @@ fun ClockWidget(
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
                         // 4. Confirm Button
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .clickable {
                                     focusManager.clearFocus()
                                     triggerConfirmPulse()
@@ -1018,21 +1008,21 @@ fun ClockWidget(
                                     onTaskCreated(task)
                                     stage = ClockStage.DONE
                                 },
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.primary
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 10.dp),
+                                    .padding(vertical = 8.dp),
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
                                     text = "CONFIRM TASK →",
-                                    fontSize = 12.sp,
+                                    fontSize = 11.5.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    letterSpacing = 1.5.sp,
+                                    letterSpacing = 1.2.sp,
                                     color = MaterialTheme.colorScheme.onPrimary
                                 )
                             }
