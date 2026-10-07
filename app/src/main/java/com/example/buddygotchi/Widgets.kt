@@ -55,13 +55,7 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
 
-fun getWidgetHeight(size: WidgetSize): Dp = when (size.rows) {
-    1 -> if (size.cols == 2) 110.dp else 88.dp
-    2 -> 180.dp
-    3 -> 276.dp
-    4 -> 372.dp
-    else -> 180.dp
-}
+fun getWidgetHeight(size: WidgetSize): Dp = DashboardGridDefaults.getWidgetHeight(size)
 
 @Composable
 fun TodayWidget(
@@ -207,7 +201,7 @@ fun TodayWidget(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        val maxTasks = if (size.rows == 1) 2 else (size.rows * 2)
+                        val maxTasks = if (size.rows == 1) 1 else (size.rows * 2)
                         tasks.take(maxTasks).forEach { task ->
                             Row(
                                 modifier = Modifier

@@ -59,6 +59,7 @@ fun DashboardWidgetContainer(
     onDragReorderStart: () -> Unit,
     onDragReorderMove: (dragY: Float) -> Unit,
     onDragReorderEnd: () -> Unit,
+    onResizePreview: ((WidgetSize?, ResizeDotType?) -> Unit)? = null,
     modifier: Modifier = Modifier,
     content: @Composable (liveSize: WidgetSize) -> Unit
 ) {
@@ -332,6 +333,7 @@ fun DashboardWidgetContainer(
                 if (newPreview != livePreviewSize) {
                     livePreviewSize = newPreview
                     triggerTick()
+                    onResizePreview?.invoke(newPreview, dotType)
                 }
             }
 
@@ -356,11 +358,13 @@ fun DashboardWidgetContainer(
                 if (newPreview != livePreviewSize) {
                     livePreviewSize = newPreview
                     triggerTick()
+                    onResizePreview?.invoke(newPreview, dotType)
                 }
             }
 
             fun finishDrag() {
                 if (activeDot == null) return
+                onResizePreview?.invoke(null, null)
                 val finalSize = livePreviewSize
                 val oldSize = currentItem.size
 
@@ -422,6 +426,7 @@ fun DashboardWidgetContainer(
                                 activeDot = ResizeDotType.TOP
                                 dragDeltaY = 0f
                                 livePreviewSize = currentItem.size
+                                onResizePreview?.invoke(livePreviewSize, ResizeDotType.TOP)
                                 triggerTick()
                             },
                             onDrag = { change, dragAmount ->
@@ -450,6 +455,7 @@ fun DashboardWidgetContainer(
                                 activeDot = ResizeDotType.BOTTOM
                                 dragDeltaY = 0f
                                 livePreviewSize = currentItem.size
+                                onResizePreview?.invoke(livePreviewSize, ResizeDotType.BOTTOM)
                                 triggerTick()
                             },
                             onDrag = { change, dragAmount ->
@@ -478,6 +484,7 @@ fun DashboardWidgetContainer(
                                 activeDot = ResizeDotType.LEFT
                                 dragDeltaX = 0f
                                 livePreviewSize = currentItem.size
+                                onResizePreview?.invoke(livePreviewSize, ResizeDotType.LEFT)
                                 triggerTick()
                             },
                             onDrag = { change, dragAmount ->
@@ -506,6 +513,7 @@ fun DashboardWidgetContainer(
                                 activeDot = ResizeDotType.RIGHT
                                 dragDeltaX = 0f
                                 livePreviewSize = currentItem.size
+                                onResizePreview?.invoke(livePreviewSize, ResizeDotType.RIGHT)
                                 triggerTick()
                             },
                             onDrag = { change, dragAmount ->
@@ -591,12 +599,8 @@ private fun getEstimatedSizeDp(size: WidgetSize): Pair<Float, Float> {
         3 -> 260f
         else -> 360f
     }
-    val h = when (size.rows) {
-        1 -> if (size.cols == 2) 110f else 88f
-        2 -> 180f
-        3 -> 276f
-        else -> 372f
-    }
+    val h = DashboardGridDefaults.getWidgetHeight(size.rows).value
     return Pair(w, h)
 }
+
 

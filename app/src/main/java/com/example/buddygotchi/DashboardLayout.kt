@@ -1,8 +1,37 @@
 package com.example.buddygotchi
 
 import android.content.Context
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import org.json.JSONArray
 import org.json.JSONObject
+
+object DashboardGridDefaults {
+    const val COLUMNS = 4
+    val HORIZONTAL_PADDING: Dp = 16.dp
+    val GAP: Dp = 14.dp
+    val UNIT_HEIGHT: Dp = 88.dp // True modular grid: ALL height-1 widgets are exactly 88dp!
+
+    fun getWidgetHeight(rows: Int): Dp = when (rows) {
+        1 -> UNIT_HEIGHT // 88.dp
+        2 -> UNIT_HEIGHT * 2 + GAP // 190.dp
+        3 -> UNIT_HEIGHT * 3 + GAP * 2 // 292.dp
+        4 -> UNIT_HEIGHT * 4 + GAP * 3 // 394.dp
+        else -> UNIT_HEIGHT * 2 + GAP
+    }
+
+    fun getWidgetHeight(size: WidgetSize): Dp = getWidgetHeight(size.rows)
+
+    fun getUnitWidth(contentWidth: Dp): Dp {
+        val totalGaps = GAP * (COLUMNS - 1)
+        return (contentWidth - totalGaps) / COLUMNS
+    }
+
+    fun getWidgetWidth(cols: Int, contentWidth: Dp): Dp {
+        val unitW = getUnitWidth(contentWidth)
+        return unitW * cols + GAP * (cols - 1)
+    }
+}
 
 enum class DashboardWidgetId(
     val title: String,
@@ -16,28 +45,28 @@ enum class DashboardWidgetId(
 
 enum class WidgetSize(val cols: Int, val rows: Int) {
     // 1-column widgets
-    CUBE(1, 1),       // 1x1 cube (88dp x 88dp) - MIN SIZE
-    TALL_1X2(1, 2),   // 1x2 vertical strip (88dp x 180dp)
-    TALL_1X3(1, 3),   // 1x3 vertical strip (88dp x 276dp)
-    TALL(1, 4),       // 1x4 vertical strip (88dp x 372dp)
+    CUBE(1, 1),       // 1x1 cube (~80dp x 88dp) - MIN SIZE
+    TALL_1X2(1, 2),   // 1x2 vertical strip (~80dp x 190dp)
+    TALL_1X3(1, 3),   // 1x3 vertical strip (~80dp x 292dp)
+    TALL(1, 4),       // 1x4 vertical strip (~80dp x 394dp)
 
     // 2-column widgets
-    HALF(2, 1),       // 2x1 half row (~170dp x 110dp)
-    HALF_2X2(2, 2),   // 2x2 half block (~170dp x 180dp)
-    HALF_2X3(2, 3),   // 2x3 half tall (~170dp x 276dp)
-    HALF_2X4(2, 4),   // 2x4 half tower (~170dp x 372dp)
+    HALF(2, 1),       // 2x1 half row (~170dp x 88dp) - FLUSH with CUBE!
+    HALF_2X2(2, 2),   // 2x2 half block (~170dp x 190dp)
+    HALF_2X3(2, 3),   // 2x3 half tall (~170dp x 292dp)
+    HALF_2X4(2, 4),   // 2x4 half tower (~170dp x 394dp)
 
     // 3-column widgets
-    COL3_1(3, 1),     // 3x1 (3/4 width x 88dp)
-    COL3_2(3, 2),     // 3x2 (3/4 width x 180dp)
-    COL3_3(3, 3),     // 3x3 (3/4 width x 276dp)
-    COL3_4(3, 4),     // 3x4 (3/4 width x 372dp)
+    COL3_1(3, 1),     // 3x1 (3/4 width x 88dp) - FLUSH with CUBE & HALF!
+    COL3_2(3, 2),     // 3x2 (3/4 width x 190dp)
+    COL3_3(3, 3),     // 3x3 (3/4 width x 292dp)
+    COL3_4(3, 4),     // 3x4 (3/4 width x 394dp)
 
     // 4-column (full width) widgets
-    SLIM(4, 1),       // 4x1 full width slim banner (~360dp x 88dp)
-    WIDE(4, 2),       // 4x2 full width (~360dp x 180dp)
-    MAX(4, 3),        // 4x3 full width (~360dp x 276dp)
-    MAX_4X4(4, 4);    // 4x4 full width (~360dp x 372dp)
+    SLIM(4, 1),       // 4x1 full width slim banner (~360dp x 88dp) - FLUSH with row 1!
+    WIDE(4, 2),       // 4x2 full width (~360dp x 190dp)
+    MAX(4, 3),        // 4x3 full width (~360dp x 292dp)
+    MAX_4X4(4, 4);    // 4x4 full width (~360dp x 394dp)
 
     val label: String get() = "${cols}x${rows}"
 

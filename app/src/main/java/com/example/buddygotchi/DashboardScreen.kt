@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.example.buddygotchi.ui.nothingDotGrid
+import com.example.buddygotchi.ui.DashboardGridBackground
 import com.example.buddygotchi.ui.theme.*
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -146,6 +147,8 @@ fun DashboardScreen() {
 
     // Edit Mode state
     var isEditMode by remember { mutableStateOf(false) }
+    var activeResizeWidgetId by remember { mutableStateOf<DashboardWidgetId?>(null) }
+    var activeResizePreviewSize by remember { mutableStateOf<WidgetSize?>(null) }
 
     fun updateLayout(newLayout: List<DashboardWidgetItem>) {
         layout = newLayout
@@ -181,7 +184,6 @@ fun DashboardScreen() {
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .nothingDotGrid()
             .pointerInput(Unit) {
                 try {
                     awaitPointerEventScope {
@@ -345,267 +347,284 @@ fun DashboardScreen() {
                     when (pageIndex) {
                     0 -> BlankTabPage(pageNumber = "01", label = "LEFT")
                     1 -> {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(scrollState, enabled = draggedIndex == null)
-                                .padding(
-                                    start = 16.dp,
-                                    end = 16.dp,
-                                    top = 2.dp,
-                                    bottom = 32.dp
-                                )
-                                .animateContentSize(
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioLowBouncy,
-                                        stiffness = Spring.StiffnessMediumLow
-                                    )
-                                ),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        BoxWithConstraints(
+                            modifier = Modifier.fillMaxSize()
                         ) {
-                            // Render Rows of Widgets
-                            packedRows.forEach { rowItems ->
-                if (rowItems.size == 1) {
-                    val item = rowItems[0]
-                    val itemIndex = layout.indexOfFirst { it.widgetId == item.widgetId }
-                    val isThisItemDragged = (itemIndex == draggedIndex && itemIndex != -1)
+                            val contentWidth = maxWidth - (DashboardGridDefaults.HORIZONTAL_PADDING * 2)
 
-                    val itemScale by animateFloatAsState(
-                        targetValue = if (isThisItemDragged) 1.04f else 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioLowBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        ),
-                        label = "itemScale_${item.widgetId}"
-                    )
-                    val targetDisplacement = remember(itemIndex, draggedIndex, currentTargetIndex, layout) {
-                        if (itemIndex != -1) {
-                            computeDisplacementForIndex(itemIndex, draggedIndex, currentTargetIndex, layout, density, gapPx)
-                        } else 0f
-                    }
-                    val animatedDisplacement by animateFloatAsState(
-                        targetValue = targetDisplacement,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioLowBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        ),
-                        label = "itemDisplacement_${item.widgetId}"
-                    )
-                    val effectiveOffsetY = if (isThisItemDragged) activeDragY else animatedDisplacement
+                            // Aligned Modular Dot Grid Background (with connecting blueprint lines in edit mode & resize illumination)
+                            DashboardGridBackground(
+                                isEditMode = isEditMode,
+                                packedRows = packedRows,
+                                activeResizeWidgetId = activeResizeWidgetId,
+                                activeResizePreviewSize = activeResizePreviewSize,
+                                scrollY = scrollState.value.toFloat(),
+                                modifier = Modifier.fillMaxSize()
+                            )
 
-                    val widgetWidthModifier = when (item.size.cols) {
-                        1 -> Modifier.width(88.dp)
-                        2 -> Modifier.fillMaxWidth(0.5f)
-                        3 -> Modifier.fillMaxWidth(0.75f)
-                        else -> Modifier.fillMaxWidth()
-                    }
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(scrollState, enabled = draggedIndex == null)
+                                    .padding(
+                                        start = DashboardGridDefaults.HORIZONTAL_PADDING,
+                                        end = DashboardGridDefaults.HORIZONTAL_PADDING,
+                                        top = 2.dp,
+                                        bottom = 32.dp
+                                    )
+                                    .animateContentSize(
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioLowBouncy,
+                                            stiffness = Spring.StiffnessMediumLow
+                                        )
+                                    ),
+                                verticalArrangement = Arrangement.spacedBy(DashboardGridDefaults.GAP)
+                            ) {
+                                // Render Rows of Widgets
+                                packedRows.forEach { rowItems ->
+                                    if (rowItems.size == 1) {
+                                        val item = rowItems[0]
+                                        val itemIndex = layout.indexOfFirst { it.widgetId == item.widgetId }
+                                        val isThisItemDragged = (itemIndex == draggedIndex && itemIndex != -1)
 
-                    key(item.widgetId) {
-                        DashboardWidgetContainer(
-                            item = item,
-                            isEditMode = isEditMode,
-                            onEnterEditMode = { isEditMode = true },
-                            onResize = { newSize ->
-                                updateLayout(DashboardLayoutManager.updateWidgetSize(layout, item.widgetId, newSize))
-                            },
-                            onDragReorderStart = {
-                                if (itemIndex != -1) {
-                                    draggedIndex = itemIndex
-                                    dragOffsetY = 0f
-                                    isDropping = false
-                                }
-                            },
-                            onDragReorderMove = { dy ->
-                                dragOffsetY += dy
-                            },
-                            onDragReorderEnd = {
-                                coroutineScope.launch {
-                                    val d = draggedIndex
-                                    if (d != null && d != -1) {
-                                        try {
-                                            val t = computeTargetIndex(d, dragOffsetY, layout, density, gapPx)
-                                            isDropping = true
-                                            dropAnimOffsetY.snapTo(dragOffsetY)
-                                            if (t != d) {
-                                                val landingOffset = computeLandingOffset(d, t, layout, density, gapPx)
-                                                dropAnimOffsetY.animateTo(
-                                                    targetValue = landingOffset,
+                                        val itemScale by animateFloatAsState(
+                                            targetValue = if (isThisItemDragged) 1.04f else 1f,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                                stiffness = Spring.StiffnessMediumLow
+                                            ),
+                                            label = "itemScale_${item.widgetId}"
+                                        )
+                                        val targetDisplacement = remember(itemIndex, draggedIndex, currentTargetIndex, layout) {
+                                            if (itemIndex != -1) {
+                                                computeDisplacementForIndex(itemIndex, draggedIndex, currentTargetIndex, layout, density, gapPx)
+                                            } else 0f
+                                        }
+                                        val animatedDisplacement by animateFloatAsState(
+                                            targetValue = targetDisplacement,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                                stiffness = Spring.StiffnessMediumLow
+                                            ),
+                                            label = "itemDisplacement_${item.widgetId}"
+                                        )
+                                        val effectiveOffsetY = if (isThisItemDragged) activeDragY else animatedDisplacement
+
+                                        val widgetWidth = DashboardGridDefaults.getWidgetWidth(item.size.cols, contentWidth)
+
+                                        key(item.widgetId) {
+                                            DashboardWidgetContainer(
+                                                item = item,
+                                                isEditMode = isEditMode,
+                                                onEnterEditMode = { isEditMode = true },
+                                                onResize = { newSize ->
+                                                    updateLayout(DashboardLayoutManager.updateWidgetSize(layout, item.widgetId, newSize))
+                                                },
+                                                onResizePreview = { previewSize, _ ->
+                                                    activeResizeWidgetId = if (previewSize != null) item.widgetId else null
+                                                    activeResizePreviewSize = previewSize
+                                                },
+                                                onDragReorderStart = {
+                                                    if (itemIndex != -1) {
+                                                        draggedIndex = itemIndex
+                                                        dragOffsetY = 0f
+                                                        isDropping = false
+                                                    }
+                                                },
+                                                onDragReorderMove = { dy ->
+                                                    dragOffsetY += dy
+                                                },
+                                                onDragReorderEnd = {
+                                                    coroutineScope.launch {
+                                                        val d = draggedIndex
+                                                        if (d != null && d != -1) {
+                                                            try {
+                                                                val t = computeTargetIndex(d, dragOffsetY, layout, density, gapPx)
+                                                                isDropping = true
+                                                                dropAnimOffsetY.snapTo(dragOffsetY)
+                                                                if (t != d) {
+                                                                    val landingOffset = computeLandingOffset(d, t, layout, density, gapPx)
+                                                                    dropAnimOffsetY.animateTo(
+                                                                        targetValue = landingOffset,
+                                                                        animationSpec = spring(
+                                                                            dampingRatio = Spring.DampingRatioLowBouncy,
+                                                                            stiffness = Spring.StiffnessMedium
+                                                                        )
+                                                                    )
+                                                                    val newLayout = DashboardLayoutManager.moveItem(layout, d, t)
+                                                                    updateLayout(newLayout)
+                                                                    triggerDropHaptic()
+                                                                } else {
+                                                                    dropAnimOffsetY.animateTo(0f, spring(Spring.DampingRatioLowBouncy))
+                                                                }
+                                                            } finally {
+                                                                dragOffsetY = 0f
+                                                                dropAnimOffsetY.snapTo(0f)
+                                                                isDropping = false
+                                                                draggedIndex = null
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                modifier = Modifier
+                                                    .width(widgetWidth)
+                                                    .zIndex(if (isThisItemDragged) 100f else 1f)
+                                                    .offset { IntOffset(0, effectiveOffsetY.roundToInt()) }
+                                                    .graphicsLayer {
+                                                        scaleX = itemScale
+                                                        scaleY = itemScale
+                                                        shadowElevation = if (isThisItemDragged) with(density) { 24.dp.toPx() } else 0f
+                                                        shape = RoundedCornerShape(if (item.size.cols == 1 && item.size.rows == 1) 20.dp else 24.dp)
+                                                        clip = false
+                                                    }
+                                            ) { liveSize ->
+                                                RenderDashboardWidgetContent(
+                                                    item = item,
+                                                    liveSize = liveSize,
+                                                    tasks = tasks,
+                                                    onToggleTask = { task -> tasks = TaskManager.toggleTask(context, task.id) },
+                                                    onClearDoneTasks = { tasks = TaskManager.clearDoneTasks(context) },
+                                                    nextTask = nextTask,
+                                                    buddyXp = buddyXp,
+                                                    buddyLevel = buddyLevel,
+                                                    onTaskCreated = { newTask ->
+                                                        tasks = TaskManager.addTask(context, newTask)
+                                                        buddyXp = TaskManager.getBuddyXp(context)
+                                                    },
+                                                    getTouchPosition = { globalTouchPosition.value }
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        // Multiple widgets side-by-side in this row (e.g. Next + Buddy, or Cubes)
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .animateContentSize(
                                                     animationSpec = spring(
                                                         dampingRatio = Spring.DampingRatioLowBouncy,
-                                                        stiffness = Spring.StiffnessMedium
+                                                        stiffness = Spring.StiffnessMediumLow
                                                     )
+                                                ),
+                                            horizontalArrangement = Arrangement.spacedBy(DashboardGridDefaults.GAP),
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            rowItems.forEach { item ->
+                                                val itemIndex = layout.indexOfFirst { it.widgetId == item.widgetId }
+                                                val isThisItemDragged = (itemIndex == draggedIndex && itemIndex != -1)
+
+                                                val itemScale by animateFloatAsState(
+                                                    targetValue = if (isThisItemDragged) 1.04f else 1f,
+                                                    animationSpec = spring(
+                                                        dampingRatio = Spring.DampingRatioLowBouncy,
+                                                        stiffness = Spring.StiffnessMediumLow
+                                                    ),
+                                                    label = "itemScale_${item.widgetId}"
                                                 )
-                                                val newLayout = DashboardLayoutManager.moveItem(layout, d, t)
-                                                updateLayout(newLayout)
-                                                triggerDropHaptic()
-                                            } else {
-                                                dropAnimOffsetY.animateTo(0f, spring(Spring.DampingRatioLowBouncy))
-                                            }
-                                        } finally {
-                                            dragOffsetY = 0f
-                                            dropAnimOffsetY.snapTo(0f)
-                                            isDropping = false
-                                            draggedIndex = null
-                                        }
-                                    }
-                                }
-                            },
-                            modifier = widgetWidthModifier
-                                .zIndex(if (isThisItemDragged) 100f else 1f)
-                                .offset { IntOffset(0, effectiveOffsetY.roundToInt()) }
-                                .graphicsLayer {
-                                    scaleX = itemScale
-                                    scaleY = itemScale
-                                    shadowElevation = if (isThisItemDragged) with(density) { 24.dp.toPx() } else 0f
-                                    shape = RoundedCornerShape(if (item.size.cols == 1 && item.size.rows == 1) 20.dp else 24.dp)
-                                    clip = false
-                                }
-                        ) { liveSize ->
-                            RenderDashboardWidgetContent(
-                                item = item,
-                                liveSize = liveSize,
-                                tasks = tasks,
-                                onToggleTask = { task -> tasks = TaskManager.toggleTask(context, task.id) },
-                                onClearDoneTasks = { tasks = TaskManager.clearDoneTasks(context) },
-                                nextTask = nextTask,
-                                buddyXp = buddyXp,
-                                buddyLevel = buddyLevel,
-                                onTaskCreated = { newTask ->
-                                    tasks = TaskManager.addTask(context, newTask)
-                                    buddyXp = TaskManager.getBuddyXp(context)
-                                },
-                                getTouchPosition = { globalTouchPosition.value }
-                            )
-                        }
-                    }
-                } else {
-                    // Multiple widgets side-by-side in this row (e.g. Next + Buddy, or Cubes)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .animateContentSize(
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioLowBouncy,
-                                    stiffness = Spring.StiffnessMediumLow
-                                )
-                            ),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        rowItems.forEach { item ->
-                            val itemIndex = layout.indexOfFirst { it.widgetId == item.widgetId }
-                            val isThisItemDragged = (itemIndex == draggedIndex && itemIndex != -1)
+                                                val targetDisplacement = remember(itemIndex, draggedIndex, currentTargetIndex, layout) {
+                                                    if (itemIndex != -1) {
+                                                        computeDisplacementForIndex(itemIndex, draggedIndex, currentTargetIndex, layout, density, gapPx)
+                                                    } else 0f
+                                                }
+                                                val animatedDisplacement by animateFloatAsState(
+                                                    targetValue = targetDisplacement,
+                                                    animationSpec = spring(
+                                                        dampingRatio = Spring.DampingRatioLowBouncy,
+                                                        stiffness = Spring.StiffnessMediumLow
+                                                    ),
+                                                    label = "itemDisplacement_${item.widgetId}"
+                                                )
+                                                val effectiveOffsetY = if (isThisItemDragged) activeDragY else animatedDisplacement
 
-                            val itemScale by animateFloatAsState(
-                                targetValue = if (isThisItemDragged) 1.04f else 1f,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioLowBouncy,
-                                    stiffness = Spring.StiffnessMediumLow
-                                ),
-                                label = "itemScale_${item.widgetId}"
-                            )
-                            val targetDisplacement = remember(itemIndex, draggedIndex, currentTargetIndex, layout) {
-                                if (itemIndex != -1) {
-                                    computeDisplacementForIndex(itemIndex, draggedIndex, currentTargetIndex, layout, density, gapPx)
-                                } else 0f
-                            }
-                            val animatedDisplacement by animateFloatAsState(
-                                targetValue = targetDisplacement,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioLowBouncy,
-                                    stiffness = Spring.StiffnessMediumLow
-                                ),
-                                label = "itemDisplacement_${item.widgetId}"
-                            )
-                            val effectiveOffsetY = if (isThisItemDragged) activeDragY else animatedDisplacement
+                                                val itemWidth = DashboardGridDefaults.getWidgetWidth(item.size.cols, contentWidth)
 
-                            val cellModifier = Modifier.weight(item.size.cols.toFloat())
-
-                            key(item.widgetId) {
-                                DashboardWidgetContainer(
-                                    item = item,
-                                    isEditMode = isEditMode,
-                                    onEnterEditMode = { isEditMode = true },
-                                    onResize = { newSize ->
-                                        updateLayout(DashboardLayoutManager.updateWidgetSize(layout, item.widgetId, newSize))
-                                    },
-                                    onDragReorderStart = {
-                                        if (itemIndex != -1) {
-                                            draggedIndex = itemIndex
-                                            dragOffsetY = 0f
-                                            isDropping = false
-                                        }
-                                    },
-                                    onDragReorderMove = { dy ->
-                                        dragOffsetY += dy
-                                    },
-                                    onDragReorderEnd = {
-                                        coroutineScope.launch {
-                                            val d = draggedIndex
-                                            if (d != null && d != -1) {
-                                                try {
-                                                    val t = computeTargetIndex(d, dragOffsetY, layout, density, gapPx)
-                                                    isDropping = true
-                                                    dropAnimOffsetY.snapTo(dragOffsetY)
-                                                    if (t != d) {
-                                                        val landingOffset = computeLandingOffset(d, t, layout, density, gapPx)
-                                                        dropAnimOffsetY.animateTo(
-                                                            targetValue = landingOffset,
-                                                            animationSpec = spring(
-                                                                dampingRatio = Spring.DampingRatioLowBouncy,
-                                                                stiffness = Spring.StiffnessMedium
-                                                            )
+                                                key(item.widgetId) {
+                                                    DashboardWidgetContainer(
+                                                        item = item,
+                                                        isEditMode = isEditMode,
+                                                        onEnterEditMode = { isEditMode = true },
+                                                        onResize = { newSize ->
+                                                            updateLayout(DashboardLayoutManager.updateWidgetSize(layout, item.widgetId, newSize))
+                                                        },
+                                                        onResizePreview = { previewSize, _ ->
+                                                            activeResizeWidgetId = if (previewSize != null) item.widgetId else null
+                                                            activeResizePreviewSize = previewSize
+                                                        },
+                                                        onDragReorderStart = {
+                                                            if (itemIndex != -1) {
+                                                                draggedIndex = itemIndex
+                                                                dragOffsetY = 0f
+                                                                isDropping = false
+                                                            }
+                                                        },
+                                                        onDragReorderMove = { dy ->
+                                                            dragOffsetY += dy
+                                                        },
+                                                        onDragReorderEnd = {
+                                                            coroutineScope.launch {
+                                                                val d = draggedIndex
+                                                                if (d != null && d != -1) {
+                                                                    try {
+                                                                        val t = computeTargetIndex(d, dragOffsetY, layout, density, gapPx)
+                                                                        isDropping = true
+                                                                        dropAnimOffsetY.snapTo(dragOffsetY)
+                                                                        if (t != d) {
+                                                                            val landingOffset = computeLandingOffset(d, t, layout, density, gapPx)
+                                                                            dropAnimOffsetY.animateTo(
+                                                                                targetValue = landingOffset,
+                                                                                animationSpec = spring(
+                                                                                    dampingRatio = Spring.DampingRatioLowBouncy,
+                                                                                    stiffness = Spring.StiffnessMedium
+                                                                                )
+                                                                            )
+                                                                            val newLayout = DashboardLayoutManager.moveItem(layout, d, t)
+                                                                            updateLayout(newLayout)
+                                                                            triggerDropHaptic()
+                                                                        } else {
+                                                                            dropAnimOffsetY.animateTo(0f, spring(Spring.DampingRatioLowBouncy))
+                                                                        }
+                                                                    } finally {
+                                                                        dragOffsetY = 0f
+                                                                        dropAnimOffsetY.snapTo(0f)
+                                                                        isDropping = false
+                                                                        draggedIndex = null
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        modifier = Modifier
+                                                            .width(itemWidth)
+                                                            .zIndex(if (isThisItemDragged) 100f else 1f)
+                                                            .offset { IntOffset(0, effectiveOffsetY.roundToInt()) }
+                                                            .graphicsLayer {
+                                                                scaleX = itemScale
+                                                                scaleY = itemScale
+                                                                shadowElevation = if (isThisItemDragged) with(density) { 24.dp.toPx() } else 0f
+                                                                shape = RoundedCornerShape(if (item.size.cols == 1 && item.size.rows == 1) 20.dp else 24.dp)
+                                                                clip = false
+                                                            }
+                                                    ) { liveSize ->
+                                                        RenderDashboardWidgetContent(
+                                                            item = item,
+                                                            liveSize = liveSize,
+                                                            tasks = tasks,
+                                                            onToggleTask = { task -> tasks = TaskManager.toggleTask(context, task.id) },
+                                                            onClearDoneTasks = { tasks = TaskManager.clearDoneTasks(context) },
+                                                            nextTask = nextTask,
+                                                            buddyXp = buddyXp,
+                                                            buddyLevel = buddyLevel,
+                                                            onTaskCreated = { newTask ->
+                                                                tasks = TaskManager.addTask(context, newTask)
+                                                                buddyXp = TaskManager.getBuddyXp(context)
+                                                            },
+                                                            getTouchPosition = { globalTouchPosition.value }
                                                         )
-                                                        val newLayout = DashboardLayoutManager.moveItem(layout, d, t)
-                                                        updateLayout(newLayout)
-                                                        triggerDropHaptic()
-                                                    } else {
-                                                        dropAnimOffsetY.animateTo(0f, spring(Spring.DampingRatioLowBouncy))
                                                     }
-                                                } finally {
-                                                    dragOffsetY = 0f
-                                                    dropAnimOffsetY.snapTo(0f)
-                                                    isDropping = false
-                                                    draggedIndex = null
                                                 }
                                             }
                                         }
-                                    },
-                                    modifier = cellModifier
-                                        .zIndex(if (isThisItemDragged) 100f else 1f)
-                                        .offset { IntOffset(0, effectiveOffsetY.roundToInt()) }
-                                        .graphicsLayer {
-                                            scaleX = itemScale
-                                            scaleY = itemScale
-                                            shadowElevation = if (isThisItemDragged) with(density) { 24.dp.toPx() } else 0f
-                                            shape = RoundedCornerShape(if (item.size.cols == 1 && item.size.rows == 1) 20.dp else 24.dp)
-                                            clip = false
-                                        }
-                                ) { liveSize ->
-                                    RenderDashboardWidgetContent(
-                                        item = item,
-                                        liveSize = liveSize,
-                                        tasks = tasks,
-                                        onToggleTask = { task -> tasks = TaskManager.toggleTask(context, task.id) },
-                                        onClearDoneTasks = { tasks = TaskManager.clearDoneTasks(context) },
-                                        nextTask = nextTask,
-                                        buddyXp = buddyXp,
-                                        buddyLevel = buddyLevel,
-                                        onTaskCreated = { newTask ->
-                                            tasks = TaskManager.addTask(context, newTask)
-                                            buddyXp = TaskManager.getBuddyXp(context)
-                                        },
-                                        getTouchPosition = { globalTouchPosition.value }
-                                    )
+                                    }
                                 }
-                            }
-                        }
-                        val totalCols = rowItems.sumOf { it.size.cols }
-                        if (totalCols < 4) {
-                            Spacer(modifier = Modifier.weight((4 - totalCols).toFloat()))
-                        }
-                    }
-                }
                             }
                         }
                     }
@@ -884,6 +903,7 @@ fun BlankTabPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .nothingDotGrid()
             .padding(horizontal = 16.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
