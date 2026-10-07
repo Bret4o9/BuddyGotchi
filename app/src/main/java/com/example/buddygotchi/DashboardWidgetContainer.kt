@@ -160,6 +160,15 @@ fun DashboardWidgetContainer(
 
     val cornerRadius = if (item.size.cols == 1) 20.dp else 24.dp
 
+    val widgetContentAlpha by animateFloatAsState(
+        targetValue = if (activeDot != null) 0f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "widgetContentAlpha"
+    )
+
     Box(
         modifier = modifier
             .zIndex(if (activeDot != null || isSettling) 80f else 1f)
@@ -240,7 +249,7 @@ fun DashboardWidgetContainer(
                 if (isEditMode) {
                     Modifier.border(
                         width = 1.5.dp,
-                        color = if (activeDot != null || isSettling) NothingRed else MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                        color = if (activeDot != null) Color.Transparent else if (isSettling) NothingRed else MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
                         shape = RoundedCornerShape(cornerRadius)
                     )
                 } else {
@@ -248,7 +257,7 @@ fun DashboardWidgetContainer(
                 }
             )
     ) {
-        // Main Widget Content (counter-scaled so content NEVER distorts, locked to item.size during drag)
+        // Main Widget Content (hidden with 0% opacity during resize drag so only the preview is shown)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -256,6 +265,7 @@ fun DashboardWidgetContainer(
                     scaleX = 1f / currentStretchX
                     scaleY = 1f / currentStretchY
                     this.transformOrigin = currentTransformOrigin
+                    this.alpha = widgetContentAlpha
                 }
         ) {
             content(item.size)

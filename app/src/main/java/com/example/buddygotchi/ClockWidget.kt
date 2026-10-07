@@ -213,8 +213,8 @@ fun ClockWidget(
     }
 
     val widgetCardHeight = when (stage) {
-        ClockStage.CATEGORY -> 336.dp
-        else -> 276.dp
+        ClockStage.CATEGORY -> DashboardGridDefaults.getWidgetHeight(4)
+        else -> DashboardGridDefaults.getWidgetHeight(3)
     }
 
     WidgetCard(

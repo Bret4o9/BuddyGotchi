@@ -210,10 +210,8 @@ fun DashboardGridBackground(
         val illuminatedDotRadius = 2.0.dp.toPx()
         val baseAlpha = 0.08f + 0.12f * editModeProgress
 
-        // Collect X coordinates across the 4 columns
+        // Collect X coordinates across the 4 columns (strictly on the grid cells, no gap or margin dots)
         val xCoords = mutableListOf<Float>()
-        // Left screen margin dot
-        xCoords.add(horizontalPaddingPx / 2f)
         for (c in 0 until DashboardGridDefaults.COLUMNS) {
             val left = getColLeft(c)
             xCoords.add(left)
@@ -221,14 +219,9 @@ fun DashboardGridBackground(
             xCoords.add(left + unitWPx * (2f / 3f))
             val right = getColRight(c)
             xCoords.add(right)
-            if (c < DashboardGridDefaults.COLUMNS - 1) {
-                xCoords.add(right + gapPx / 2f)
-            }
         }
-        // Right screen margin dot
-        xCoords.add(canvasWidth - horizontalPaddingPx / 2f)
 
-        // For each row, collect Y coordinates
+        // For each row, collect Y coordinates (strictly on the grid cells, no gap dots)
         for (r in 0 until totalGridRows) {
             val top = getRowTop(r)
             if (top > canvasHeight + 20 || top + unitHPx + gapPx < -20) continue
@@ -237,8 +230,7 @@ fun DashboardGridBackground(
                 top,
                 top + unitHPx * (1f / 3f),
                 top + unitHPx * (2f / 3f),
-                getRowBottom(r),
-                getRowBottom(r) + gapPx / 2f
+                getRowBottom(r)
             )
 
             for (y in yCoords) {

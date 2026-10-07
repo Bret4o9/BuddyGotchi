@@ -637,16 +637,7 @@ fun DashboardScreen() {
 }
 
 private fun getItemHeightPx(item: DashboardWidgetItem, density: Density): Float = with(density) {
-    when (item.widgetId) {
-        DashboardWidgetId.CLOCK -> 276.dp.toPx()
-        else -> when (item.size.rows) {
-            1 -> if (item.size.cols == 2) 110.dp.toPx() else 88.dp.toPx()
-            2 -> 180.dp.toPx()
-            3 -> 276.dp.toPx()
-            4 -> 372.dp.toPx()
-            else -> 180.dp.toPx()
-        }
-    }
+    DashboardGridDefaults.getWidgetHeight(item.size).toPx()
 }
 
 private fun computeTargetIndex(
