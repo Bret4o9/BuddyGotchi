@@ -212,9 +212,14 @@ fun ClockWidget(
         }
     }
 
+    val widgetCardHeight = when (stage) {
+        ClockStage.CATEGORY -> 336.dp
+        else -> 276.dp
+    }
+
     WidgetCard(
         title = "",
-        height = 276.dp
+        height = widgetCardHeight
     ) {
         AnimatedContent(
             targetState = stage,
@@ -756,7 +761,9 @@ fun ClockWidget(
 
                 ClockStage.CATEGORY -> {
                     Column(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
