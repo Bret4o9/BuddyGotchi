@@ -345,7 +345,7 @@ fun DashboardScreen() {
                         }
                 ) {
                     when (pageIndex) {
-                    0 -> BlankTabPage(pageNumber = "01", label = "LEFT")
+                    0 -> LeftDashboardPage()
                     1 -> {
                         BoxWithConstraints(
                             modifier = Modifier.fillMaxSize()
