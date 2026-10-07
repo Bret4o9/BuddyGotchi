@@ -67,6 +67,10 @@ fun DashboardWidgetContainer(
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
 
+    val currentItem by rememberUpdatedState(item)
+    val currentOnResize by rememberUpdatedState(onResize)
+    val currentDensity by rememberUpdatedState(density)
+
     val vibrator = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
@@ -309,38 +313,39 @@ fun DashboardWidgetContainer(
             // Helper to handle horizontal drag on Left/Right dots
             fun handleHorizontalDrag(dotType: ResizeDotType, delta: Float) {
                 dragDeltaX += delta
-                val pullDp = with(density) {
+                val pullDp = with(currentDensity) {
                     (if (dotType == ResizeDotType.RIGHT) dragDeltaX else -dragDeltaX).toDp().value
                 }
-                val newPreview = when (item.size) {
+                val currentSize = currentItem.size
+                val newPreview = when (currentSize) {
                     WidgetSize.CUBE -> when {
-                        pullDp > 110f -> WidgetSize.SLIM
-                        pullDp > 35f -> WidgetSize.HALF
+                        pullDp > 60f -> WidgetSize.SLIM
+                        pullDp > 20f -> WidgetSize.HALF
                         else -> WidgetSize.CUBE
                     }
                     WidgetSize.HALF -> when {
-                        pullDp > 55f -> WidgetSize.SLIM
-                        pullDp < -35f -> WidgetSize.CUBE
+                        pullDp > 25f -> WidgetSize.SLIM
+                        pullDp < -20f -> WidgetSize.CUBE
                         else -> WidgetSize.HALF
                     }
                     WidgetSize.SLIM -> when {
-                        pullDp < -100f -> WidgetSize.CUBE
-                        pullDp < -45f -> WidgetSize.HALF
+                        pullDp < -60f -> WidgetSize.CUBE
+                        pullDp < -25f -> WidgetSize.HALF
                         else -> WidgetSize.SLIM
                     }
                     WidgetSize.WIDE -> when {
-                        pullDp < -100f -> WidgetSize.CUBE
-                        pullDp < -45f -> WidgetSize.HALF
+                        pullDp < -60f -> WidgetSize.CUBE
+                        pullDp < -25f -> WidgetSize.HALF
                         else -> WidgetSize.WIDE
                     }
                     WidgetSize.MAX -> when {
-                        pullDp < -120f -> WidgetSize.TALL
-                        pullDp < -50f -> WidgetSize.HALF
+                        pullDp < -70f -> WidgetSize.TALL
+                        pullDp < -30f -> WidgetSize.HALF
                         else -> WidgetSize.MAX
                     }
                     WidgetSize.TALL -> when {
-                        pullDp > 110f -> WidgetSize.MAX
-                        pullDp > 45f -> WidgetSize.HALF
+                        pullDp > 60f -> WidgetSize.MAX
+                        pullDp > 25f -> WidgetSize.WIDE
                         else -> WidgetSize.TALL
                     }
                 }
@@ -353,40 +358,40 @@ fun DashboardWidgetContainer(
             // Helper to handle vertical drag on Top/Bottom dots
             fun handleVerticalDrag(dotType: ResizeDotType, delta: Float) {
                 dragDeltaY += delta
-                val pullDp = with(density) {
+                val pullDp = with(currentDensity) {
                     (if (dotType == ResizeDotType.BOTTOM) dragDeltaY else -dragDeltaY).toDp().value
                 }
-                val newPreview = when (item.size) {
+                val currentSize = currentItem.size
+                val newPreview = when (currentSize) {
                     WidgetSize.CUBE -> when {
-                        pullDp > 90f -> WidgetSize.TALL
-                        pullDp > 35f -> WidgetSize.HALF
+                        pullDp > 25f -> WidgetSize.TALL
                         else -> WidgetSize.CUBE
                     }
-                    WidgetSize.TALL -> when {
-                        pullDp < -50f -> WidgetSize.CUBE
-                        else -> WidgetSize.TALL
-                    }
-                    WidgetSize.SLIM -> when {
-                        pullDp > 110f -> WidgetSize.MAX
-                        pullDp > 45f -> WidgetSize.WIDE
-                        else -> WidgetSize.SLIM
-                    }
                     WidgetSize.HALF -> when {
-                        pullDp > 95f -> WidgetSize.MAX
-                        pullDp > 40f -> WidgetSize.WIDE
-                        pullDp < -25f -> WidgetSize.CUBE
+                        pullDp > 60f -> WidgetSize.MAX
+                        pullDp > 25f -> WidgetSize.WIDE
+                        pullDp < -20f -> WidgetSize.CUBE
                         else -> WidgetSize.HALF
                     }
+                    WidgetSize.SLIM -> when {
+                        pullDp > 60f -> WidgetSize.MAX
+                        pullDp > 25f -> WidgetSize.WIDE
+                        else -> WidgetSize.SLIM
+                    }
                     WidgetSize.WIDE -> when {
-                        pullDp > 45f -> WidgetSize.MAX
-                        pullDp < -40f -> WidgetSize.SLIM
-                        pullDp < -75f -> WidgetSize.CUBE
+                        pullDp > 25f -> WidgetSize.MAX
+                        pullDp < -50f -> WidgetSize.CUBE
+                        pullDp < -25f -> WidgetSize.SLIM
                         else -> WidgetSize.WIDE
                     }
                     WidgetSize.MAX -> when {
-                        pullDp < -95f -> WidgetSize.SLIM
-                        pullDp < -45f -> WidgetSize.WIDE
+                        pullDp < -60f -> WidgetSize.SLIM
+                        pullDp < -25f -> WidgetSize.WIDE
                         else -> WidgetSize.MAX
+                    }
+                    WidgetSize.TALL -> when {
+                        pullDp < -25f -> WidgetSize.CUBE
+                        else -> WidgetSize.TALL
                     }
                 }
                 if (newPreview != livePreviewSize) {
@@ -398,16 +403,22 @@ fun DashboardWidgetContainer(
             fun finishDrag() {
                 if (activeDot == null) return
                 val finalSize = livePreviewSize
-                val oldSize = item.size
+                val oldSize = currentItem.size
 
                 coroutineScope.launch {
                     isSettling = true
-                    animStretchX.snapTo(targetScaleX)
-                    animStretchY.snapTo(targetScaleY)
+
+                    val (oldW, oldH) = getEstimatedSizeDp(oldSize)
+                    val (newW, newH) = getEstimatedSizeDp(finalSize)
+                    val startScaleX = (targetScaleX * (oldW / newW)).coerceIn(0.4f, 2.5f)
+                    val startScaleY = (targetScaleY * (oldH / newH)).coerceIn(0.4f, 2.5f)
+
+                    animStretchX.snapTo(startScaleX)
+                    animStretchY.snapTo(startScaleY)
 
                     if (finalSize != oldSize) {
                         triggerSnap()
-                        onResize(finalSize)
+                        currentOnResize(finalSize)
                     }
 
                     launch {
@@ -445,13 +456,13 @@ fun DashboardWidgetContainer(
                 counterScaleY = 1f / currentStretchY,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .offset(y = (-6).dp)
-                    .pointerInput(Unit) {
+                    .offset(y = (-4).dp)
+                    .pointerInput(item.widgetId, item.size) {
                         detectDragGestures(
                             onDragStart = {
                                 activeDot = ResizeDotType.TOP
                                 dragDeltaY = 0f
-                                livePreviewSize = item.size
+                                livePreviewSize = currentItem.size
                                 triggerTick()
                             },
                             onDrag = { change, dragAmount ->
@@ -473,13 +484,13 @@ fun DashboardWidgetContainer(
                 counterScaleY = 1f / currentStretchY,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .offset(y = 6.dp)
-                    .pointerInput(Unit) {
+                    .offset(y = 4.dp)
+                    .pointerInput(item.widgetId, item.size) {
                         detectDragGestures(
                             onDragStart = {
                                 activeDot = ResizeDotType.BOTTOM
                                 dragDeltaY = 0f
-                                livePreviewSize = item.size
+                                livePreviewSize = currentItem.size
                                 triggerTick()
                             },
                             onDrag = { change, dragAmount ->
@@ -501,13 +512,13 @@ fun DashboardWidgetContainer(
                 counterScaleY = 1f / currentStretchY,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .offset(x = (-6).dp)
-                    .pointerInput(Unit) {
+                    .offset(x = (-4).dp)
+                    .pointerInput(item.widgetId, item.size) {
                         detectDragGestures(
                             onDragStart = {
                                 activeDot = ResizeDotType.LEFT
                                 dragDeltaX = 0f
-                                livePreviewSize = item.size
+                                livePreviewSize = currentItem.size
                                 triggerTick()
                             },
                             onDrag = { change, dragAmount ->
@@ -529,13 +540,13 @@ fun DashboardWidgetContainer(
                 counterScaleY = 1f / currentStretchY,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .offset(x = 6.dp)
-                    .pointerInput(Unit) {
+                    .offset(x = 4.dp)
+                    .pointerInput(item.widgetId, item.size) {
                         detectDragGestures(
                             onDragStart = {
                                 activeDot = ResizeDotType.RIGHT
                                 dragDeltaX = 0f
-                                livePreviewSize = item.size
+                                livePreviewSize = currentItem.size
                                 triggerTick()
                             },
                             onDrag = { change, dragAmount ->
@@ -613,3 +624,13 @@ private fun ResizeDot(
         }
     }
 }
+
+private fun getEstimatedSizeDp(size: WidgetSize): Pair<Float, Float> = when (size) {
+    WidgetSize.CUBE -> Pair(88f, 88f)
+    WidgetSize.HALF -> Pair(170f, 120f)
+    WidgetSize.SLIM -> Pair(360f, 88f)
+    WidgetSize.WIDE -> Pair(360f, 180f)
+    WidgetSize.MAX -> Pair(360f, 276f)
+    WidgetSize.TALL -> Pair(88f, 276f)
+}
+
