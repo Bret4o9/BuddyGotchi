@@ -12,11 +12,19 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,14 +32,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,6 +76,7 @@ fun ClockWidget(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
+    val focusManager = LocalFocusManager.current
 
     val vibrator = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -122,6 +138,8 @@ fun ClockWidget(
     var offsetDragAccumulator by remember { mutableFloatStateOf(0f) }
 
     var selectedCategory by remember { mutableStateOf(TaskCategory.WORK) }
+    var isRecurring by remember { mutableStateOf(false) }
+    var taskDescription by remember { mutableStateOf("") }
 
     val selectedOffsetMinutes = offsetOptions[offsetIndex]
 
@@ -738,14 +756,17 @@ fun ClockWidget(
 
                 ClockStage.CATEGORY -> {
                     Column(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState()),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // Top back button
+                        // Top back button & time summary
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Start
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "← Back to Offset",
@@ -755,74 +776,274 @@ fun ClockWidget(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
                                     .clickable { stage = ClockStage.OFFSET }
-                                    .padding(4.dp)
+                                    .padding(vertical = 4.dp, horizontal = 2.dp)
+                            )
+                            Text(
+                                text = "$displayedTime • -${selectedOffsetMinutes}m",
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.secondary
                             )
                         }
 
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // 1. Above Category: Recurrence Selector (One-Off vs Recurring)
+                        Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
-                                text = "CHOOSE CATEGORY",
-                                fontSize = 12.sp,
+                                text = "TASK TYPE",
+                                fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 2.sp,
-                                color = MaterialTheme.colorScheme.secondary
+                                letterSpacing = 1.5.sp,
+                                color = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                             )
-                            Spacer(modifier = Modifier.height(16.dp))
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                TaskCategory.entries.forEach { category ->
-                                    val isSelected = category == selectedCategory
-                                    Surface(
-                                        shape = RoundedCornerShape(14.dp),
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .clickable {
-                                                selectedCategory = category
-                                                triggerConfirmPulse()
-
-                                                val taskTargetTime = finalCal.time
-                                                val reminderCal = Calendar.getInstance().apply {
-                                                    time = taskTargetTime
-                                                    add(Calendar.MINUTE, -selectedOffsetMinutes)
-                                                }
-                                                val reminderFireTime = reminderCal.time
-
-                                                val task = ReminderTask(
-                                                    taskTime = taskTargetTime,
-                                                    offsetMinutes = selectedOffsetMinutes,
-                                                    reminderTime = reminderFireTime,
-                                                    category = category
-                                                )
-                                                onTaskCreated(task)
-                                                stage = ClockStage.DONE
+                                // ONE-OFF
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            if (isRecurring) {
+                                                isRecurring = false
+                                                triggerTick()
                                             }
+                                        },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (!isRecurring) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                    border = if (!isRecurring) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                                ) {
+                                    Box(
+                                        modifier = Modifier.padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            text = category.label,
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            text = "ONE-OFF",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 1.sp,
+                                            color = if (!isRecurring) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                // RECURRING
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            if (!isRecurring) {
+                                                isRecurring = true
+                                                triggerTick()
+                                            }
+                                        },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isRecurring) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                    border = if (isRecurring) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                                ) {
+                                    Box(
+                                        modifier = Modifier.padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "↻ RECURRING",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 1.sp,
+                                            color = if (isRecurring) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(1.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // 2. Middle: Category Selector (Work, Personal, Other)
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "CATEGORY",
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.5.sp,
+                                color = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TaskCategory.entries.forEach { category ->
+                                    val isSelected = category == selectedCategory
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                        border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                if (selectedCategory != category) {
+                                                    selectedCategory = category
+                                                    triggerTick()
+                                                }
+                                            }
+                                    ) {
+                                        Box(
+                                            modifier = Modifier.padding(vertical = 8.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = category.label,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                letterSpacing = 1.sp,
+                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // 3. Below Category: Task Description Input Field
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "DESCRIPTION",
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.5.sp,
+                                color = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                            )
+                            BasicTextField(
+                                value = taskDescription,
+                                onValueChange = { if (it.length <= 60) taskDescription = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (taskDescription.isNotBlank()) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                textStyle = TextStyle(
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    capitalization = KeyboardCapitalization.Sentences,
+                                    imeAction = ImeAction.Done
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onDone = { focusManager.clearFocus() }
+                                ),
+                                decorationBox = { innerTextField ->
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Box(modifier = Modifier.weight(1f)) {
+                                            if (taskDescription.isEmpty()) {
+                                                Text(
+                                                    text = "e.g. Finish report, workout...",
+                                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = FontWeight.Normal
+                                                )
+                                            }
+                                            innerTextField()
+                                        }
+                                        if (taskDescription.isNotEmpty()) {
+                                            Text(
+                                                text = "✕",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.outline,
+                                                modifier = Modifier
+                                                    .clip(CircleShape)
+                                                    .clickable {
+                                                        taskDescription = ""
+                                                        triggerTick()
+                                                    }
+                                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // 4. Confirm Button
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable {
+                                    focusManager.clearFocus()
+                                    triggerConfirmPulse()
+
+                                    val taskTargetTime = finalCal.time
+                                    val reminderCal = Calendar.getInstance().apply {
+                                        time = taskTargetTime
+                                        add(Calendar.MINUTE, -selectedOffsetMinutes)
+                                    }
+                                    val reminderFireTime = reminderCal.time
+
+                                    val task = ReminderTask(
+                                        taskTime = taskTargetTime,
+                                        offsetMinutes = selectedOffsetMinutes,
+                                        reminderTime = reminderFireTime,
+                                        category = selectedCategory,
+                                        description = taskDescription.trim(),
+                                        isRecurring = isRecurring
+                                    )
+                                    onTaskCreated(task)
+                                    stage = ClockStage.DONE
+                                },
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 10.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "CONFIRM TASK →",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 1.5.sp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        }
                     }
                 }
 
                 ClockStage.DONE -> {
                     LaunchedEffect(Unit) {
                         triggerConfirmPulse()
-                        delay(900L)
+                        delay(950L)
                         // Reset to current real clock
                         val resetCal = Calendar.getInstance()
                         hourFloat = resetCal.get(Calendar.HOUR_OF_DAY).toFloat()
@@ -830,6 +1051,8 @@ fun ClockWidget(
                         offsetIndex = 3
                         selectedDayOffset = 0
                         baseDate = Date()
+                        taskDescription = ""
+                        isRecurring = false
                         stage = ClockStage.TIME
                     }
 
@@ -849,14 +1072,28 @@ fun ClockWidget(
                         Text(
                             text = displayedTime,
                             fontFamily = Dseg7FontFamily,
-                            fontSize = 52.sp,
+                            fontSize = 44.sp,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 2.sp
+                            letterSpacing = 2.sp,
+                            color = MaterialTheme.colorScheme.onBackground
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        if (taskDescription.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = taskDescription.trim().uppercase(Locale.getDefault()),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "$displayedDateLabel • ${selectedCategory.label} (-$selectedOffsetMinutes min)",
-                            fontSize = 13.sp,
+                            text = "$displayedDateLabel • ${if (isRecurring) "↻ REC • " else ""}${selectedCategory.label} (-$selectedOffsetMinutes min)",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.secondary
                         )
                     }

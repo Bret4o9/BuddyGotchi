@@ -17,6 +17,8 @@ object ReminderScheduler {
             putExtra(ReminderReceiver.EXTRA_CATEGORY, task.category.label)
             putExtra(ReminderReceiver.EXTRA_TASK_TIME, task.taskTime.time)
             putExtra(ReminderReceiver.EXTRA_OFFSET_MINUTES, task.offsetMinutes)
+            putExtra(ReminderReceiver.EXTRA_DESCRIPTION, task.description)
+            putExtra(ReminderReceiver.EXTRA_IS_RECURRING, task.isRecurring)
         }
 
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

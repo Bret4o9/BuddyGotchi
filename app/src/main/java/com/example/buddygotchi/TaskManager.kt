@@ -30,6 +30,8 @@ object TaskManager {
                     TaskCategory.WORK
                 }
                 val isCompleted = obj.optBoolean("isCompleted", false)
+                val description = obj.optString("description", "")
+                val isRecurring = obj.optBoolean("isRecurring", false)
 
                 list.add(
                     ReminderTask(
@@ -38,7 +40,9 @@ object TaskManager {
                         offsetMinutes = offsetMinutes,
                         reminderTime = Date(reminderTimeMs),
                         category = category,
-                        isCompleted = isCompleted
+                        isCompleted = isCompleted,
+                        description = description,
+                        isRecurring = isRecurring
                     )
                 )
             }
@@ -56,6 +60,8 @@ object TaskManager {
                 put("reminderTime", task.reminderTime.time)
                 put("category", task.category.name)
                 put("isCompleted", task.isCompleted)
+                put("description", task.description)
+                put("isRecurring", task.isRecurring)
             }
             jsonArray.put(obj)
         }

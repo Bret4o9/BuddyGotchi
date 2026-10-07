@@ -164,14 +164,37 @@ fun TodayWidget(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(
-                                    text = timeFormat.format(task.taskTime),
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                                    color = if (task.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
-                                )
+                                Column(modifier = Modifier.weight(1f, fill = false)) {
+                                    if (task.description.isNotBlank()) {
+                                        Text(
+                                            text = task.description,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                                            color = if (task.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = timeFormat.format(task.taskTime),
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = if (task.description.isNotBlank()) 10.sp else 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                                            color = if (task.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        if (task.isRecurring) {
+                                            Text(
+                                                text = " ↻",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (task.isCompleted) MaterialTheme.colorScheme.outline else NothingRed
+                                            )
+                                        }
+                                    }
+                                }
                                 Text(
                                     text = if (task.isCompleted) "✓" else task.category.label,
                                     fontSize = 10.sp,
@@ -332,7 +355,19 @@ fun TodayWidget(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Column {
+                                Column(modifier = Modifier.weight(1f, fill = false)) {
+                                    if (task.description.isNotBlank()) {
+                                        Text(
+                                            text = task.description,
+                                            fontSize = if (size == WidgetSize.MAX) 15.sp else 13.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                                            color = if (task.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                    }
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         if (dayLabel.isNotEmpty()) {
                                             Text(
@@ -346,11 +381,19 @@ fun TodayWidget(
                                             text = timeFormat.format(task.taskTime),
                                             fontFamily = FontFamily.Monospace,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = if (size == WidgetSize.MAX) 18.sp else 16.sp,
+                                            fontSize = if (task.description.isNotBlank()) 13.sp else if (size == WidgetSize.MAX) 18.sp else 16.sp,
                                             letterSpacing = 1.sp,
                                             textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
                                             color = if (task.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
                                         )
+                                        if (task.isRecurring) {
+                                            Text(
+                                                text = "  ↻",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (task.isCompleted) MaterialTheme.colorScheme.outline else NothingRed
+                                            )
+                                        }
                                     }
                                     if (task.offsetMinutes > 0) {
                                         Text(
@@ -461,7 +504,16 @@ fun NextWidget(
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        if (!isToday) {
+                        if (nextTask.description.isNotBlank()) {
+                            Text(
+                                text = nextTask.description,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        } else if (!isToday) {
                             Text(
                                 text = "Tomorrow",
                                 fontSize = 11.sp,
@@ -471,15 +523,25 @@ fun NextWidget(
                         Text(
                             text = timeFormat.format(nextTask.taskTime),
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 24.sp,
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 2.sp
                         )
-                        Text(
-                            text = nextTask.category.label,
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = nextTask.category.label,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                            if (nextTask.isRecurring) {
+                                Text(
+                                    text = " • ↻",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NothingRed
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -519,13 +581,24 @@ fun NextWidget(
                                 letterSpacing = 1.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            Text(
-                                text = if (isToday) "TODAY" else "TOMORROW",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
+                            Column {
+                                if (nextTask.description.isNotBlank()) {
+                                    Text(
+                                        text = nextTask.description,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Text(
+                                    text = if (isToday) "TODAY" else "TOMORROW",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
                         }
 
                         Box(
@@ -534,7 +607,7 @@ fun NextWidget(
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                         ) {
                             Text(
-                                text = nextTask.category.label.uppercase(Locale.getDefault()),
+                                text = if (nextTask.isRecurring) "↻ ${nextTask.category.label}" else nextTask.category.label.uppercase(Locale.getDefault()),
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
@@ -583,6 +656,16 @@ fun NextWidget(
                                 letterSpacing = 1.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
+                            if (nextTask.description.isNotBlank()) {
+                                Text(
+                                    text = nextTask.description,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
                         }
                         Box(
                             modifier = Modifier
@@ -590,7 +673,7 @@ fun NextWidget(
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                         ) {
                             Text(
-                                text = nextTask.category.label.uppercase(Locale.getDefault()),
+                                text = if (nextTask.isRecurring) "↻ ${nextTask.category.label}" else nextTask.category.label.uppercase(Locale.getDefault()),
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
                                 fontSize = 8.5.sp,
                                 fontWeight = FontWeight.Bold,
@@ -626,12 +709,34 @@ fun NextWidget(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
-                            Text(
-                                text = if (isToday) "Today" else "Tomorrow",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
+                            if (nextTask.description.isNotBlank()) {
+                                Text(
+                                    text = nextTask.description,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (isToday) "Today" else "Tomorrow",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.padding(end = 6.dp)
+                                )
+                                if (nextTask.isRecurring) {
+                                    Text(
+                                        text = "↻ RECURRING",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = NothingRed
+                                    )
+                                }
+                            }
                             Text(
                                 text = timeFormat.format(nextTask.taskTime),
                                 fontFamily = FontFamily.Monospace,

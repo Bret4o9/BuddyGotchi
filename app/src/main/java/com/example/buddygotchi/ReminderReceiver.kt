@@ -32,6 +32,22 @@ class ReminderReceiver : BroadcastReceiver() {
                 AlarmPlayer.stopAlarm()
                 val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 nm.cancel(taskId.hashCode())
+
+                // If task is recurring, advance by 24h and reschedule
+                val tasks = TaskManager.getTasks(context)
+                val task = tasks.find { it.id == taskId }
+                if (task != null && task.isRecurring) {
+                    val nextReminder = Date(task.reminderTime.time + 24 * 60 * 60 * 1000L)
+                    val nextTaskTime = Date(task.taskTime.time + 24 * 60 * 60 * 1000L)
+                    val recurringTask = task.copy(
+                        reminderTime = nextReminder,
+                        taskTime = nextTaskTime,
+                        isCompleted = false
+                    )
+                    val updated = tasks.map { if (it.id == taskId) recurringTask else it }
+                    TaskManager.saveTasks(context, updated)
+                    ReminderScheduler.scheduleReminder(context, recurringTask)
+                }
             }
 
             ACTION_SNOOZE_ALARM -> {
@@ -48,6 +64,8 @@ class ReminderReceiver : BroadcastReceiver() {
                 val categoryLabel = intent.getStringExtra(EXTRA_CATEGORY) ?: "REMINDER"
                 val taskTimeMs = intent.getLongExtra(EXTRA_TASK_TIME, 0L)
                 val offsetMinutes = intent.getIntExtra(EXTRA_OFFSET_MINUTES, 0)
+                val taskDescription = intent.getStringExtra(EXTRA_DESCRIPTION) ?: ""
+                val isRecurring = intent.getBooleanExtra(EXTRA_IS_RECURRING, false)
 
                 // 1. Play looping alarm sound & vibration immediately
                 AlarmPlayer.startAlarm(context, taskId)
@@ -65,6 +83,8 @@ class ReminderReceiver : BroadcastReceiver() {
                     putExtra(AlarmActivity.EXTRA_CATEGORY, categoryLabel)
                     putExtra(AlarmActivity.EXTRA_TASK_TIME, taskTimeMs)
                     putExtra(AlarmActivity.EXTRA_OFFSET_MINUTES, offsetMinutes)
+                    putExtra(AlarmActivity.EXTRA_DESCRIPTION, taskDescription)
+                    putExtra(AlarmActivity.EXTRA_IS_RECURRING, isRecurring)
                 }
                 val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -113,11 +133,23 @@ class ReminderReceiver : BroadcastReceiver() {
                     "Due now at $formattedTaskTime"
                 }
 
+                val notificationTitle = if (taskDescription.isNotBlank()) {
+                    taskDescription
+                } else {
+                    "BuddyGotchi • $categoryLabel"
+                }
+
+                val notificationSubtitle = if (taskDescription.isNotBlank()) {
+                    "$categoryLabel • $message"
+                } else {
+                    message
+                }
+
                 // 6. Build High-Priority Alarm Notification with Full-Screen Alert
                 val notification = NotificationCompat.Builder(context, channelId)
                     .setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle("BuddyGotchi • $categoryLabel")
-                    .setContentText(message)
+                    .setContentTitle(notificationTitle)
+                    .setContentText(notificationSubtitle)
                     .setPriority(NotificationCompat.PRIORITY_MAX)
                     .setCategory(NotificationCompat.CATEGORY_ALARM)
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -167,5 +199,7 @@ class ReminderReceiver : BroadcastReceiver() {
         const val EXTRA_CATEGORY = "com.example.buddygotchi.EXTRA_CATEGORY"
         const val EXTRA_TASK_TIME = "com.example.buddygotchi.EXTRA_TASK_TIME"
         const val EXTRA_OFFSET_MINUTES = "com.example.buddygotchi.EXTRA_OFFSET_MINUTES"
+        const val EXTRA_DESCRIPTION = "com.example.buddygotchi.EXTRA_DESCRIPTION"
+        const val EXTRA_IS_RECURRING = "com.example.buddygotchi.EXTRA_IS_RECURRING"
     }
 }

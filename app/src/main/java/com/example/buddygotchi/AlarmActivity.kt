@@ -57,6 +57,8 @@ class AlarmActivity : ComponentActivity() {
         val taskId = intent.getStringExtra(EXTRA_TASK_ID) ?: ""
         val categoryLabel = intent.getStringExtra(EXTRA_CATEGORY) ?: "TASK"
         val taskTimeMs = intent.getLongExtra(EXTRA_TASK_TIME, 0L)
+        val description = intent.getStringExtra(EXTRA_DESCRIPTION) ?: ""
+        val isRecurring = intent.getBooleanExtra(EXTRA_IS_RECURRING, false)
 
         // Ensure alarm sound is ringing if not started already
         AlarmPlayer.startAlarm(this, taskId)
@@ -66,6 +68,8 @@ class AlarmActivity : ComponentActivity() {
                 AlarmScreen(
                     category = categoryLabel,
                     taskTimeMs = taskTimeMs,
+                    description = description,
+                    isRecurring = isRecurring,
                     onDismiss = {
                         dismissAlarm(taskId)
                     },
@@ -81,6 +85,23 @@ class AlarmActivity : ComponentActivity() {
         AlarmPlayer.stopAlarm()
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.cancel(taskId.hashCode())
+
+        // If recurring, advance by 24h and reschedule
+        val tasks = TaskManager.getTasks(this)
+        val task = tasks.find { it.id == taskId }
+        if (task != null && task.isRecurring) {
+            val nextReminder = Date(task.reminderTime.time + 24 * 60 * 60 * 1000L)
+            val nextTaskTime = Date(task.taskTime.time + 24 * 60 * 60 * 1000L)
+            val recurringTask = task.copy(
+                reminderTime = nextReminder,
+                taskTime = nextTaskTime,
+                isCompleted = false
+            )
+            val updated = tasks.map { if (it.id == taskId) recurringTask else it }
+            TaskManager.saveTasks(this, updated)
+            ReminderScheduler.scheduleReminder(this, recurringTask)
+        }
+
         finish()
     }
 
@@ -102,6 +123,8 @@ class AlarmActivity : ComponentActivity() {
         const val EXTRA_CATEGORY = "com.example.buddygotchi.EXTRA_CATEGORY"
         const val EXTRA_TASK_TIME = "com.example.buddygotchi.EXTRA_TASK_TIME"
         const val EXTRA_OFFSET_MINUTES = "com.example.buddygotchi.EXTRA_OFFSET_MINUTES"
+        const val EXTRA_DESCRIPTION = "com.example.buddygotchi.EXTRA_DESCRIPTION"
+        const val EXTRA_IS_RECURRING = "com.example.buddygotchi.EXTRA_IS_RECURRING"
     }
 }
 
@@ -109,6 +132,8 @@ class AlarmActivity : ComponentActivity() {
 fun AlarmScreen(
     category: String,
     taskTimeMs: Long,
+    description: String = "",
+    isRecurring: Boolean = false,
     onDismiss: () -> Unit,
     onSnooze: () -> Unit
 ) {
@@ -176,7 +201,7 @@ fun AlarmScreen(
                 color = MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Text(
-                    text = category.uppercase(Locale.getDefault()),
+                    text = if (isRecurring) "↻ RECURRING • ${category.uppercase(Locale.getDefault())}" else category.uppercase(Locale.getDefault()),
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -200,6 +225,16 @@ fun AlarmScreen(
                 letterSpacing = 4.sp,
                 color = MaterialTheme.colorScheme.onBackground
             )
+
+            if (description.isNotBlank()) {
+                Text(
+                    text = description.uppercase(Locale.getDefault()),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 2.sp,
+                    color = NothingRed
+                )
+            }
 
             if (formattedScheduledTime.isNotEmpty()) {
                 Text(
