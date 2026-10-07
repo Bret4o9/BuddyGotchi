@@ -28,13 +28,13 @@ fun WidgetCard(
     headerAction: @Composable (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val isCompact = size == WidgetSize.CUBE || size == WidgetSize.TALL
-    val isCube = isCompact
-    val cornerRadius = if (isCompact) 20.dp else 24.dp
-    val internalPadding = when (size) {
-        WidgetSize.CUBE, WidgetSize.TALL -> 8.dp
-        WidgetSize.SLIM -> 10.dp
-        else -> 16.dp
+    val isCompact = size.cols == 1
+    val isCube = size.cols == 1 && size.rows == 1
+    val cornerRadius = if (isCube) 20.dp else 24.dp
+    val internalPadding = when {
+        size.cols == 1 -> 8.dp
+        size.rows == 1 -> 10.dp
+        else -> 14.dp
     }
 
     val animatedHeight by animateDpAsState(

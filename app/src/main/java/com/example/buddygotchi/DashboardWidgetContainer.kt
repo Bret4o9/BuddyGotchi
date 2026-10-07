@@ -157,7 +157,7 @@ fun DashboardWidgetContainer(
     val currentStretchX = if (isSettling) animStretchX.value else targetScaleX
     val currentStretchY = if (isSettling) animStretchY.value else targetScaleY
 
-    val cornerRadius = if (item.size == WidgetSize.CUBE || item.size == WidgetSize.TALL) 20.dp else 24.dp
+    val cornerRadius = if (item.size.cols == 1) 20.dp else 24.dp
 
     Box(
         modifier = modifier
@@ -290,13 +290,14 @@ fun DashboardWidgetContainer(
                                 .background(NothingRed)
                         )
                         Text(
-                            text = when (livePreviewSize) {
-                                WidgetSize.CUBE -> "1×1 CUBE"
-                                WidgetSize.HALF -> "2×1 HALF"
-                                WidgetSize.SLIM -> "4×1 SLIM"
-                                WidgetSize.WIDE -> "4×2 WIDE"
-                                WidgetSize.MAX -> "4×3 MAX"
-                                WidgetSize.TALL -> "1×4 TALL"
+                            text = "${livePreviewSize.cols}×${livePreviewSize.rows}" + when (livePreviewSize) {
+                                WidgetSize.CUBE -> " CUBE"
+                                WidgetSize.HALF -> " HALF"
+                                WidgetSize.SLIM -> " SLIM"
+                                WidgetSize.WIDE -> " WIDE"
+                                WidgetSize.MAX -> " MAX"
+                                WidgetSize.TALL -> " TALL"
+                                else -> ""
                             },
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
@@ -316,39 +317,18 @@ fun DashboardWidgetContainer(
                 val pullDp = with(currentDensity) {
                     (if (dotType == ResizeDotType.RIGHT) dragDeltaX else -dragDeltaX).toDp().value
                 }
-                val currentSize = currentItem.size
-                val newPreview = when (currentSize) {
-                    WidgetSize.CUBE -> when {
-                        pullDp > 60f -> WidgetSize.SLIM
-                        pullDp > 20f -> WidgetSize.HALF
-                        else -> WidgetSize.CUBE
-                    }
-                    WidgetSize.HALF -> when {
-                        pullDp > 25f -> WidgetSize.SLIM
-                        pullDp < -20f -> WidgetSize.CUBE
-                        else -> WidgetSize.HALF
-                    }
-                    WidgetSize.SLIM -> when {
-                        pullDp < -60f -> WidgetSize.CUBE
-                        pullDp < -25f -> WidgetSize.HALF
-                        else -> WidgetSize.SLIM
-                    }
-                    WidgetSize.WIDE -> when {
-                        pullDp < -60f -> WidgetSize.CUBE
-                        pullDp < -25f -> WidgetSize.HALF
-                        else -> WidgetSize.WIDE
-                    }
-                    WidgetSize.MAX -> when {
-                        pullDp < -70f -> WidgetSize.TALL
-                        pullDp < -30f -> WidgetSize.HALF
-                        else -> WidgetSize.MAX
-                    }
-                    WidgetSize.TALL -> when {
-                        pullDp > 60f -> WidgetSize.MAX
-                        pullDp > 25f -> WidgetSize.WIDE
-                        else -> WidgetSize.TALL
-                    }
+                val startCols = currentItem.size.cols
+                val colDelta = when {
+                    pullDp > 75f -> 3
+                    pullDp > 45f -> 2
+                    pullDp > 18f -> 1
+                    pullDp < -75f -> -3
+                    pullDp < -45f -> -2
+                    pullDp < -18f -> -1
+                    else -> 0
                 }
+                val targetCols = (startCols + colDelta).coerceIn(1, 4)
+                val newPreview = WidgetSize.from(targetCols, currentItem.size.rows)
                 if (newPreview != livePreviewSize) {
                     livePreviewSize = newPreview
                     triggerTick()
@@ -361,39 +341,18 @@ fun DashboardWidgetContainer(
                 val pullDp = with(currentDensity) {
                     (if (dotType == ResizeDotType.BOTTOM) dragDeltaY else -dragDeltaY).toDp().value
                 }
-                val currentSize = currentItem.size
-                val newPreview = when (currentSize) {
-                    WidgetSize.CUBE -> when {
-                        pullDp > 25f -> WidgetSize.TALL
-                        else -> WidgetSize.CUBE
-                    }
-                    WidgetSize.HALF -> when {
-                        pullDp > 60f -> WidgetSize.MAX
-                        pullDp > 25f -> WidgetSize.WIDE
-                        pullDp < -20f -> WidgetSize.CUBE
-                        else -> WidgetSize.HALF
-                    }
-                    WidgetSize.SLIM -> when {
-                        pullDp > 60f -> WidgetSize.MAX
-                        pullDp > 25f -> WidgetSize.WIDE
-                        else -> WidgetSize.SLIM
-                    }
-                    WidgetSize.WIDE -> when {
-                        pullDp > 25f -> WidgetSize.MAX
-                        pullDp < -50f -> WidgetSize.CUBE
-                        pullDp < -25f -> WidgetSize.SLIM
-                        else -> WidgetSize.WIDE
-                    }
-                    WidgetSize.MAX -> when {
-                        pullDp < -60f -> WidgetSize.SLIM
-                        pullDp < -25f -> WidgetSize.WIDE
-                        else -> WidgetSize.MAX
-                    }
-                    WidgetSize.TALL -> when {
-                        pullDp < -25f -> WidgetSize.CUBE
-                        else -> WidgetSize.TALL
-                    }
+                val startRows = currentItem.size.rows
+                val rowDelta = when {
+                    pullDp > 75f -> 3
+                    pullDp > 45f -> 2
+                    pullDp > 18f -> 1
+                    pullDp < -75f -> -3
+                    pullDp < -45f -> -2
+                    pullDp < -18f -> -1
+                    else -> 0
                 }
+                val targetRows = (startRows + rowDelta).coerceIn(1, 4)
+                val newPreview = WidgetSize.from(currentItem.size.cols, targetRows)
                 if (newPreview != livePreviewSize) {
                     livePreviewSize = newPreview
                     triggerTick()
@@ -625,12 +584,19 @@ private fun ResizeDot(
     }
 }
 
-private fun getEstimatedSizeDp(size: WidgetSize): Pair<Float, Float> = when (size) {
-    WidgetSize.CUBE -> Pair(88f, 88f)
-    WidgetSize.HALF -> Pair(170f, 120f)
-    WidgetSize.SLIM -> Pair(360f, 88f)
-    WidgetSize.WIDE -> Pair(360f, 180f)
-    WidgetSize.MAX -> Pair(360f, 276f)
-    WidgetSize.TALL -> Pair(88f, 276f)
+private fun getEstimatedSizeDp(size: WidgetSize): Pair<Float, Float> {
+    val w = when (size.cols) {
+        1 -> 88f
+        2 -> 170f
+        3 -> 260f
+        else -> 360f
+    }
+    val h = when (size.rows) {
+        1 -> if (size.cols == 2) 110f else 88f
+        2 -> 180f
+        3 -> 276f
+        else -> 372f
+    }
+    return Pair(w, h)
 }
 

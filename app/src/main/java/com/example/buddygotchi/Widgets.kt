@@ -55,18 +55,21 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
 
+fun getWidgetHeight(size: WidgetSize): Dp = when (size.rows) {
+    1 -> if (size.cols == 2) 110.dp else 88.dp
+    2 -> 180.dp
+    3 -> 276.dp
+    4 -> 372.dp
+    else -> 180.dp
+}
+
 @Composable
 fun TodayWidget(
     tasks: List<ReminderTask> = emptyList(),
     onToggleTask: (ReminderTask) -> Unit = {},
     onClearDoneTasks: () -> Unit = {},
     size: WidgetSize = WidgetSize.WIDE,
-    height: Dp = when (size) {
-        WidgetSize.CUBE, WidgetSize.SLIM -> 88.dp
-        WidgetSize.HALF -> 120.dp
-        WidgetSize.WIDE -> 180.dp
-        WidgetSize.MAX, WidgetSize.TALL -> 276.dp
-    },
+    height: Dp = getWidgetHeight(size),
     modifier: Modifier = Modifier
 ) {
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
@@ -85,7 +88,7 @@ fun TodayWidget(
         size = size,
         modifier = modifier,
         headerAction = {
-            if (hasCompleted && (size == WidgetSize.WIDE || size == WidgetSize.MAX || size == WidgetSize.SLIM)) {
+            if (hasCompleted && (size.cols >= 3 || size.rows >= 2)) {
                 Text(
                     text = "CLEAR DONE",
                     fontSize = 10.sp,
@@ -100,8 +103,8 @@ fun TodayWidget(
             }
         }
     ) {
-        when (size) {
-            WidgetSize.CUBE -> {
+        when {
+            size.cols == 1 && size.rows == 1 -> {
                 // Compact 1x1 Cube Layout
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -135,8 +138,62 @@ fun TodayWidget(
                 }
             }
 
-            WidgetSize.HALF -> {
-                // Compact 2x1 Half-width Layout
+            size.cols == 1 -> {
+                // 1x2, 1x3, 1x4 Vertical Strip Layout (88.dp width)
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "${activeTasks.size}",
+                            fontSize = if (size.rows == 2) 22.sp else 26.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (activeTasks.isEmpty()) MaterialTheme.colorScheme.outline else NothingRed
+                        )
+                        Text(
+                            text = if (activeTasks.isEmpty()) "DONE" else "TASKS",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                    if (tasks.isNotEmpty()) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            tasks.take(size.rows).forEach { task ->
+                                Text(
+                                    text = timeFormat.format(task.taskTime),
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                                    color = if (task.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                    if (hasCompleted) {
+                        Text(
+                            text = "CLEAR",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { onClearDoneTasks() }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+
+            size.cols == 2 -> {
+                // 2x1, 2x2, 2x3, 2x4 Half-width Layout
                 if (tasks.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
@@ -150,7 +207,8 @@ fun TodayWidget(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        tasks.take(2).forEach { task ->
+                        val maxTasks = if (size.rows == 1) 2 else (size.rows * 2)
+                        tasks.take(maxTasks).forEach { task ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -209,8 +267,8 @@ fun TodayWidget(
                 }
             }
 
-            WidgetSize.SLIM -> {
-                // 4x1 Full-width Slim Banner Layout (88.dp)
+            size.rows == 1 -> {
+                // 3x1, 4x1 Full-width Slim Banner Layout
                 Row(
                     modifier = Modifier.fillMaxSize(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -247,71 +305,17 @@ fun TodayWidget(
                 }
             }
 
-            WidgetSize.TALL -> {
-                // 1x4 Vertical Strip Layout (88.dp width, 276.dp height)
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "${activeTasks.size}",
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (activeTasks.isEmpty()) MaterialTheme.colorScheme.outline else NothingRed
-                        )
-                        Text(
-                            text = if (activeTasks.isEmpty()) "DONE" else "TASKS",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-                    if (tasks.isNotEmpty()) {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            tasks.take(4).forEach { task ->
-                                Text(
-                                    text = timeFormat.format(task.taskTime),
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                                    color = if (task.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                    if (hasCompleted) {
-                        Text(
-                            text = "CLEAR",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .clickable { onClearDoneTasks() }
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
-
-            WidgetSize.WIDE, WidgetSize.MAX -> {
-                // Expanded 4x2 or 4x3 MAX Layout
+            else -> {
+                // Expanded 4x2, 4x3, 4x4 or 3x2, 3x3, 3x4 Layout
                 if (tasks.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "No reminders yet",
                                 color = MaterialTheme.colorScheme.outline,
-                                fontSize = if (size == WidgetSize.MAX) 16.sp else 14.sp
+                                fontSize = if (size.rows >= 3) 16.sp else 14.sp
                             )
-                            if (size == WidgetSize.MAX) {
+                            if (size.rows >= 3) {
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     text = "Scroll down to add a new task",
@@ -351,7 +355,7 @@ fun TodayWidget(
                                         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                                     )
                                     .clickable { onToggleTask(task) }
-                                    .padding(horizontal = 12.dp, vertical = if (size == WidgetSize.MAX) 10.dp else 8.dp),
+                                    .padding(horizontal = 12.dp, vertical = if (size.rows >= 3) 10.dp else 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -359,7 +363,7 @@ fun TodayWidget(
                                     if (task.description.isNotBlank()) {
                                         Text(
                                             text = task.description,
-                                            fontSize = if (size == WidgetSize.MAX) 15.sp else 13.5.sp,
+                                            fontSize = if (size.rows >= 3) 15.sp else 13.5.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
                                             color = if (task.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
@@ -381,7 +385,7 @@ fun TodayWidget(
                                             text = timeFormat.format(task.taskTime),
                                             fontFamily = FontFamily.Monospace,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = if (task.description.isNotBlank()) 13.sp else if (size == WidgetSize.MAX) 18.sp else 16.sp,
+                                            fontSize = if (task.description.isNotBlank()) 13.sp else if (size.rows >= 3) 18.sp else 16.sp,
                                             letterSpacing = 1.sp,
                                             textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
                                             color = if (task.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
@@ -431,24 +435,19 @@ fun TodayWidget(
 fun NextWidget(
     nextTask: ReminderTask? = null,
     size: WidgetSize = WidgetSize.HALF,
-    height: Dp = when (size) {
-        WidgetSize.CUBE, WidgetSize.SLIM -> 88.dp
-        WidgetSize.HALF -> 120.dp
-        WidgetSize.WIDE -> 180.dp
-        WidgetSize.MAX, WidgetSize.TALL -> 276.dp
-    },
+    height: Dp = getWidgetHeight(size),
     modifier: Modifier = Modifier
 ) {
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
     WidgetCard(
-        title = if (size == WidgetSize.MAX) "UPCOMING REMINDER" else "NEXT",
+        title = if (size.rows >= 3) "UPCOMING REMINDER" else "NEXT",
         height = height,
         size = size,
         modifier = modifier
     ) {
-        when (size) {
-            WidgetSize.CUBE -> {
+        when {
+            size.cols == 1 && size.rows == 1 -> {
                 // 1x1 Cube Layout
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -483,7 +482,73 @@ fun NextWidget(
                 }
             }
 
-            WidgetSize.HALF -> {
+            size.cols == 1 -> {
+                // 1x2, 1x3, 1x4 Vertical Strip Layout (88.dp width)
+                if (nextTask == null) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "FREE",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.SpaceBetween,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "NEXT",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = timeFormat.format(nextTask.taskTime),
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = if (size.rows == 2) 17.sp else 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (nextTask.description.isNotBlank() && size.rows >= 3) {
+                                Text(
+                                    text = nextTask.description,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                        ) {
+                            Text(
+                                text = if (nextTask.isRecurring) "↻ ${nextTask.category.label}" else nextTask.category.label.uppercase(Locale.getDefault()),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+
+            size.cols == 2 -> {
                 // 2x1 Half-width Layout
                 if (nextTask == null) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -546,7 +611,7 @@ fun NextWidget(
                 }
             }
 
-            WidgetSize.SLIM -> {
+            size.rows == 1 -> {
                 // 4x1 Full-width Slim Banner Layout (88.dp)
                 if (nextTask == null) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -619,73 +684,7 @@ fun NextWidget(
                 }
             }
 
-            WidgetSize.TALL -> {
-                // 1x4 Vertical Strip Layout (88.dp width, 276.dp height)
-                if (nextTask == null) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "FREE",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                    }
-                } else {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.SpaceBetween,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "NEXT",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = timeFormat.format(nextTask.taskTime),
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            if (nextTask.description.isNotBlank()) {
-                                Text(
-                                    text = nextTask.description,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                            }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                        ) {
-                            Text(
-                                text = if (nextTask.isRecurring) "↻ ${nextTask.category.label}" else nextTask.category.label.uppercase(Locale.getDefault()),
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                maxLines = 1
-                            )
-                        }
-                    }
-                }
-            }
-
-            WidgetSize.WIDE -> {
+            size.rows == 2 -> {
                 // 4x2 Wide Layout (180.dp)
                 if (nextTask == null) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -771,7 +770,7 @@ fun NextWidget(
                 }
             }
 
-            WidgetSize.MAX -> {
+            else -> {
                 // 4x3 MAX Layout (276.dp, matching Clock)
                 if (nextTask == null) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -869,8 +868,8 @@ private data class EyeConfig(
 )
 
 private fun getEyeConfig(size: WidgetSize): EyeConfig {
-    return when (size) {
-        WidgetSize.CUBE, WidgetSize.SLIM, WidgetSize.TALL -> EyeConfig(
+    return when {
+        size.cols == 1 || size.rows == 1 -> EyeConfig(
             canvasWidth = 38.dp,
             canvasHeight = 18.dp,
             eyeRadius = 7.dp,
@@ -879,7 +878,7 @@ private fun getEyeConfig(size: WidgetSize): EyeConfig {
             pupilRadius = 3.dp,
             maxTravel = 2.4.dp
         )
-        WidgetSize.HALF -> EyeConfig(
+        size.cols == 2 && size.rows == 2 -> EyeConfig(
             canvasWidth = 56.dp,
             canvasHeight = 26.dp,
             eyeRadius = 11.dp,
@@ -888,7 +887,7 @@ private fun getEyeConfig(size: WidgetSize): EyeConfig {
             pupilRadius = 4.5.dp,
             maxTravel = 4.2.dp
         )
-        WidgetSize.WIDE -> EyeConfig(
+        size.rows == 2 -> EyeConfig(
             canvasWidth = 72.dp,
             canvasHeight = 34.dp,
             eyeRadius = 14.dp,
@@ -897,7 +896,7 @@ private fun getEyeConfig(size: WidgetSize): EyeConfig {
             pupilRadius = 6.dp,
             maxTravel = 5.5.dp
         )
-        WidgetSize.MAX -> EyeConfig(
+        else -> EyeConfig(
             canvasWidth = 110.dp,
             canvasHeight = 50.dp,
             eyeRadius = 22.dp,
@@ -1127,23 +1126,18 @@ fun BuddyWidget(
     xp: Int = 0,
     level: Int = 1,
     size: WidgetSize = WidgetSize.HALF,
-    height: Dp = when (size) {
-        WidgetSize.CUBE, WidgetSize.SLIM -> 88.dp
-        WidgetSize.HALF -> 120.dp
-        WidgetSize.WIDE -> 180.dp
-        WidgetSize.MAX, WidgetSize.TALL -> 276.dp
-    },
+    height: Dp = getWidgetHeight(size),
     getTouchPosition: () -> Offset? = { null },
     modifier: Modifier = Modifier
 ) {
     WidgetCard(
-        title = if (size == WidgetSize.MAX) "BUDDYGOTCHI COMPANION" else "BUDDY",
+        title = if (size.rows >= 3 && size.cols >= 2) "BUDDYGOTCHI COMPANION" else "BUDDY",
         height = height,
         size = size,
         modifier = modifier
     ) {
-        when (size) {
-            WidgetSize.CUBE -> {
+        when {
+            size.cols == 1 && size.rows == 1 -> {
                 // 1x1 Cube Layout
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -1169,7 +1163,58 @@ fun BuddyWidget(
                 }
             }
 
-            WidgetSize.HALF -> {
+            size.cols == 1 -> {
+                // 1x2, 1x3, 1x4 Vertical Strip Layout (88.dp width)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(vertical = if (size.rows == 2) 8.dp else 12.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    BuddyEyes(
+                        size = size,
+                        getTouchPosition = getTouchPosition
+                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "LVL $level",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = if (size.rows == 2) 11.sp else 13.sp,
+                            color = NothingRed
+                        )
+                        Text(
+                            text = "$xp XP",
+                            fontSize = if (size.rows == 2) 9.sp else 10.sp,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                        if (size.rows >= 3) {
+                            val progress = ((xp % 50) / 50f).coerceIn(0f, 1f)
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier
+                                    .width(44.dp)
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp)),
+                                color = NothingRed,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        }
+                    }
+                    Text(
+                        text = "BUDDY",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+
+            size.cols == 2 -> {
                 // 2x1 Half-width Layout
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -1194,8 +1239,8 @@ fun BuddyWidget(
                 }
             }
 
-            WidgetSize.SLIM -> {
-                // 4x1 Full-width Slim Banner Layout (88.dp)
+            size.rows == 1 -> {
+                // 3x1, 4x1 Full-width Slim Banner Layout (88.dp)
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1250,57 +1295,8 @@ fun BuddyWidget(
                 }
             }
 
-            WidgetSize.TALL -> {
-                // 1x4 Vertical Strip Layout (88.dp width, 276.dp height)
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(vertical = 12.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    BuddyEyes(
-                        size = size,
-                        getTouchPosition = getTouchPosition
-                    )
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "LVL $level",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = NothingRed
-                        )
-                        Text(
-                            text = "$xp XP",
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                        val progress = ((xp % 50) / 50f).coerceIn(0f, 1f)
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier
-                                .width(44.dp)
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp)),
-                            color = NothingRed,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    }
-                    Text(
-                        text = "BUDDY",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-            }
-
-            WidgetSize.WIDE -> {
-                // 4x2 Wide Layout (180.dp)
+            size.rows == 2 -> {
+                // 3x2, 4x2 Wide Layout (180.dp)
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1360,7 +1356,7 @@ fun BuddyWidget(
                 }
             }
 
-            WidgetSize.MAX -> {
+            else -> {
                 // 4x3 MAX Layout (276.dp, matching Clock)
                 Column(
                     modifier = Modifier

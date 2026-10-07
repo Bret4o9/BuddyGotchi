@@ -14,13 +14,72 @@ enum class DashboardWidgetId(
     BUDDY("Buddy", canRemove = true)
 }
 
-enum class WidgetSize {
-    CUBE,   // 1x1 cube (88dp x 88dp) - MIN SIZE
-    HALF,   // 2x1 half row (~170dp x 120dp)
-    SLIM,   // 4x1 full width slim banner (~360dp x 88dp)
-    WIDE,   // 4x2 full width (~360dp x 180dp)
-    MAX,    // 4x3 full width (~360dp x 276dp) - MAX SIZE
-    TALL    // 1x4 vertical strip (88dp x 276dp)
+enum class WidgetSize(val cols: Int, val rows: Int) {
+    // 1-column widgets
+    CUBE(1, 1),       // 1x1 cube (88dp x 88dp) - MIN SIZE
+    TALL_1X2(1, 2),   // 1x2 vertical strip (88dp x 180dp)
+    TALL_1X3(1, 3),   // 1x3 vertical strip (88dp x 276dp)
+    TALL(1, 4),       // 1x4 vertical strip (88dp x 372dp)
+
+    // 2-column widgets
+    HALF(2, 1),       // 2x1 half row (~170dp x 110dp)
+    HALF_2X2(2, 2),   // 2x2 half block (~170dp x 180dp)
+    HALF_2X3(2, 3),   // 2x3 half tall (~170dp x 276dp)
+    HALF_2X4(2, 4),   // 2x4 half tower (~170dp x 372dp)
+
+    // 3-column widgets
+    COL3_1(3, 1),     // 3x1 (3/4 width x 88dp)
+    COL3_2(3, 2),     // 3x2 (3/4 width x 180dp)
+    COL3_3(3, 3),     // 3x3 (3/4 width x 276dp)
+    COL3_4(3, 4),     // 3x4 (3/4 width x 372dp)
+
+    // 4-column (full width) widgets
+    SLIM(4, 1),       // 4x1 full width slim banner (~360dp x 88dp)
+    WIDE(4, 2),       // 4x2 full width (~360dp x 180dp)
+    MAX(4, 3),        // 4x3 full width (~360dp x 276dp)
+    MAX_4X4(4, 4);    // 4x4 full width (~360dp x 372dp)
+
+    val label: String get() = "${cols}x${rows}"
+
+    companion object {
+        fun from(cols: Int, rows: Int): WidgetSize {
+            val c = cols.coerceIn(1, 4)
+            val r = rows.coerceIn(1, 4)
+            return entries.firstOrNull { it.cols == c && it.rows == r } ?: when (c) {
+                1 -> when (r) { 1 -> CUBE; 2 -> TALL_1X2; 3 -> TALL_1X3; else -> TALL }
+                2 -> when (r) { 1 -> HALF; 2 -> HALF_2X2; 3 -> HALF_2X3; else -> HALF_2X4 }
+                3 -> when (r) { 1 -> COL3_1; 2 -> COL3_2; 3 -> COL3_3; else -> COL3_4 }
+                else -> when (r) { 1 -> SLIM; 2 -> WIDE; 3 -> MAX; else -> MAX_4X4 }
+            }
+        }
+
+        fun parse(str: String): WidgetSize {
+            return try {
+                valueOf(str)
+            } catch (_: Exception) {
+                when (str) {
+                    "1x1" -> CUBE
+                    "1x2" -> TALL_1X2
+                    "1x3" -> TALL_1X3
+                    "1x4" -> TALL
+                    "2x1" -> HALF
+                    "2x2" -> HALF_2X2
+                    "2x3" -> HALF_2X3
+                    "2x4" -> HALF_2X4
+                    "3x1" -> COL3_1
+                    "3x2" -> COL3_2
+                    "3x3" -> COL3_3
+                    "3x4" -> COL3_4
+                    "4x1" -> SLIM
+                    "4x2" -> WIDE
+                    "4x3" -> MAX
+                    "4x4" -> MAX_4X4
+                    "FULL" -> WIDE
+                    else -> WIDE
+                }
+            }
+        }
+    }
 }
 
 data class DashboardWidgetItem(
@@ -62,16 +121,7 @@ object DashboardLayoutManager {
                     val idStr = obj.optString("widget", "")
                     val sizeStr = obj.optString("size", "WIDE")
                     val id = try { DashboardWidgetId.valueOf(idStr) } catch (_: Exception) { null }
-                    val size = when (sizeStr) {
-                        "CUBE" -> WidgetSize.CUBE
-                        "HALF" -> WidgetSize.HALF
-                        "SLIM" -> WidgetSize.SLIM
-                        "TALL" -> WidgetSize.TALL
-                        "WIDE" -> WidgetSize.WIDE
-                        "MAX" -> WidgetSize.MAX
-                        "FULL" -> WidgetSize.WIDE
-                        else -> WidgetSize.WIDE
-                    }
+                    val size = WidgetSize.parse(sizeStr)
                     if (id != null) {
                         list.add(DashboardWidgetItem(id, if (id == DashboardWidgetId.CLOCK) WidgetSize.MAX else size))
                     }
@@ -168,11 +218,7 @@ object DashboardLayoutManager {
         var currentUnits = 0
 
         for (item in items) {
-            val units = when (item.size) {
-                WidgetSize.MAX, WidgetSize.WIDE, WidgetSize.SLIM -> 4
-                WidgetSize.HALF -> 2
-                WidgetSize.CUBE, WidgetSize.TALL -> 1
-            }
+            val units = item.size.cols
             if (currentUnits + units > 4) {
                 if (currentRow.isNotEmpty()) {
                     rows.add(currentRow)

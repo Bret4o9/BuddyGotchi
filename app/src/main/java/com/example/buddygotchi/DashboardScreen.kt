@@ -393,10 +393,11 @@ fun DashboardScreen() {
                     )
                     val effectiveOffsetY = if (isThisItemDragged) activeDragY else animatedDisplacement
 
-                    val widgetWidthModifier = when (item.size) {
-                        WidgetSize.CUBE, WidgetSize.TALL -> Modifier.width(88.dp)
-                        WidgetSize.HALF -> Modifier.fillMaxWidth(0.5f)
-                        WidgetSize.WIDE, WidgetSize.MAX, WidgetSize.SLIM -> Modifier.fillMaxWidth()
+                    val widgetWidthModifier = when (item.size.cols) {
+                        1 -> Modifier.width(88.dp)
+                        2 -> Modifier.fillMaxWidth(0.5f)
+                        3 -> Modifier.fillMaxWidth(0.75f)
+                        else -> Modifier.fillMaxWidth()
                     }
 
                     key(item.widgetId) {
@@ -456,7 +457,7 @@ fun DashboardScreen() {
                                     scaleX = itemScale
                                     scaleY = itemScale
                                     shadowElevation = if (isThisItemDragged) with(density) { 24.dp.toPx() } else 0f
-                                    shape = RoundedCornerShape(if (item.size == WidgetSize.CUBE) 20.dp else 24.dp)
+                                    shape = RoundedCornerShape(if (item.size.cols == 1 && item.size.rows == 1) 20.dp else 24.dp)
                                     clip = false
                                 }
                         ) { liveSize ->
@@ -518,11 +519,7 @@ fun DashboardScreen() {
                             )
                             val effectiveOffsetY = if (isThisItemDragged) activeDragY else animatedDisplacement
 
-                            val cellModifier = if (item.size == WidgetSize.CUBE || item.size == WidgetSize.TALL) {
-                                Modifier.width(88.dp)
-                            } else {
-                                Modifier.weight(1f)
-                            }
+                            val cellModifier = Modifier.weight(item.size.cols.toFloat())
 
                             key(item.widgetId) {
                                 DashboardWidgetContainer(
@@ -581,7 +578,7 @@ fun DashboardScreen() {
                                             scaleX = itemScale
                                             scaleY = itemScale
                                             shadowElevation = if (isThisItemDragged) with(density) { 24.dp.toPx() } else 0f
-                                            shape = RoundedCornerShape(if (item.size == WidgetSize.CUBE) 20.dp else 24.dp)
+                                            shape = RoundedCornerShape(if (item.size.cols == 1 && item.size.rows == 1) 20.dp else 24.dp)
                                             clip = false
                                         }
                                 ) { liveSize ->
@@ -603,6 +600,10 @@ fun DashboardScreen() {
                                 }
                             }
                         }
+                        val totalCols = rowItems.sumOf { it.size.cols }
+                        if (totalCols < 4) {
+                            Spacer(modifier = Modifier.weight((4 - totalCols).toFloat()))
+                        }
                     }
                 }
                             }
@@ -619,11 +620,12 @@ fun DashboardScreen() {
 private fun getItemHeightPx(item: DashboardWidgetItem, density: Density): Float = with(density) {
     when (item.widgetId) {
         DashboardWidgetId.CLOCK -> 276.dp.toPx()
-        else -> when (item.size) {
-            WidgetSize.CUBE, WidgetSize.SLIM -> 88.dp.toPx()
-            WidgetSize.HALF -> 120.dp.toPx()
-            WidgetSize.WIDE -> 180.dp.toPx()
-            WidgetSize.MAX, WidgetSize.TALL -> 276.dp.toPx()
+        else -> when (item.size.rows) {
+            1 -> if (item.size.cols == 2) 110.dp.toPx() else 88.dp.toPx()
+            2 -> 180.dp.toPx()
+            3 -> 276.dp.toPx()
+            4 -> 372.dp.toPx()
+            else -> 180.dp.toPx()
         }
     }
 }
