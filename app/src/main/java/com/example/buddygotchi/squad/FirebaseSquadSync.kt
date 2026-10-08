@@ -104,6 +104,7 @@ object FirebaseSquadSync {
 
         docRef.get().addOnSuccessListener { snapshot ->
             if (!snapshot.exists()) return@addOnSuccessListener
+            @Suppress("UNCHECKED_CAST")
             val rawList = snapshot.get("participants") as? List<Map<String, Any>> ?: return@addOnSuccessListener
             val updatedList = rawList.map { p ->
                 if (p["buddyCode"] == buddyCode) {
@@ -152,6 +153,7 @@ object FirebaseSquadSync {
                         val hostName = doc.getString("hostDisplayName") ?: ""
                         val isCancelled = doc.getBoolean("isCancelled") ?: false
 
+                        @Suppress("UNCHECKED_CAST")
                         val rawParticipants = doc.get("participants") as? List<Map<String, Any>> ?: emptyList()
                         val participants = rawParticipants.map { p ->
                             EventParticipant(
