@@ -43,7 +43,11 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.text.font.FontFamily
+import com.example.buddygotchi.ui.theme.NothingBorder
 import com.example.buddygotchi.ui.theme.NothingRed
+import com.example.buddygotchi.ui.theme.NothingWhite
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
@@ -60,6 +64,7 @@ fun DashboardWidgetContainer(
     onDragReorderMove: (dragY: Float) -> Unit,
     onDragReorderEnd: () -> Unit,
     onResizePreview: ((WidgetSize?, ResizeDotType?) -> Unit)? = null,
+    onStashToShelf: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     content: @Composable (liveSize: WidgetSize) -> Unit
 ) {
@@ -314,6 +319,50 @@ fun DashboardWidgetContainer(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp,
                             color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+
+        // Floating "SHELF ↘" stash button in Edit Mode (removes widget from page to shelf)
+        if (isEditMode && item.widgetId.canRemove && onStashToShelf != null && activeDot == null && !isSettling) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .zIndex(120f)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xEE181818),
+                    border = BorderStroke(1.dp, NothingBorder),
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable {
+                            triggerSnap()
+                            onStashToShelf.invoke()
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(4.dp)
+                                .clip(CircleShape)
+                                .background(NothingRed)
+                        )
+                        Text(
+                            text = "SHELF ↘",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp,
+                            color = NothingWhite
                         )
                     }
                 }

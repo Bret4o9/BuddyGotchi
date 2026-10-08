@@ -151,10 +151,45 @@ fun DashboardScreen() {
     var activeResizeWidgetId by remember { mutableStateOf<DashboardWidgetId?>(null) }
     var activeResizePreviewSize by remember { mutableStateOf<WidgetSize?>(null) }
 
+    var leftLayout by remember {
+        mutableStateOf(LeftDashboardLayoutManager.loadLayout(context))
+    }
+
+    fun updateLeftLayout(newLayout: List<DashboardWidgetItem>) {
+        leftLayout = newLayout
+        LeftDashboardLayoutManager.saveLayout(context, newLayout)
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+
+    var notes by remember { mutableStateOf(NotesManager.getNotes(context)) }
+
     fun updateLayout(newLayout: List<DashboardWidgetItem>) {
         layout = newLayout
         DashboardLayoutManager.saveLayout(context, newLayout)
         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+
+    var isShelfOpen by remember { mutableStateOf(false) }
+
+    val shelfWidgets = remember(layout, leftLayout) {
+        DashboardLayoutManager.getShelfWidgets(layout, leftLayout)
+    }
+
+    fun deployWidget(widgetId: DashboardWidgetId, targetPage: Int) {
+        when (targetPage) {
+            0 -> {
+                val newLeft = LeftDashboardLayoutManager.addWidget(leftLayout, widgetId)
+                updateLeftLayout(newLeft)
+            }
+            1 -> {
+                val newMain = DashboardLayoutManager.addWidget(layout, widgetId)
+                updateLayout(newMain)
+            }
+            else -> {
+                val newLeft = LeftDashboardLayoutManager.addWidget(leftLayout, widgetId)
+                updateLeftLayout(newLeft)
+            }
+        }
     }
 
     val unusedWidgets = remember(layout) {
@@ -306,6 +341,18 @@ fun DashboardScreen() {
                 }
             }
 
+            // Shelf Strip (resides below the title and above the widgets grid)
+            ShelfStrip(
+                isOpen = isShelfOpen,
+                stashedCount = shelfWidgets.size,
+                onClick = { isShelfOpen = !isShelfOpen },
+                modifier = Modifier.padding(
+                    start = 16.dp,
+                    end = 16.dp,
+                    bottom = 4.dp
+                )
+            )
+
             // HorizontalPager holding Left Page, Main Dashboard, Right Page
             HorizontalPager(
                 state = pagerState,
@@ -347,6 +394,10 @@ fun DashboardScreen() {
                 ) {
                     when (pageIndex) {
                     0 -> LeftDashboardPage(
+                        layout = leftLayout,
+                        onUpdateLayout = { updateLeftLayout(it) },
+                        notes = notes,
+                        onNotesUpdated = { notes = it },
                         isEditMode = isEditMode,
                         onSetEditMode = { isEditMode = it },
                         onNotesExpandedChanged = { isNotesExpanded = it }
@@ -428,6 +479,9 @@ fun DashboardScreen() {
                                                 onResizePreview = { previewSize, _ ->
                                                     activeResizeWidgetId = if (previewSize != null) item.widgetId else null
                                                     activeResizePreviewSize = previewSize
+                                                },
+                                                onStashToShelf = {
+                                                    updateLayout(DashboardLayoutManager.removeWidget(layout, item.widgetId))
                                                 },
                                                 onDragReorderStart = {
                                                     if (itemIndex != -1) {
@@ -555,6 +609,9 @@ fun DashboardScreen() {
                                                             activeResizeWidgetId = if (previewSize != null) item.widgetId else null
                                                             activeResizePreviewSize = previewSize
                                                         },
+                                                        onStashToShelf = {
+                                                            updateLayout(DashboardLayoutManager.removeWidget(layout, item.widgetId))
+                                                        },
                                                         onDragReorderStart = {
                                                             if (itemIndex != -1) {
                                                                 draggedIndex = itemIndex
@@ -638,6 +695,42 @@ fun DashboardScreen() {
             }
         }
     }
+
+    // Shelf Overlay (extends down over everything else when opened)
+    ShelfOverlay(
+        isOpen = isShelfOpen,
+        shelfWidgets = shelfWidgets,
+        currentPageIndex = pagerState.currentPage,
+        onClose = { isShelfOpen = false },
+        onDeployWidget = { widgetId, targetPage ->
+            deployWidget(widgetId, targetPage)
+        },
+        tasks = tasks,
+        onToggleTask = { task -> tasks = TaskManager.toggleTask(context, task.id) },
+        onClearDoneTasks = { tasks = TaskManager.clearDoneTasks(context) },
+        nextTask = nextTask,
+        buddyXp = buddyXp,
+        buddyLevel = buddyLevel,
+        notes = notes,
+        onExpandNotes = {
+            isShelfOpen = false
+            coroutineScope.launch {
+                pagerState.animateScrollToPage(0)
+            }
+        },
+        onQuickCreateNote = {
+            val newNote = NoteItem(
+                title = "",
+                content = "",
+                updatedAt = System.currentTimeMillis()
+            )
+            notes = NotesManager.upsertNote(context, newNote)
+            isShelfOpen = false
+            coroutineScope.launch {
+                pagerState.animateScrollToPage(0)
+            }
+        }
+    )
 }
 }
 

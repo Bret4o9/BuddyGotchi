@@ -235,8 +235,13 @@ object DashboardLayoutManager {
 
     fun getUnusedWidgets(layout: List<DashboardWidgetItem>): List<DashboardWidgetId> {
         return DashboardWidgetId.entries.filter { id ->
-            id != DashboardWidgetId.CLOCK && id != DashboardWidgetId.WATER && id != DashboardWidgetId.NOTES && !layout.any { it.widgetId == id }
+            id != DashboardWidgetId.CLOCK && !layout.any { it.widgetId == id }
         }
+    }
+
+    fun getShelfWidgets(mainLayout: List<DashboardWidgetItem>, leftLayout: List<DashboardWidgetItem>): List<DashboardWidgetId> {
+        val deployed = (mainLayout.map { it.widgetId } + leftLayout.map { it.widgetId }).toSet()
+        return DashboardWidgetId.entries.filter { it != DashboardWidgetId.CLOCK && it !in deployed }
     }
 
     /**
@@ -272,12 +277,9 @@ object DashboardLayoutManager {
 }
 
 object LeftDashboardLayoutManager {
-    private const val PREFS_KEY_LEFT_LAYOUT = "left_dashboard_widget_layout_v1"
+    private const val PREFS_KEY_LEFT_LAYOUT = "left_dashboard_widget_layout_v2"
 
-    fun getDefaultLayout(): List<DashboardWidgetItem> = listOf(
-        DashboardWidgetItem(DashboardWidgetId.WATER, WidgetSize.MAX), // 4x3 full water tracker
-        DashboardWidgetItem(DashboardWidgetId.NOTES, WidgetSize.WIDE)  // 4x2 notes card
-    )
+    fun getDefaultLayout(): List<DashboardWidgetItem> = emptyList() // Water and Notes start in the Shelf!
 
     fun loadLayout(context: Context): List<DashboardWidgetItem> {
         val prefs = context.getSharedPreferences("buddygotchi_prefs", Context.MODE_PRIVATE)
@@ -295,7 +297,7 @@ object LeftDashboardLayoutManager {
                     list.add(DashboardWidgetItem(id, size))
                 }
             }
-            if (list.isEmpty()) getDefaultLayout() else list
+            list
         } catch (_: Exception) {
             getDefaultLayout()
         }
@@ -317,6 +319,23 @@ object LeftDashboardLayoutManager {
         return layout.map { item ->
             if (item.widgetId == widgetId) item.copy(size = newSize) else item
         }
+    }
+
+    fun addWidget(layout: List<DashboardWidgetItem>, widgetId: DashboardWidgetId, defaultSize: WidgetSize? = null): List<DashboardWidgetItem> {
+        if (layout.any { it.widgetId == widgetId }) return layout
+        val size = defaultSize ?: when (widgetId) {
+            DashboardWidgetId.WATER -> WidgetSize.MAX
+            DashboardWidgetId.NOTES -> WidgetSize.WIDE
+            DashboardWidgetId.TODAY -> WidgetSize.WIDE
+            DashboardWidgetId.NEXT -> WidgetSize.HALF
+            DashboardWidgetId.BUDDY -> WidgetSize.HALF
+            DashboardWidgetId.CLOCK -> WidgetSize.MAX
+        }
+        return layout + DashboardWidgetItem(widgetId, size)
+    }
+
+    fun removeWidget(layout: List<DashboardWidgetItem>, widgetId: DashboardWidgetId): List<DashboardWidgetItem> {
+        return layout.filter { it.widgetId != widgetId }
     }
 
     fun moveItem(layout: List<DashboardWidgetItem>, fromIndex: Int, toIndex: Int): List<DashboardWidgetItem> {

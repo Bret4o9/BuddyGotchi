@@ -13,26 +13,36 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.example.buddygotchi.ui.DashboardGridBackground
-import com.example.buddygotchi.ui.theme.NothingDarkBackground
+import com.example.buddygotchi.ui.theme.*
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
 fun LeftDashboardPage(
+    layout: List<DashboardWidgetItem>,
+    onUpdateLayout: (List<DashboardWidgetItem>) -> Unit,
+    notes: List<NoteItem>,
+    onNotesUpdated: (List<NoteItem>) -> Unit,
     isEditMode: Boolean = false,
     onSetEditMode: (Boolean) -> Unit = {},
     onNotesExpandedChanged: (Boolean) -> Unit = {},
@@ -65,14 +75,9 @@ fun LeftDashboardPage(
         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
 
-    var notes by remember { mutableStateOf(NotesManager.getNotes(context)) }
     var isNotesExpanded by remember { mutableStateOf(false) }
     var initialEditingNoteId by remember { mutableStateOf<String?>(null) }
     val scrollState = rememberScrollState()
-
-    var layout by remember {
-        mutableStateOf(LeftDashboardLayoutManager.loadLayout(context))
-    }
 
     val packedRows = remember(layout) {
         LeftDashboardLayoutManager.packIntoRows(layout)
@@ -100,7 +105,7 @@ fun LeftDashboardPage(
     }
 
     fun updateLayout(newLayout: List<DashboardWidgetItem>) {
-        layout = newLayout
+        onUpdateLayout(newLayout)
         LeftDashboardLayoutManager.saveLayout(context, newLayout)
         triggerDropHaptic()
     }
@@ -137,7 +142,7 @@ fun LeftDashboardPage(
                     notes = notes,
                     initialEditingNoteId = initialEditingNoteId,
                     onNotesUpdated = { updated ->
-                        notes = updated
+                        onNotesUpdated(updated)
                     },
                     onCollapse = {
                         isNotesExpanded = false
@@ -181,6 +186,42 @@ fun LeftDashboardPage(
                             ),
                         verticalArrangement = Arrangement.spacedBy(DashboardGridDefaults.GAP)
                     ) {
+                        if (layout.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 90.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .clip(CircleShape)
+                                            .background(NothingRed)
+                                    )
+                                    Text(
+                                        text = "NO WIDGETS DEPLOYED",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.5.sp,
+                                        color = NothingTextSecondary
+                                    )
+                                    Text(
+                                        text = "PULL DOWN SHELF ABOVE TO DEPLOY WIDGETS",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 8.5.sp,
+                                        color = NothingTextTertiary,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                            }
+                        }
+
                         // Render Rows of Widgets
                         packedRows.forEach { rowItems ->
                             if (rowItems.size == 1) {
@@ -224,6 +265,9 @@ fun LeftDashboardPage(
                                         onResizePreview = { previewSize, _ ->
                                             activeResizeWidgetId = if (previewSize != null) item.widgetId else null
                                             activeResizePreviewSize = previewSize
+                                        },
+                                        onStashToShelf = {
+                                            updateLayout(LeftDashboardLayoutManager.removeWidget(layout, item.widgetId))
                                         },
                                         onDragReorderStart = {
                                             if (itemIndex != -1) {
@@ -300,7 +344,7 @@ fun LeftDashboardPage(
                                                                 content = "",
                                                                 updatedAt = System.currentTimeMillis()
                                                             )
-                                                            notes = NotesManager.upsertNote(context, newNote)
+                                                            onNotesUpdated(NotesManager.upsertNote(context, newNote))
                                                             initialEditingNoteId = newNote.id
                                                             isNotesExpanded = true
                                                             onNotesExpandedChanged(true)
@@ -369,6 +413,9 @@ fun LeftDashboardPage(
                                                 onResizePreview = { previewSize, _ ->
                                                     activeResizeWidgetId = if (previewSize != null) item.widgetId else null
                                                     activeResizePreviewSize = previewSize
+                                                },
+                                                onStashToShelf = {
+                                                    updateLayout(LeftDashboardLayoutManager.removeWidget(layout, item.widgetId))
                                                 },
                                                 onDragReorderStart = {
                                                     if (itemIndex != -1) {
@@ -445,7 +492,7 @@ fun LeftDashboardPage(
                                                                         content = "",
                                                                         updatedAt = System.currentTimeMillis()
                                                                     )
-                                                                    notes = NotesManager.upsertNote(context, newNote)
+                                                                    onNotesUpdated(NotesManager.upsertNote(context, newNote))
                                                                     initialEditingNoteId = newNote.id
                                                                     isNotesExpanded = true
                                                                     onNotesExpandedChanged(true)
