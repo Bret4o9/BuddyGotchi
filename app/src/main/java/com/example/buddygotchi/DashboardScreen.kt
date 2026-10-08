@@ -50,6 +50,7 @@ import androidx.compose.ui.zIndex
 import com.example.buddygotchi.ui.nothingDotGrid
 import com.example.buddygotchi.ui.DashboardGridBackground
 import com.example.buddygotchi.ui.theme.*
+import com.example.buddygotchi.squad.SquadDashboardPage
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -690,7 +691,7 @@ fun DashboardScreen() {
                             }
                         }
                     }
-                    2 -> BlankTabPage(pageNumber = "03", label = "RIGHT")
+                    2 -> SquadDashboardPage()
                 }
             }
         }
@@ -884,7 +885,7 @@ fun PageDrumRollIndicator(
         listOf(
             PageTabInfo("01", "LEFT"),
             PageTabInfo("02", "MAIN"),
-            PageTabInfo("03", "RIGHT")
+            PageTabInfo("03", "SQUAD")
         )
     }
 
