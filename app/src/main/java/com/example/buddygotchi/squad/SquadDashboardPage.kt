@@ -603,11 +603,20 @@ fun SquadDashboardPage(
         AddFriendDialog(
             onDismiss = { showAddFriendDialog = false },
             onAddFriend = { code, name ->
-                friends = SquadManager.getFriends(context).toMutableList().also {
-                    val added = SquadManager.addFriend(context, code, name)
-                }
+                SquadManager.addFriend(context, code, name)
                 friends = SquadManager.getFriends(context)
                 Toast.makeText(context, "SQUAD BUDDY ADDED", Toast.LENGTH_SHORT).show()
+                FirebaseSquadSync.findUserByBuddyCode(code) { cloudBuddy ->
+                    if (cloudBuddy != null) {
+                        val current = SquadManager.getFriends(context).toMutableList()
+                        val idx = current.indexOfFirst { it.buddyCode == cloudBuddy.buddyCode }
+                        if (idx >= 0) {
+                            current[idx] = cloudBuddy
+                            SquadManager.saveFriends(context, current)
+                            friends = current
+                        }
+                    }
+                }
             }
         )
     }
