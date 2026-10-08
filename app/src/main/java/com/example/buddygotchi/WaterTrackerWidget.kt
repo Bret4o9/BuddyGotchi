@@ -184,7 +184,7 @@ fun WaterTrackerWidget(
                         isPouring = isPouring,
                         modifier = Modifier
                             .weight(1f)
-                            .width(46.dp)
+                            .fillMaxWidth()
                             .padding(vertical = 4.dp)
                     )
 
@@ -328,9 +328,7 @@ fun WaterTrackerWidget(
                         InteractiveWaterGlass(
                             fillProgress = animatedProgress.value,
                             isPouring = isPouring,
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .width(if (size.rows == 2) 75.dp else 95.dp)
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
 
@@ -586,24 +584,22 @@ fun WaterTrackerWidget(
                     ) {
                         Box(
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(if (size.rows >= 4) 1.25f else 1f)
                                 .fillMaxHeight(),
                             contentAlignment = Alignment.Center
                         ) {
                             InteractiveWaterGlass(
                                 fillProgress = animatedProgress.value,
                                 isPouring = isPouring,
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .width(if (size.rows == 2) 90.dp else 115.dp)
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(14.dp))
+                        Spacer(modifier = Modifier.width(if (size.rows >= 4) 16.dp else 12.dp))
 
                         Column(
                             modifier = Modifier
-                                .weight(1.1f)
+                                .weight(if (size.rows >= 4) 1f else 1.1f)
                                 .fillMaxHeight(),
                             verticalArrangement = Arrangement.Center
                         ) {
@@ -611,7 +607,11 @@ fun WaterTrackerWidget(
                                 Text(
                                     text = String.format("%02d", displayPct.coerceAtMost(999)),
                                     fontFamily = Dseg7FontFamily,
-                                    fontSize = if (size.rows == 2) 30.sp else 38.sp,
+                                    fontSize = when {
+                                        size.rows == 2 -> 28.sp
+                                        size.rows >= 4 -> 44.sp
+                                        else -> 38.sp
+                                    },
                                     fontWeight = FontWeight.Bold,
                                     color = if (displayPct >= 100) Color(0xFF00E5FF) else NothingWhite
                                 )
@@ -619,39 +619,43 @@ fun WaterTrackerWidget(
                                 Text(
                                     text = "%",
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 14.sp,
+                                    fontSize = if (size.rows >= 4) 18.sp else 14.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF00E5FF),
-                                    modifier = Modifier.padding(bottom = 4.dp)
+                                    modifier = Modifier.padding(bottom = if (size.rows >= 4) 6.dp else 4.dp)
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(modifier = Modifier.height(if (size.rows >= 4) 4.dp else 2.dp))
 
                             Text(
                                 text = "${waterState.currentMl} / ${waterState.targetMl} ML",
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = if (size.rows == 2) 11.sp else 12.sp,
+                                fontSize = when {
+                                    size.rows == 2 -> 11.sp
+                                    size.rows >= 4 -> 13.sp
+                                    else -> 12.sp
+                                },
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp,
                                 color = NothingWhite.copy(alpha = 0.9f)
                             )
 
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(modifier = Modifier.height(if (size.rows >= 4) 4.dp else 2.dp))
 
                             Text(
                                 text = "${waterState.glassesCount} OF ${waterState.targetGlasses} GLASSES",
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 9.sp,
+                                fontSize = if (size.rows >= 4) 10.sp else 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp,
                                 color = NothingTextSecondary
                             )
 
                             if (size.rows >= 3) {
-                                Spacer(modifier = Modifier.height(6.dp))
+                                Spacer(modifier = Modifier.height(if (size.rows >= 4) 12.dp else 6.dp))
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(if (size.rows >= 4) 6.dp else 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     val maxDisplayGlasses = min(waterState.targetGlasses, 12)
@@ -659,7 +663,10 @@ fun WaterTrackerWidget(
                                         val isFilled = i < waterState.glassesCount
                                         Box(
                                             modifier = Modifier
-                                                .size(width = 8.dp, height = 12.dp)
+                                                .size(
+                                                    width = if (size.rows >= 4) 10.dp else 8.dp,
+                                                    height = if (size.rows >= 4) 16.dp else 12.dp
+                                                )
                                                 .clip(RoundedCornerShape(2.dp))
                                                 .background(
                                                     if (isFilled) Color(0xFF00E5FF) else NothingSurfaceVariant
@@ -677,6 +684,12 @@ fun WaterTrackerWidget(
                     }
 
                     // Action Buttons Row
+                    val actionButtonHeight = when {
+                        size.rows == 2 -> 34.dp
+                        size.rows >= 4 -> 42.dp
+                        else -> 36.dp
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -684,7 +697,7 @@ fun WaterTrackerWidget(
                         Box(
                             modifier = Modifier
                                 .weight(1.4f)
-                                .height(36.dp)
+                                .height(actionButtonHeight)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(Color(0xFF00E5FF).copy(alpha = 0.15f))
                                 .border(1.dp, Color(0xFF00E5FF), RoundedCornerShape(10.dp))
@@ -705,7 +718,7 @@ fun WaterTrackerWidget(
                                 Text(
                                     text = "+ 250 ML",
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.5.sp,
+                                    fontSize = if (size.rows >= 4) 11.5.sp else 10.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = NothingWhite
                                 )
@@ -715,7 +728,7 @@ fun WaterTrackerWidget(
                         Box(
                             modifier = Modifier
                                 .weight(1.1f)
-                                .height(36.dp)
+                                .height(actionButtonHeight)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(NothingSurfaceVariant)
                                 .border(1.dp, NothingBorder, RoundedCornerShape(10.dp))
@@ -728,7 +741,7 @@ fun WaterTrackerWidget(
                             Text(
                                 text = "+ 500 ML",
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 10.sp,
+                                fontSize = if (size.rows >= 4) 11.sp else 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = NothingTextSecondary
                             )
@@ -737,7 +750,7 @@ fun WaterTrackerWidget(
                         Box(
                             modifier = Modifier
                                 .weight(0.7f)
-                                .height(36.dp)
+                                .height(actionButtonHeight)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(NothingSurfaceVariant)
                                 .border(1.dp, NothingBorder, RoundedCornerShape(10.dp))
@@ -751,7 +764,7 @@ fun WaterTrackerWidget(
                             Text(
                                 text = "- 250",
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 9.5.sp,
+                                fontSize = if (size.rows >= 4) 10.5.sp else 9.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = NothingTextTertiary
                             )
@@ -760,7 +773,7 @@ fun WaterTrackerWidget(
                         Box(
                             modifier = Modifier
                                 .weight(0.7f)
-                                .height(36.dp)
+                                .height(actionButtonHeight)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(NothingSurfaceVariant)
                                 .border(1.dp, NothingBorder, RoundedCornerShape(10.dp))
@@ -772,7 +785,7 @@ fun WaterTrackerWidget(
                             Text(
                                 text = "RESET",
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 8.5.sp,
+                                fontSize = if (size.rows >= 4) 10.sp else 8.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = NothingTextTertiary
                             )
@@ -923,10 +936,29 @@ fun InteractiveWaterGlass(
         val canvasW = size.width
         val canvasH = size.height
 
-        val glassTopY = 4.dp.toPx()
-        val glassBottomY = canvasH - 4.dp.toPx()
-        val glassTopW = canvasW * 0.88f
-        val glassBottomW = canvasW * 0.70f
+        // Strict Aspect Ratio Lock for the Water Glass:
+        // TopWidth / Height = 0.65f, BottomWidth / TopWidth = 0.70f / 0.88f (0.795f taper).
+        // This guarantees the cup preserves the exact iconic Nothing OS shape seen in 4x1 and 4x3 without squishing or stretching.
+        val targetCupAspect = 0.65f
+        val maxAvailableHeight = (canvasH - 8.dp.toPx()).coerceAtLeast(10f)
+        val maxAvailableTopWidth = (canvasW * 0.88f).coerceAtLeast(10f)
+
+        val (actualCupTopW, actualCupHeight) = if (maxAvailableTopWidth / maxAvailableHeight > targetCupAspect) {
+            // Container is wider than the cup aspect ratio (e.g. 4x2): height is the constraint
+            val h = maxAvailableHeight
+            val w = h * targetCupAspect
+            w to h
+        } else {
+            // Container is taller than the cup aspect ratio (e.g. 4x4, tall strips): width is the constraint
+            val w = maxAvailableTopWidth
+            val h = w / targetCupAspect
+            w to h
+        }
+
+        val glassTopY = (canvasH - actualCupHeight) / 2f
+        val glassBottomY = glassTopY + actualCupHeight
+        val glassTopW = actualCupTopW
+        val glassBottomW = actualCupTopW * (0.70f / 0.88f)
 
         val topCenterX = canvasW / 2f
         val topLeftX = topCenterX - glassTopW / 2f
@@ -936,9 +968,10 @@ fun InteractiveWaterGlass(
         val bottomLeftX = bottomCenterX - glassBottomW / 2f
         val bottomRightX = bottomCenterX + glassBottomW / 2f
 
-        val wallThickness = 2.5.dp.toPx()
-        val baseThickness = 6.dp.toPx()
-        val cornerRadius = 12.dp.toPx()
+        val scaleFactor = (actualCupHeight / 150f).coerceIn(0.55f, 1.4f)
+        val wallThickness = 2.5.dp.toPx() * scaleFactor
+        val baseThickness = 6.dp.toPx() * scaleFactor
+        val cornerRadius = 12.dp.toPx() * scaleFactor
 
         val outerPath = Path().apply {
             moveTo(topLeftX, glassTopY)
@@ -950,13 +983,13 @@ fun InteractiveWaterGlass(
             close()
         }
 
-        val innerTopY = glassTopY + 2.dp.toPx()
+        val innerTopY = glassTopY + 2.dp.toPx() * scaleFactor
         val innerBottomY = glassBottomY - baseThickness
         val innerTopLeftX = topLeftX + wallThickness
         val innerTopRightX = topRightX - wallThickness
         val innerBottomLeftX = bottomLeftX + wallThickness
         val innerBottomRightX = bottomRightX - wallThickness
-        val innerCornerRadius = (cornerRadius - wallThickness).coerceAtLeast(3.dp.toPx())
+        val innerCornerRadius = (cornerRadius - wallThickness).coerceAtLeast(2.dp.toPx())
 
         val innerGlassPath = Path().apply {
             moveTo(innerTopLeftX, innerTopY)
@@ -974,17 +1007,17 @@ fun InteractiveWaterGlass(
         )
 
         // Etched ticks
-        if (canvasH > 60.dp.toPx()) {
+        if (actualCupHeight > 55.dp.toPx()) {
             val ticks = listOf(0.25f, 0.50f, 0.75f, 1.00f)
             ticks.forEach { t ->
                 val tickY = innerBottomY - (innerBottomY - innerTopY) * t
-                val tickWidth = 6.dp.toPx()
+                val tickWidth = 6.dp.toPx() * scaleFactor
                 val rightWallX = innerTopRightX + (innerBottomRightX - innerTopRightX) * (1f - t)
                 drawLine(
                     color = Color(0x44FFFFFF),
                     start = Offset(rightWallX - tickWidth, tickY),
                     end = Offset(rightWallX, tickY),
-                    strokeWidth = 1.dp.toPx()
+                    strokeWidth = 1.dp.toPx() * scaleFactor
                 )
             }
         }
@@ -998,13 +1031,13 @@ fun InteractiveWaterGlass(
                 val waterCenterY = innerBottomY - cavityHeight * clampedP.coerceAtMost(1.0f)
                 val slope = tan(liquidAngle)
 
-                val extendedW = canvasW * 1.5f
+                val extendedW = glassTopW * 1.5f
                 val leftX = topCenterX - extendedW
                 val rightX = topCenterX + extendedW
 
                 val surfaceYLeft = waterCenterY - extendedW * slope
                 val surfaceYRight = waterCenterY + extendedW * slope
-                val waveOffset = sin(wavePhase) * waveAmplitude
+                val waveOffset = sin(wavePhase) * waveAmplitude * scaleFactor
 
                 val waterPath = Path().apply {
                     moveTo(leftX, surfaceYLeft)
@@ -1045,17 +1078,17 @@ fun InteractiveWaterGlass(
                     style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
                 )
 
-                if (canvasH > 50.dp.toPx()) {
+                if (actualCupHeight > 45.dp.toPx()) {
                     bubbles.forEach { b ->
                         val bCycle = (bubbleTime * b.speed + b.wobblePhase) % 1.0f
                         val bY = innerBottomY - cavityHeight * clampedP * bCycle
-                        val wobbleX = sin(bubbleTime * 4f + b.wobblePhase) * 3.dp.toPx()
+                        val wobbleX = sin(bubbleTime * 4f + b.wobblePhase) * 3.dp.toPx() * scaleFactor
                         val bX = innerBottomLeftX + (innerBottomRightX - innerBottomLeftX) * b.xFrac + wobbleX
 
-                        if (bY > waterCenterY + 4.dp.toPx()) {
+                        if (bY > waterCenterY + 4.dp.toPx() * scaleFactor) {
                             drawCircle(
                                 color = Color(0x66FFFFFF),
-                                radius = b.radius.dp.toPx(),
+                                radius = b.radius.dp.toPx() * scaleFactor,
                                 center = Offset(bX, bY)
                             )
                         }
@@ -1067,7 +1100,7 @@ fun InteractiveWaterGlass(
         // Pouring Stream
         if (isPouring) {
             val streamCenterX = topCenterX
-            val streamWidth = 4.dp.toPx()
+            val streamWidth = (4.dp.toPx() * scaleFactor).coerceAtLeast(2.dp.toPx())
             val cavityHeight = innerBottomY - innerTopY
             val waterCenterY = (innerBottomY - cavityHeight * fillProgress.coerceIn(0f, 1f)).coerceAtLeast(innerTopY)
 
@@ -1085,12 +1118,12 @@ fun InteractiveWaterGlass(
                 size = Size(streamWidth, waterCenterY)
             )
 
-            val splashWidth = 14.dp.toPx()
+            val splashWidth = 14.dp.toPx() * scaleFactor
             drawOval(
                 color = Color(0xAAFFFFFF),
                 topLeft = Offset(streamCenterX - splashWidth / 2f, waterCenterY - 2.dp.toPx()),
-                size = Size(splashWidth, 5.dp.toPx()),
-                style = Stroke(width = 1.5.dp.toPx())
+                size = Size(splashWidth, 5.dp.toPx() * scaleFactor),
+                style = Stroke(width = 1.5.dp.toPx() * scaleFactor)
             )
         }
 
