@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "999051061552",
+    "project_id": "buddygotchi-db3f2",
+    "storage_bucket": "buddygotchi-db3f2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:999051061552:android:1ed32eee1838b967c3c0f5",
+        "android_client_info": {
+          "package_name": "com.example.buddygotchi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMIwdu0O6Y8SLnMWHrouqP09gZb-RpyUg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -48,8 +48,13 @@ fun SquadDashboardPage(
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var showAddFriendDialog by remember { mutableStateOf(false) }
-
     val scrollState = rememberScrollState()
+
+    LaunchedEffect(Unit) {
+        FirebaseSquadSync.initialize(context) { updatedEvents ->
+            events = updatedEvents
+        }
+    }
 
     fun copyBuddyCode() {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

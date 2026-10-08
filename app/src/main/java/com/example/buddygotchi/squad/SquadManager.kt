@@ -28,6 +28,9 @@ object SquadManager {
     fun saveProfile(context: Context, profile: UserProfile) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_PROFILE, profile.toJson().toString()).apply()
+        try {
+            FirebaseSquadSync.syncProfile(context)
+        } catch (_: Exception) {}
     }
 
     private fun generateDefaultProfile(context: Context): UserProfile {
@@ -154,6 +157,9 @@ object SquadManager {
         events.add(0, event)
         saveEvents(context, events)
         GroupEventScheduler.scheduleEventReminder(context, event)
+        try {
+            FirebaseSquadSync.publishEvent(event)
+        } catch (_: Exception) {}
         return events.sortedBy { it.eventTime }
     }
 
@@ -176,6 +182,9 @@ object SquadManager {
             } else ev
         }
         saveEvents(context, events)
+        try {
+            FirebaseSquadSync.updateParticipantStatus(eventId, profile.buddyCode, status)
+        } catch (_: Exception) {}
         return events
     }
 
@@ -183,6 +192,9 @@ object SquadManager {
         GroupEventScheduler.cancelEventReminder(context, eventId)
         val events = getEvents(context).filter { it.id != eventId }
         saveEvents(context, events)
+        try {
+            FirebaseSquadSync.deleteEvent(eventId)
+        } catch (_: Exception) {}
         return events
     }
 }
