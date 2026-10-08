@@ -147,6 +147,7 @@ fun DashboardScreen() {
 
     // Edit Mode state
     var isEditMode by remember { mutableStateOf(false) }
+    var isNotesExpanded by remember { mutableStateOf(false) }
     var activeResizeWidgetId by remember { mutableStateOf<DashboardWidgetId?>(null) }
     var activeResizePreviewSize by remember { mutableStateOf<WidgetSize?>(null) }
 
@@ -308,7 +309,7 @@ fun DashboardScreen() {
             // HorizontalPager holding Left Page, Main Dashboard, Right Page
             HorizontalPager(
                 state = pagerState,
-                userScrollEnabled = !isEditMode && draggedIndex == null,
+                userScrollEnabled = !isEditMode && draggedIndex == null && !isNotesExpanded,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
@@ -345,7 +346,11 @@ fun DashboardScreen() {
                         }
                 ) {
                     when (pageIndex) {
-                    0 -> LeftDashboardPage()
+                    0 -> LeftDashboardPage(
+                        isEditMode = isEditMode,
+                        onSetEditMode = { isEditMode = it },
+                        onNotesExpandedChanged = { isNotesExpanded = it }
+                    )
                     1 -> {
                         BoxWithConstraints(
                             modifier = Modifier.fillMaxSize()
@@ -732,7 +737,10 @@ fun RenderDashboardWidgetContent(
 ) {
     when (item.widgetId) {
         DashboardWidgetId.CLOCK -> {
-            ClockWidget(onTaskCreated = onTaskCreated)
+            ClockWidget(
+                size = liveSize,
+                onTaskCreated = onTaskCreated
+            )
         }
         DashboardWidgetId.TODAY -> {
             TodayWidget(
@@ -754,6 +762,19 @@ fun RenderDashboardWidgetContent(
                 level = buddyLevel,
                 size = liveSize,
                 getTouchPosition = getTouchPosition
+            )
+        }
+        DashboardWidgetId.WATER -> {
+            WaterTrackerWidget(size = liveSize)
+        }
+        DashboardWidgetId.NOTES -> {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val notes = remember { NotesManager.getNotes(context) }
+            NotesCollapsedWidget(
+                size = liveSize,
+                notes = notes,
+                onExpand = {},
+                onQuickCreate = {}
             )
         }
     }

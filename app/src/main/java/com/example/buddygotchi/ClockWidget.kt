@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.buddygotchi.ui.theme.Dseg7FontFamily
+import com.example.buddygotchi.ui.theme.NothingRed
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -70,6 +71,7 @@ enum class ClockStage {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClockWidget(
+    size: WidgetSize = WidgetSize.MAX,
     onTaskCreated: (ReminderTask) -> Unit = {}
 ) {
     val haptic = LocalHapticFeedback.current
@@ -213,13 +215,14 @@ fun ClockWidget(
     }
 
     val widgetCardHeight = when (stage) {
-        ClockStage.CATEGORY -> DashboardGridDefaults.getWidgetHeight(4)
-        else -> DashboardGridDefaults.getWidgetHeight(3)
+        ClockStage.CATEGORY, ClockStage.OFFSET -> DashboardGridDefaults.getWidgetHeight(4)
+        else -> DashboardGridDefaults.getWidgetHeight(size)
     }
 
     WidgetCard(
         title = "",
-        height = widgetCardHeight
+        height = widgetCardHeight,
+        size = size
     ) {
         AnimatedContent(
             targetState = stage,
@@ -228,100 +231,274 @@ fun ClockWidget(
         ) { currentStage ->
             when (currentStage) {
                 ClockStage.TIME -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        // Top: Date strip with strictly "Today", "Tomorrow", "More"
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val isTodaySelected = selectedDayOffset == 0 && !isAutoTomorrow
-                            val isTomorrowSelected = (selectedDayOffset == 1 && !isAutoTomorrow) || isAutoTomorrow
-                            val isMoreSelected = selectedDayOffset > 1 && !isAutoTomorrow
+                    val isCube = size.cols == 1 && size.rows == 1
+                    val isTallStrip = size.cols == 1 && size.rows > 1
+                    val isHalfRow = size.cols == 2 && size.rows == 1
+                    val isSlim = size.cols == 4 && size.rows == 1
 
-                            // 1. Today
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isTodaySelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                    when {
+                        isCube -> {
+                            Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        selectedDayOffset = 0
-                                        triggerTick()
-                                    }
+                                    .fillMaxSize()
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "Today",
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isTodaySelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isTodaySelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            // 2. Tomorrow
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isTomorrowSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        selectedDayOffset = 1
-                                        triggerTick()
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = displayedTime,
+                                        fontFamily = Dseg7FontFamily,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = displayedDateLabel.uppercase(),
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 8.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = NothingRed
+                                    )
+                                    Spacer(modifier = Modifier.height(5.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.primary)
+                                            .clickable {
+                                                triggerTriplePulse()
+                                                stage = ClockStage.CATEGORY
+                                            }
+                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(
+                                            text = "+ TASK",
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 8.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
                                     }
-                            ) {
-                                Text(
-                                    text = "Tomorrow",
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isTomorrowSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isTomorrowSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            // 3. More
-                            val moreLabel = if (isMoreSelected) {
-                                SimpleDateFormat("MMM d", Locale.getDefault()).format(finalCal.time)
-                            } else {
-                                "More"
-                            }
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isMoreSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        showDatePickerDialog = true
-                                        triggerTick()
-                                    }
-                            ) {
-                                Text(
-                                    text = moreLabel,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isMoreSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isMoreSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                }
                             }
                         }
+                        isTallStrip -> {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 6.dp, vertical = 10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = displayedDateLabel.uppercase(),
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NothingRed
+                                )
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = String.format(Locale.getDefault(), "%02d", currentSelectedHour),
+                                        fontFamily = Dseg7FontFamily,
+                                        fontSize = 32.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(4.dp)
+                                            .clip(CircleShape)
+                                            .background(NothingRed)
+                                    )
+                                    Text(
+                                        text = String.format(Locale.getDefault(), "%02d", currentSelectedMinute),
+                                        fontFamily = Dseg7FontFamily,
+                                        fontSize = 32.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(MaterialTheme.colorScheme.primary)
+                                        .clickable {
+                                            triggerTriplePulse()
+                                            stage = ClockStage.CATEGORY
+                                        }
+                                        .padding(vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "+ TASK",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
+                        isHalfRow || isSlim -> {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = displayedTime,
+                                        fontFamily = Dseg7FontFamily,
+                                        fontSize = if (isSlim) 28.sp else 22.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = displayedDateLabel.uppercase(),
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = NothingRed
+                                    )
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            triggerTriplePulse()
+                                            stage = ClockStage.CATEGORY
+                                        }
+                                ) {
+                                    Text(
+                                        text = "+ TASK →",
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
+                        else -> {
+                            val isCompact = size.rows == 2
+                            val drumHeightDp = if (isCompact) 92.dp else 138.dp
+                            val itemHeightDp = if (isCompact) 34.dp else 48.dp
+                            val centerFontSize = if (isCompact) 38.sp else 58.sp
+                            val outerFontSize = if (isCompact) 24.sp else 36.sp
+                            val colonFontSize = if (isCompact) 32.sp else 50.sp
+                            val buttonHeightDp = if (isCompact) 36.dp else 44.dp
+                            val datePaddingV = if (isCompact) 4.dp else 6.dp
+                            val datePaddingH = if (isCompact) 10.dp else 16.dp
+                            val dateFontSize = if (isCompact) 10.sp else 12.sp
+                            val spacerHeight = if (isCompact) 4.dp else 10.dp
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                // Top: Date strip with strictly "Today", "Tomorrow", "More"
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val isTodaySelected = selectedDayOffset == 0 && !isAutoTomorrow
+                                    val isTomorrowSelected = (selectedDayOffset == 1 && !isAutoTomorrow) || isAutoTomorrow
+                                    val isMoreSelected = selectedDayOffset > 1 && !isAutoTomorrow
 
-                        // Middle: Split 3D Rotating Drum Wheel (Hours on Left, Minutes on Right)
-                        val itemHeightDp = 48.dp
-                        val itemHeightPx = with(density) { itemHeightDp.toPx() }
+                                    // 1. Today
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (isTodaySelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                selectedDayOffset = 0
+                                                triggerTick()
+                                            }
+                                    ) {
+                                        Text(
+                                            text = "Today",
+                                            modifier = Modifier.padding(horizontal = datePaddingH, vertical = datePaddingV),
+                                            fontSize = dateFontSize,
+                                            fontWeight = if (isTodaySelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isTodaySelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
 
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(138.dp)
-                                .clip(RoundedCornerShape(16.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
+                                    // 2. Tomorrow
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (isTomorrowSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                selectedDayOffset = 1
+                                                triggerTick()
+                                            }
+                                    ) {
+                                        Text(
+                                            text = "Tomorrow",
+                                            modifier = Modifier.padding(horizontal = datePaddingH, vertical = datePaddingV),
+                                            fontSize = dateFontSize,
+                                            fontWeight = if (isTomorrowSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isTomorrowSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    // 3. More
+                                    val moreLabel = if (isMoreSelected) {
+                                        SimpleDateFormat("MMM d", Locale.getDefault()).format(finalCal.time)
+                                    } else {
+                                        "More"
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (isMoreSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                showDatePickerDialog = true
+                                                triggerTick()
+                                            }
+                                    ) {
+                                        Text(
+                                            text = moreLabel,
+                                            modifier = Modifier.padding(horizontal = datePaddingH, vertical = datePaddingV),
+                                            fontSize = dateFontSize,
+                                            fontWeight = if (isMoreSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isMoreSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(spacerHeight))
+
+                                // Middle: Split 3D Rotating Drum Wheel (Hours on Left, Minutes on Right)
+                                val itemHeightPx = with(density) { itemHeightDp.toPx() }
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(drumHeightDp)
+                                        .clip(RoundedCornerShape(16.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
                             // Guide brackets
                             Row(
                                 modifier = Modifier
@@ -608,7 +785,7 @@ fun ClockWidget(
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(44.dp)
+                                .height(buttonHeightDp)
                                 .clip(RoundedCornerShape(14.dp))
                                 .clickable {
                                     triggerTriplePulse()
@@ -639,6 +816,8 @@ fun ClockWidget(
                         }
                     }
                 }
+            }
+        }
 
                 ClockStage.OFFSET -> {
                     Column(

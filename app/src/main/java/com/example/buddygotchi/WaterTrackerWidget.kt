@@ -19,7 +19,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,12 +33,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -47,6 +44,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -59,14 +57,13 @@ import com.example.buddygotchi.ui.theme.NothingSurfaceVariant
 import com.example.buddygotchi.ui.theme.NothingTextSecondary
 import com.example.buddygotchi.ui.theme.NothingTextTertiary
 import com.example.buddygotchi.ui.theme.NothingWhite
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import kotlin.math.*
 import kotlin.random.Random
 
 @Composable
 fun WaterTrackerWidget(
+    size: WidgetSize = WidgetSize.MAX,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -75,12 +72,10 @@ fun WaterTrackerWidget(
 
     // Pouring state
     var isPouring by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
 
     // Smooth animated intake progress
     val animatedProgress = remember { Animatable(waterState.percentage) }
 
-    // Synchronize animatedProgress when waterState changes
     LaunchedEffect(waterState.currentMl, waterState.targetMl) {
         val targetP = waterState.percentage
         if (isPouring) {
@@ -97,312 +92,697 @@ fun WaterTrackerWidget(
         }
     }
 
+    val displayPct = (animatedProgress.value * 100f).roundToInt()
+    val isCube = size.cols == 1 && size.rows == 1
+    val isHalfRow = size.cols == 2 && size.rows == 1
+    val isSlim = size.cols == 4 && size.rows == 1
+    val isTallStrip = size.cols == 1 && size.rows > 1
+    val isHalfBlock = size.cols == 2 && size.rows > 1
+    val isCol3Row1 = size.cols == 3 && size.rows == 1
+
+    val cornerRadius = if (isCube) 20.dp else 24.dp
+    val internalPadding = when {
+        size.cols == 1 -> 8.dp
+        size.rows == 1 -> 10.dp
+        else -> 14.dp
+    }
+
     Card(
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(cornerRadius),
         colors = CardDefaults.cardColors(containerColor = NothingCardSurface),
         border = BorderStroke(1.dp, NothingBorder),
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
+            .fillMaxWidth()
+            .height(DashboardGridDefaults.getWidgetHeight(size))
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            // Header Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF00E5FF))
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "WATER TRACKER",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.5.sp,
-                        color = NothingWhite
-                    )
-                }
-
-                // Calculator Button / Weight Indicator
-                Row(
+        when {
+            // === 1. COMPACT 1x1 CUBE ===
+            isCube -> {
+                Column(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(NothingSurfaceVariant)
-                        .border(1.dp, NothingBorder, RoundedCornerShape(8.dp))
-                        .clickable { showCalculator = true }
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .fillMaxSize()
+                        .clickable {
+                            isPouring = true
+                            waterState = WaterTrackerManager.addWater(context, 250)
+                        }
+                        .padding(internalPadding),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "${waterState.userWeightKg} KG ⚙",
-                        fontSize = 9.5.sp,
+                        text = "${displayPct}%",
+                        fontFamily = Dseg7FontFamily,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
+                        color = if (displayPct >= 100) Color(0xFF00E5FF) else NothingWhite
+                    )
+
+                    InteractiveWaterGlass(
+                        fillProgress = animatedProgress.value,
+                        isPouring = isPouring,
+                        modifier = Modifier.size(width = 30.dp, height = 36.dp)
+                    )
+
+                    Text(
+                        text = "${waterState.currentMl}ML",
                         fontFamily = FontFamily.Monospace,
-                        letterSpacing = 1.sp,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
                         color = NothingTextSecondary
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Info Bar: Daily Guideline Recommendation
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0x1400E5FF))
-                    .border(0.5.dp, Color(0x3300E5FF), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 10.dp, vertical = 5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "RECOMMENDED: ${waterState.targetGlasses} GLASSES (${waterState.targetMl} ML)",
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 0.8.sp,
-                    color = Color(0xFF80D8FF)
-                )
-                Text(
-                    text = "35 ML/KG",
-                    fontSize = 8.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    color = NothingTextTertiary
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Main Interactive Row: Glass Graphic (Left) + Stats & Progress (Right)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(175.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Interactive Physics Glass with Tilt & Pouring
-                Box(
+            // === 2. VERTICAL STRIP (1x2, 1x3, 1x4) ===
+            isTallStrip -> {
+                Column(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    contentAlignment = Alignment.Center
+                        .fillMaxSize()
+                        .padding(internalPadding),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "WATER",
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = NothingTextSecondary
+                        )
+                        Text(
+                            text = "${displayPct}%",
+                            fontFamily = Dseg7FontFamily,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF00E5FF)
+                        )
+                    }
+
                     InteractiveWaterGlass(
                         fillProgress = animatedProgress.value,
                         isPouring = isPouring,
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .width(115.dp)
+                            .weight(1f)
+                            .width(46.dp)
+                            .padding(vertical = 4.dp)
                     )
-                }
 
-                Spacer(modifier = Modifier.width(14.dp))
-
-                // Numerical Readouts & Stats Column
-                Column(
-                    modifier = Modifier
-                        .weight(1.1f)
-                        .fillMaxHeight(),
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    // Big Percentage Readout
-                    val displayPct = (animatedProgress.value * 100f).roundToInt()
-                    Row(verticalAlignment = Alignment.Bottom) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = String.format("%02d", displayPct.coerceAtMost(999)),
-                            fontFamily = Dseg7FontFamily,
-                            fontSize = 38.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (displayPct >= 100) Color(0xFF00E5FF) else NothingWhite
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "%",
+                            text = "${waterState.currentMl}ML",
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF00E5FF),
-                            modifier = Modifier.padding(bottom = 6.dp)
+                            fontSize = 8.5.sp,
+                            color = NothingTextTertiary
                         )
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Volume Progress
-                    Text(
-                        text = "${waterState.currentMl} / ${waterState.targetMl} ML",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = NothingWhite.copy(alpha = 0.9f)
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Glasses Counter Dots
-                    Text(
-                        text = "${waterState.glassesCount} OF ${waterState.targetGlasses} GLASSES",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 9.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = NothingTextSecondary
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Dot Matrix Progress Bar for Glasses
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val maxDisplayGlasses = min(waterState.targetGlasses, 12)
-                        for (i in 0 until maxDisplayGlasses) {
-                            val isFilled = i < waterState.glassesCount
-                            Box(
-                                modifier = Modifier
-                                    .size(width = 8.dp, height = 12.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(
-                                        if (isFilled) Color(0xFF00E5FF) else NothingSurfaceVariant
-                                    )
-                                    .border(
-                                        0.5.dp,
-                                        if (isFilled) Color(0xFF80D8FF) else NothingBorder,
-                                        RoundedCornerShape(2.dp)
-                                    )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF00E5FF).copy(alpha = 0.15f))
+                                .border(0.5.dp, Color(0xFF00E5FF), RoundedCornerShape(6.dp))
+                                .clickable {
+                                    isPouring = true
+                                    waterState = WaterTrackerManager.addWater(context, 250)
+                                }
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "+250",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingWhite
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Action Buttons Row: Quick Add Water (+250ml glass, +500ml bottle, -250ml, Reset)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Primary: Add 1 Glass (250 ml) with pouring trigger
-                Box(
+            // === 3. HALF ROW (2x1, 88dp height) ===
+            isHalfRow -> {
+                Row(
                     modifier = Modifier
-                        .weight(1.4f)
-                        .height(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF00E5FF).copy(alpha = 0.15f))
-                        .border(1.dp, Color(0xFF00E5FF), RoundedCornerShape(12.dp))
-                        .clickable {
-                            isPouring = true
-                            waterState = WaterTrackerManager.addWater(context, 250)
-                        },
-                    contentAlignment = Alignment.Center
+                        .fillMaxSize()
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(NothingRed)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
+                    InteractiveWaterGlass(
+                        fillProgress = animatedProgress.value,
+                        isPouring = isPouring,
+                        modifier = Modifier.size(width = 40.dp, height = 58.dp)
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 8.dp),
+                        verticalArrangement = Arrangement.Center
+                    ) {
                         Text(
-                            text = "+ 250 ML",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
+                            text = "${displayPct}%",
+                            fontFamily = Dseg7FontFamily,
+                            fontSize = 19.sp,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp,
+                            color = if (displayPct >= 100) Color(0xFF00E5FF) else NothingWhite
+                        )
+                        Text(
+                            text = "${waterState.currentMl} / ${waterState.targetMl} ML",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.5.sp,
+                            color = NothingTextSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .height(30.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF00E5FF).copy(alpha = 0.15f))
+                            .border(1.dp, Color(0xFF00E5FF), RoundedCornerShape(8.dp))
+                            .clickable {
+                                isPouring = true
+                                waterState = WaterTrackerManager.addWater(context, 250)
+                            }
+                            .padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "+250",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold,
                             color = NothingWhite
                         )
                     }
                 }
+            }
 
-                // Secondary: Add Bottle (+500 ml)
-                Box(
+            // === 4. HALF BLOCK (2x2, 2x3, 2x4) ===
+            isHalfBlock -> {
+                Column(
                     modifier = Modifier
-                        .weight(1.1f)
-                        .height(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(NothingSurfaceVariant)
-                        .border(1.dp, NothingBorder, RoundedCornerShape(12.dp))
-                        .clickable {
-                            isPouring = true
-                            waterState = WaterTrackerManager.addWater(context, 500)
-                        },
-                    contentAlignment = Alignment.Center
+                        .fillMaxSize()
+                        .padding(internalPadding),
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = "+ 500 ML",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = NothingTextSecondary
-                    )
-                }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF00E5FF))
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "WATER",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingWhite
+                            )
+                        }
 
-                // Undo: -250 ml
-                Box(
-                    modifier = Modifier
-                        .weight(0.7f)
-                        .height(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(NothingSurfaceVariant)
-                        .border(1.dp, NothingBorder, RoundedCornerShape(12.dp))
-                        .clickable {
-                            if (waterState.currentMl > 0) {
-                                waterState = WaterTrackerManager.removeWater(context, 250)
+                        Text(
+                            text = "${waterState.userWeightKg}KG ⚙",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.5.sp,
+                            color = NothingTextSecondary,
+                            modifier = Modifier.clickable { showCalculator = true }
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        InteractiveWaterGlass(
+                            fillProgress = animatedProgress.value,
+                            isPouring = isPouring,
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(if (size.rows == 2) 75.dp else 95.dp)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Column {
+                            Text(
+                                text = "${displayPct}%",
+                                fontFamily = Dseg7FontFamily,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF00E5FF)
+                            )
+                            Text(
+                                text = "${waterState.currentMl}/${waterState.targetMl} ML",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.5.sp,
+                                color = NothingTextSecondary
+                            )
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFF00E5FF).copy(alpha = 0.15f))
+                                    .border(1.dp, Color(0xFF00E5FF), RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        isPouring = true
+                                        waterState = WaterTrackerManager.addWater(context, 250)
+                                    }
+                                    .padding(horizontal = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "+250",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NothingWhite
+                                )
                             }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "- 250",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NothingTextTertiary
-                    )
-                }
 
-                // Reset
-                Box(
+                            Box(
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(NothingSurfaceVariant)
+                                    .border(1.dp, NothingBorder, RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        if (waterState.currentMl > 0) {
+                                            waterState = WaterTrackerManager.removeWater(context, 250)
+                                        }
+                                    }
+                                    .padding(horizontal = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "-250",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 8.5.sp,
+                                    color = NothingTextTertiary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // === 5. SLIM BANNER (4x1, 3x1) ===
+            isSlim || isCol3Row1 -> {
+                Row(
                     modifier = Modifier
-                        .weight(0.7f)
-                        .height(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(NothingSurfaceVariant)
-                        .border(1.dp, NothingBorder, RoundedCornerShape(12.dp))
-                        .clickable {
-                            waterState = WaterTrackerManager.resetWater(context)
-                        },
-                    contentAlignment = Alignment.Center
+                        .fillMaxSize()
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = "RESET",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NothingTextTertiary
+                    InteractiveWaterGlass(
+                        fillProgress = animatedProgress.value,
+                        isPouring = isPouring,
+                        modifier = Modifier.size(width = 40.dp, height = 58.dp)
                     )
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "${displayPct}%",
+                                fontFamily = Dseg7FontFamily,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (displayPct >= 100) Color(0xFF00E5FF) else NothingWhite
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "${waterState.currentMl} / ${waterState.targetMl} ML",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingWhite.copy(alpha = 0.9f)
+                            )
+                        }
+                        Text(
+                            text = "${waterState.glassesCount} OF ${waterState.targetGlasses} GLASSES",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.5.sp,
+                            color = NothingTextSecondary
+                        )
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .height(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF00E5FF).copy(alpha = 0.15f))
+                                .border(1.dp, Color(0xFF00E5FF), RoundedCornerShape(8.dp))
+                                .clickable {
+                                    isPouring = true
+                                    waterState = WaterTrackerManager.addWater(context, 250)
+                                }
+                                .padding(horizontal = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "+ 250 ML",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingWhite
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .height(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(NothingSurfaceVariant)
+                                .border(1.dp, NothingBorder, RoundedCornerShape(8.dp))
+                                .clickable {
+                                    if (waterState.currentMl > 0) {
+                                        waterState = WaterTrackerManager.removeWater(context, 250)
+                                    }
+                                }
+                                .padding(horizontal = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "- 250",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp,
+                                color = NothingTextTertiary
+                            )
+                        }
+                    }
+                }
+            }
+
+            // === 6. FULL RICH DISPLAY (4x2, 4x3, 4x4) ===
+            else -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(internalPadding),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Header Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF00E5FF))
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "WATER TRACKER",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.5.sp,
+                                color = NothingWhite
+                            )
+                        }
+
+                        // Calculator Button / Weight Indicator
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(NothingSurfaceVariant)
+                                .border(1.dp, NothingBorder, RoundedCornerShape(8.dp))
+                                .clickable { showCalculator = true }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${waterState.userWeightKg} KG ⚙",
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 1.sp,
+                                color = NothingTextSecondary
+                            )
+                        }
+                    }
+
+                    // Info Bar: Daily Guideline Recommendation (if rows >= 3)
+                    if (size.rows >= 3) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0x1400E5FF))
+                                .border(0.5.dp, Color(0x3300E5FF), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "RECOMMENDED: ${waterState.targetGlasses} GLASSES (${waterState.targetMl} ML)",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 0.8.sp,
+                                color = Color(0xFF80D8FF)
+                            )
+                            Text(
+                                text = "35 ML/KG",
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = NothingTextTertiary
+                            )
+                        }
+                    }
+
+                    // Main Interactive Center Row: Glass + Numerical Stats
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            InteractiveWaterGlass(
+                                fillProgress = animatedProgress.value,
+                                isPouring = isPouring,
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .width(if (size.rows == 2) 90.dp else 115.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column(
+                            modifier = Modifier
+                                .weight(1.1f)
+                                .fillMaxHeight(),
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text(
+                                    text = String.format("%02d", displayPct.coerceAtMost(999)),
+                                    fontFamily = Dseg7FontFamily,
+                                    fontSize = if (size.rows == 2) 30.sp else 38.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (displayPct >= 100) Color(0xFF00E5FF) else NothingWhite
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "%",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF00E5FF),
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(2.dp))
+
+                            Text(
+                                text = "${waterState.currentMl} / ${waterState.targetMl} ML",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = if (size.rows == 2) 11.sp else 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                color = NothingWhite.copy(alpha = 0.9f)
+                            )
+
+                            Spacer(modifier = Modifier.height(2.dp))
+
+                            Text(
+                                text = "${waterState.glassesCount} OF ${waterState.targetGlasses} GLASSES",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                color = NothingTextSecondary
+                            )
+
+                            if (size.rows >= 3) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val maxDisplayGlasses = min(waterState.targetGlasses, 12)
+                                    for (i in 0 until maxDisplayGlasses) {
+                                        val isFilled = i < waterState.glassesCount
+                                        Box(
+                                            modifier = Modifier
+                                                .size(width = 8.dp, height = 12.dp)
+                                                .clip(RoundedCornerShape(2.dp))
+                                                .background(
+                                                    if (isFilled) Color(0xFF00E5FF) else NothingSurfaceVariant
+                                                )
+                                                .border(
+                                                    0.5.dp,
+                                                    if (isFilled) Color(0xFF80D8FF) else NothingBorder,
+                                                    RoundedCornerShape(2.dp)
+                                                )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Action Buttons Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1.4f)
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF00E5FF).copy(alpha = 0.15f))
+                                .border(1.dp, Color(0xFF00E5FF), RoundedCornerShape(10.dp))
+                                .clickable {
+                                    isPouring = true
+                                    waterState = WaterTrackerManager.addWater(context, 250)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(5.dp)
+                                        .clip(CircleShape)
+                                        .background(NothingRed)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "+ 250 ML",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NothingWhite
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1.1f)
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(NothingSurfaceVariant)
+                                .border(1.dp, NothingBorder, RoundedCornerShape(10.dp))
+                                .clickable {
+                                    isPouring = true
+                                    waterState = WaterTrackerManager.addWater(context, 500)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "+ 500 ML",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingTextSecondary
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(0.7f)
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(NothingSurfaceVariant)
+                                .border(1.dp, NothingBorder, RoundedCornerShape(10.dp))
+                                .clickable {
+                                    if (waterState.currentMl > 0) {
+                                        waterState = WaterTrackerManager.removeWater(context, 250)
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "- 250",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingTextTertiary
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(0.7f)
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(NothingSurfaceVariant)
+                                .border(1.dp, NothingBorder, RoundedCornerShape(10.dp))
+                                .clickable {
+                                    waterState = WaterTrackerManager.resetWater(context)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "RESET",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingTextTertiary
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 
-    // Weight & Water Recommendation Calculator Dialog
     if (showCalculator) {
         WaterCalculatorDialog(
             currentWeightKg = waterState.userWeightKg,
@@ -450,7 +830,6 @@ fun InteractiveWaterGlass(
                 val ax = event.values[0] // tilt roll left/right
                 val ay = event.values[1] // tilt pitch up/down
 
-                // Calculate tilt angle in radians relative to vertical (clamped to +/- 50 degrees)
                 val angleRad = atan2(ax, ay).coerceIn(-0.85f, 0.85f)
                 targetSensorAngle = angleRad
             }
@@ -467,11 +846,11 @@ fun InteractiveWaterGlass(
         }
     }
 
-    // Main 60FPS Physics Simulation Loop (Harmonic Spring-Damper for realistic water inertia & slosh)
+    // Main 60FPS Physics Simulation Loop (Harmonic Spring-Damper for realistic fluid sloshing)
     LaunchedEffect(isPouring) {
         var lastTimeNanos = 0L
         if (isPouring) {
-            waveAmplitude = 12f // Extra slosh disturbance on pour
+            waveAmplitude = 12f
             liquidAngularVel += (Random.nextFloat() - 0.5f) * 1.5f
         }
 
@@ -487,7 +866,6 @@ fun InteractiveWaterGlass(
 
                 val effectiveTargetAngle = (targetSensorAngle + touchTiltOffset).coerceIn(-0.85f, 0.85f)
 
-                // Spring-Mass-Damper parameters for fluid sloshing
                 val springK = 50f
                 val dampingC = 6.2f
                 val angleDiff = liquidAngle - effectiveTargetAngle
@@ -496,7 +874,6 @@ fun InteractiveWaterGlass(
                 liquidAngularVel += angularAccel * dt
                 liquidAngle += liquidAngularVel * dt
 
-                // Surface wave excitation from movement & pouring
                 val disturbance = abs(angularAccel) * 0.04f + abs(liquidAngularVel) * 1.2f
                 waveAmplitude = (waveAmplitude * (1f - dt * 2.5f) + disturbance * 0.15f).coerceIn(0f, 15f)
                 wavePhase += dt * 9f
@@ -504,7 +881,6 @@ fun InteractiveWaterGlass(
         }
     }
 
-    // Touch Drag gesture on the glass to allow manual swirling / testing
     val dragModifier = Modifier.pointerInput(Unit) {
         detectDragGestures(
             onDragEnd = { touchTiltOffset = 0f },
@@ -517,7 +893,6 @@ fun InteractiveWaterGlass(
         )
     }
 
-    // Rising Bubbles State
     val bubbles = remember {
         List(6) { index ->
             BubbleState(
@@ -548,10 +923,8 @@ fun InteractiveWaterGlass(
         val canvasW = size.width
         val canvasH = size.height
 
-        // Glass Silhouette Dimensions
-        val glassTopY = 24.dp.toPx()
-        val glassBottomY = canvasH - 8.dp.toPx()
-        val glassH = glassBottomY - glassTopY
+        val glassTopY = 4.dp.toPx()
+        val glassBottomY = canvasH - 4.dp.toPx()
         val glassTopW = canvasW * 0.88f
         val glassBottomW = canvasW * 0.70f
 
@@ -563,11 +936,10 @@ fun InteractiveWaterGlass(
         val bottomLeftX = bottomCenterX - glassBottomW / 2f
         val bottomRightX = bottomCenterX + glassBottomW / 2f
 
-        val wallThickness = 3.dp.toPx()
-        val baseThickness = 9.dp.toPx()
-        val cornerRadius = 14.dp.toPx()
+        val wallThickness = 2.5.dp.toPx()
+        val baseThickness = 6.dp.toPx()
+        val cornerRadius = 12.dp.toPx()
 
-        // 1. Build Outer Glass Outline Path
         val outerPath = Path().apply {
             moveTo(topLeftX, glassTopY)
             lineTo(topRightX, glassTopY)
@@ -578,14 +950,13 @@ fun InteractiveWaterGlass(
             close()
         }
 
-        // 2. Build Inner Glass Cavity Path (where water resides)
         val innerTopY = glassTopY + 2.dp.toPx()
         val innerBottomY = glassBottomY - baseThickness
         val innerTopLeftX = topLeftX + wallThickness
         val innerTopRightX = topRightX - wallThickness
         val innerBottomLeftX = bottomLeftX + wallThickness
         val innerBottomRightX = bottomRightX - wallThickness
-        val innerCornerRadius = (cornerRadius - wallThickness).coerceAtLeast(4.dp.toPx())
+        val innerCornerRadius = (cornerRadius - wallThickness).coerceAtLeast(3.dp.toPx())
 
         val innerGlassPath = Path().apply {
             moveTo(innerTopLeftX, innerTopY)
@@ -597,27 +968,28 @@ fun InteractiveWaterGlass(
             close()
         }
 
-        // Draw Frosted Glass Back Background
         drawPath(
             path = innerGlassPath,
             color = Color(0x1AFFFFFF)
         )
 
-        // 3. Etched Measurement Tick Marks on Glass
-        val ticks = listOf(0.25f, 0.50f, 0.75f, 1.00f)
-        ticks.forEach { t ->
-            val tickY = innerBottomY - (innerBottomY - innerTopY) * t
-            val tickWidth = 8.dp.toPx()
-            val rightWallX = innerTopRightX + (innerBottomRightX - innerTopRightX) * (1f - t)
-            drawLine(
-                color = Color(0x44FFFFFF),
-                start = Offset(rightWallX - tickWidth, tickY),
-                end = Offset(rightWallX, tickY),
-                strokeWidth = 1.dp.toPx()
-            )
+        // Etched ticks
+        if (canvasH > 60.dp.toPx()) {
+            val ticks = listOf(0.25f, 0.50f, 0.75f, 1.00f)
+            ticks.forEach { t ->
+                val tickY = innerBottomY - (innerBottomY - innerTopY) * t
+                val tickWidth = 6.dp.toPx()
+                val rightWallX = innerTopRightX + (innerBottomRightX - innerTopRightX) * (1f - t)
+                drawLine(
+                    color = Color(0x44FFFFFF),
+                    start = Offset(rightWallX - tickWidth, tickY),
+                    end = Offset(rightWallX, tickY),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
         }
 
-        // 4. Draw Liquid inside Glass (clipped strictly to innerGlassPath)
+        // Draw Liquid
         clipPath(innerGlassPath) {
             val clampedP = fillProgress.coerceIn(0f, 1.2f)
 
@@ -626,21 +998,16 @@ fun InteractiveWaterGlass(
                 val waterCenterY = innerBottomY - cavityHeight * clampedP.coerceAtMost(1.0f)
                 val slope = tan(liquidAngle)
 
-                // Extend beyond glass edges to ensure complete coverage during steep tilts
                 val extendedW = canvasW * 1.5f
                 val leftX = topCenterX - extendedW
                 val rightX = topCenterX + extendedW
 
                 val surfaceYLeft = waterCenterY - extendedW * slope
                 val surfaceYRight = waterCenterY + extendedW * slope
-
-                // Wave oscillation across meniscus
                 val waveOffset = sin(wavePhase) * waveAmplitude
 
-                // Liquid Body Path
                 val waterPath = Path().apply {
                     moveTo(leftX, surfaceYLeft)
-                    // Meniscus wave
                     quadraticTo(
                         topCenterX,
                         waterCenterY + waveOffset,
@@ -652,19 +1019,17 @@ fun InteractiveWaterGlass(
                     close()
                 }
 
-                // Vibrant Water Gradient
                 val waterBrush = Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xD900E5FF), // glowing bright cyan surface
-                        Color(0xB30091EA), // oceanic blue
-                        Color(0x99003366)  // deep water
+                        Color(0xD900E5FF),
+                        Color(0xB30091EA),
+                        Color(0x99003366)
                     ),
                     startY = waterCenterY - 20f,
                     endY = innerBottomY
                 )
                 drawPath(path = waterPath, brush = waterBrush)
 
-                // Glowing Specular Meniscus Surface Highlight Line
                 val meniscusLine = Path().apply {
                     moveTo(leftX, surfaceYLeft)
                     quadraticTo(
@@ -680,38 +1045,32 @@ fun InteractiveWaterGlass(
                     style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
                 )
 
-                // Floating Rising Bubbles
-                bubbles.forEach { b ->
-                    val bCycle = (bubbleTime * b.speed + b.wobblePhase) % 1.0f
-                    val bY = innerBottomY - cavityHeight * clampedP * bCycle
-                    val wobbleX = sin(bubbleTime * 4f + b.wobblePhase) * 4.dp.toPx()
-                    val bX = innerBottomLeftX + (innerBottomRightX - innerBottomLeftX) * b.xFrac + wobbleX
+                if (canvasH > 50.dp.toPx()) {
+                    bubbles.forEach { b ->
+                        val bCycle = (bubbleTime * b.speed + b.wobblePhase) % 1.0f
+                        val bY = innerBottomY - cavityHeight * clampedP * bCycle
+                        val wobbleX = sin(bubbleTime * 4f + b.wobblePhase) * 3.dp.toPx()
+                        val bX = innerBottomLeftX + (innerBottomRightX - innerBottomLeftX) * b.xFrac + wobbleX
 
-                    if (bY > waterCenterY + 4.dp.toPx()) {
-                        drawCircle(
-                            color = Color(0x66FFFFFF),
-                            radius = b.radius.dp.toPx(),
-                            center = Offset(bX, bY)
-                        )
-                        // tiny bubble highlight
-                        drawCircle(
-                            color = Color(0xCCFFFFFF),
-                            radius = (b.radius * 0.35f).dp.toPx(),
-                            center = Offset(bX - 0.7f, bY - 0.7f)
-                        )
+                        if (bY > waterCenterY + 4.dp.toPx()) {
+                            drawCircle(
+                                color = Color(0x66FFFFFF),
+                                radius = b.radius.dp.toPx(),
+                                center = Offset(bX, bY)
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // 5. Draw Pouring Stream (if pouring)
+        // Pouring Stream
         if (isPouring) {
             val streamCenterX = topCenterX
-            val streamWidth = 5.dp.toPx()
+            val streamWidth = 4.dp.toPx()
             val cavityHeight = innerBottomY - innerTopY
             val waterCenterY = (innerBottomY - cavityHeight * fillProgress.coerceIn(0f, 1f)).coerceAtLeast(innerTopY)
 
-            // Falling liquid jet from top
             drawRect(
                 brush = Brush.verticalGradient(
                     colors = listOf(
@@ -726,37 +1085,28 @@ fun InteractiveWaterGlass(
                 size = Size(streamWidth, waterCenterY)
             )
 
-            // Splash ripples at point of impact
-            val splashWidth = 18.dp.toPx()
+            val splashWidth = 14.dp.toPx()
             drawOval(
                 color = Color(0xAAFFFFFF),
-                topLeft = Offset(streamCenterX - splashWidth / 2f, waterCenterY - 3.dp.toPx()),
-                size = Size(splashWidth, 6.dp.toPx()),
+                topLeft = Offset(streamCenterX - splashWidth / 2f, waterCenterY - 2.dp.toPx()),
+                size = Size(splashWidth, 5.dp.toPx()),
                 style = Stroke(width = 1.5.dp.toPx())
             )
         }
 
-        // 6. Outer Glass Highlights & Border (Crisp Nothing OS Highball Silhouette)
+        // Outer Glass Border
         drawPath(
             path = outerPath,
             color = Color(0x40FFFFFF),
             style = Stroke(width = wallThickness)
         )
 
-        // Glass Base (Thick heavy bottom rim reflection)
+        // Glass Base
         drawLine(
             color = Color(0x55FFFFFF),
-            start = Offset(bottomLeftX + 6.dp.toPx(), glassBottomY - 2.dp.toPx()),
-            end = Offset(bottomRightX - 6.dp.toPx(), glassBottomY - 2.dp.toPx()),
+            start = Offset(bottomLeftX + 4.dp.toPx(), glassBottomY - 2.dp.toPx()),
+            end = Offset(bottomRightX - 4.dp.toPx(), glassBottomY - 2.dp.toPx()),
             strokeWidth = 2.dp.toPx()
-        )
-
-        // Subtle left wall specular reflection line
-        drawLine(
-            color = Color(0x33FFFFFF),
-            start = Offset(topLeftX + 2.dp.toPx(), glassTopY + 8.dp.toPx()),
-            end = Offset(bottomLeftX + 2.dp.toPx(), glassBottomY - 14.dp.toPx()),
-            strokeWidth = 1.5.dp.toPx()
         )
     }
 }
@@ -796,7 +1146,6 @@ fun WaterCalculatorDialog(
                     .fillMaxWidth()
                     .padding(20.dp)
             ) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -832,7 +1181,6 @@ fun WaterCalculatorDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Explanatory Note
                 Text(
                     text = "Health standards recommend 8 glasses (2,000 ml) daily, or approximately 35 ml per kilogram of body weight for active individuals.",
                     fontSize = 10.sp,
@@ -842,7 +1190,6 @@ fun WaterCalculatorDialog(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                // Weight Selector Box
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -895,7 +1242,6 @@ fun WaterCalculatorDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Calculation Result
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -934,7 +1280,6 @@ fun WaterCalculatorDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Action Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)

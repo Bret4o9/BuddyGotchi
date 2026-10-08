@@ -58,176 +58,484 @@ fun NotesCollapsedWidget(
     notes: List<NoteItem>,
     onExpand: () -> Unit,
     onQuickCreate: () -> Unit,
+    size: WidgetSize = WidgetSize.WIDE,
     modifier: Modifier = Modifier
 ) {
     val latestNote = notes.firstOrNull()
     val dateFormat = remember { SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()) }
 
+    val isCube = size.cols == 1 && size.rows == 1
+    val isTallStrip = size.cols == 1 && size.rows > 1
+    val isHalfRow = size.cols == 2 && size.rows == 1
+    val isHalfBlock = size.cols == 2 && size.rows > 1
+    val isSlim = size.cols == 4 && size.rows == 1
+
+    val cornerRadius = if (isCube) 20.dp else 24.dp
+    val internalPadding = when {
+        size.cols == 1 -> 8.dp
+        size.rows == 1 -> 10.dp
+        else -> 14.dp
+    }
+
     Card(
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(cornerRadius),
         colors = CardDefaults.cardColors(containerColor = NothingCardSurface),
         border = BorderStroke(1.dp, NothingBorder),
         modifier = modifier
             .fillMaxWidth()
+            .height(DashboardGridDefaults.getWidgetHeight(size))
             .clickable { onExpand() }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            // Header Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(NothingRed)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+        when {
+            // === 1. COMPACT 1x1 CUBE ===
+            isCube -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(internalPadding),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        text = "NOTES",
-                        fontSize = 11.sp,
+                        text = "${notes.size}",
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.5.sp,
-                        color = NothingWhite
+                        color = NothingRed,
+                        lineHeight = 24.sp
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "[ ${String.format("%02d", notes.size)} ]",
+                        text = if (notes.isEmpty()) "EMPTY" else "NOTES",
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        color = NothingTextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "EXPAND ↗",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 7.5.sp,
+                        color = NothingTextTertiary
+                    )
+                }
+            }
+
+            // === 2. VERTICAL STRIP (1x2, 1x3, 1x4) ===
+            isTallStrip -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(internalPadding),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "${notes.size}",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NothingRed
+                        )
+                        Text(
+                            text = "NOTES",
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = NothingTextSecondary
+                        )
+                    }
+
+                    if (latestNote != null) {
+                        Text(
+                            text = if (latestNote.title.isNotBlank()) latestNote.title else "(UNTITLED)",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NothingWhite,
+                            maxLines = size.rows,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Text(
+                        text = "EXPAND ↗",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 8.sp,
+                        color = NothingTextTertiary
+                    )
+                }
+            }
+
+            // === 3. HALF ROW (2x1, 88dp height) ===
+            isHalfRow -> {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(NothingRed)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Column {
+                            Text(
+                                text = "NOTES [${notes.size}]",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingWhite
+                            )
+                            if (latestNote != null) {
+                                Text(
+                                    text = if (latestNote.title.isNotBlank()) latestNote.title else "(UNTITLED)",
+                                    fontSize = 9.sp,
+                                    color = NothingTextSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "EXPAND ↗",
                         fontFamily = FontFamily.Monospace,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         color = NothingTextSecondary
                     )
                 }
-
-                // Expand indicator pill
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(NothingSurfaceVariant)
-                        .border(1.dp, NothingBorder, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "EXPAND ↗",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 9.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = NothingTextSecondary
-                    )
-                }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
-
-            if (latestNote != null) {
-                // Latest Note Preview Box
+            // === 4. HALF BLOCK (2x2, 2x3, 2x4) ===
+            isHalfBlock -> {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(NothingDarkBackground)
-                        .border(1.dp, NothingBorder, RoundedCornerShape(14.dp))
-                        .padding(12.dp)
+                        .fillMaxSize()
+                        .padding(internalPadding),
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(NothingRed)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "NOTES [${notes.size}]",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingWhite
+                            )
+                        }
+
                         Text(
-                            text = if (latestNote.title.isNotBlank()) latestNote.title else "(UNTITLED NOTE)",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = NothingWhite,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = dateFormat.format(Date(latestNote.updatedAt)),
+                            text = "EXPAND ↗",
                             fontFamily = FontFamily.Monospace,
                             fontSize = 8.5.sp,
+                            color = NothingTextSecondary
+                        )
+                    }
+
+                    if (latestNote != null) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(NothingDarkBackground)
+                                .padding(8.dp)
+                        ) {
+                            Text(
+                                text = if (latestNote.title.isNotBlank()) latestNote.title else "(UNTITLED)",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingWhite,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (latestNote.content.isNotBlank()) latestNote.content else "No text...",
+                                fontSize = 9.sp,
+                                color = NothingTextSecondary,
+                                maxLines = if (size.rows == 2) 2 else 4,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "NO NOTES YET",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.sp,
                             color = NothingTextTertiary
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Text(
-                        text = if (latestNote.content.isNotBlank()) latestNote.content else "No additional text...",
-                        fontSize = 11.sp,
-                        lineHeight = 15.sp,
-                        color = NothingTextSecondary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            } else {
-                // Empty state
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(65.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(NothingDarkBackground)
-                        .border(1.dp, NothingBorder, RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "NO NOTES YET // TAP TO WRITE",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = NothingTextTertiary
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(NothingRed.copy(alpha = 0.15f))
+                                .border(1.dp, NothingRed, RoundedCornerShape(6.dp))
+                                .clickable { onQuickCreate() }
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "+ NEW",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingWhite
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Bottom Bar: Tap to expand hint & Quick new note
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "TAP CARD TO EXPAND FULLSCREEN",
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 8.5.sp,
-                    letterSpacing = 0.8.sp,
-                    color = NothingTextTertiary
-                )
-
-                Box(
+            // === 5. SLIM BANNER (4x1) ===
+            isSlim -> {
+                Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(NothingRed.copy(alpha = 0.15f))
-                        .border(1.dp, NothingRed, RoundedCornerShape(8.dp))
-                        .clickable { onQuickCreate() }
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .fillMaxSize()
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = "+ NEW NOTE",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = NothingWhite
-                    )
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(NothingRed)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "NOTES [${notes.size}]",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NothingWhite
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        if (latestNote != null) {
+                            Text(
+                                text = if (latestNote.title.isNotBlank()) latestNote.title else "(UNTITLED NOTE)",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                color = NothingTextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "EXPAND ↗",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NothingWhite,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(NothingRed.copy(alpha = 0.15f))
+                                .border(1.dp, NothingRed, RoundedCornerShape(6.dp))
+                                .clickable { onQuickCreate() }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "+ NEW",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingWhite
+                            )
+                        }
+                    }
+                }
+            }
+
+            // === 6. FULL RICH DISPLAY (4x2, 4x3, 4x4) ===
+            else -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(internalPadding),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Header Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(NothingRed)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "NOTES",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.5.sp,
+                                color = NothingWhite
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "[ ${String.format("%02d", notes.size)} ]",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingTextSecondary
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(NothingSurfaceVariant)
+                                .border(1.dp, NothingBorder, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "EXPAND ↗",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                color = NothingTextSecondary
+                            )
+                        }
+                    }
+
+                    if (latestNote != null) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(NothingDarkBackground)
+                                .border(1.dp, NothingBorder, RoundedCornerShape(14.dp))
+                                .padding(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (latestNote.title.isNotBlank()) latestNote.title else "(UNTITLED NOTE)",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NothingWhite,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = dateFormat.format(Date(latestNote.updatedAt)),
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 8.5.sp,
+                                    color = NothingTextTertiary
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = if (latestNote.content.isNotBlank()) latestNote.content else "No additional text...",
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp,
+                                color = NothingTextSecondary,
+                                maxLines = if (size.rows == 2) 2 else 5,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(55.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(NothingDarkBackground)
+                                .border(1.dp, NothingBorder, RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "NO NOTES YET // TAP TO WRITE",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                color = NothingTextTertiary
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "TAP CARD TO EXPAND FULLSCREEN",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.5.sp,
+                            letterSpacing = 0.8.sp,
+                            color = NothingTextTertiary
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(NothingRed.copy(alpha = 0.15f))
+                                .border(1.dp, NothingRed, RoundedCornerShape(8.dp))
+                                .clickable { onQuickCreate() }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "+ NEW NOTE",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                color = NothingWhite
+                            )
+                        }
+                    }
                 }
             }
         }

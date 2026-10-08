@@ -1,6 +1,7 @@
 package com.example.buddygotchi
 
 import android.content.Context
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.json.JSONArray
@@ -40,7 +41,9 @@ enum class DashboardWidgetId(
     CLOCK("Clock", canRemove = false),
     TODAY("Today", canRemove = true),
     NEXT("Next", canRemove = true),
-    BUDDY("Buddy", canRemove = true)
+    BUDDY("Buddy", canRemove = true),
+    WATER("Water", canRemove = true),
+    NOTES("Notes", canRemove = true)
 }
 
 enum class WidgetSize(val cols: Int, val rows: Int) {
@@ -118,6 +121,8 @@ data class DashboardWidgetItem(
         DashboardWidgetId.TODAY -> WidgetSize.WIDE
         DashboardWidgetId.NEXT -> WidgetSize.HALF
         DashboardWidgetId.BUDDY -> WidgetSize.HALF
+        DashboardWidgetId.WATER -> WidgetSize.MAX
+        DashboardWidgetId.NOTES -> WidgetSize.WIDE
     }
 )
 
@@ -152,7 +157,7 @@ object DashboardLayoutManager {
                     val id = try { DashboardWidgetId.valueOf(idStr) } catch (_: Exception) { null }
                     val size = WidgetSize.parse(sizeStr)
                     if (id != null) {
-                        list.add(DashboardWidgetItem(id, if (id == DashboardWidgetId.CLOCK) WidgetSize.MAX else size))
+                        list.add(DashboardWidgetItem(id, size))
                     }
                 } else {
                     // Legacy migration: { "type": "full", "widget": "..." } or { "type": "split", "first": "...", "second": "..." }
@@ -183,7 +188,7 @@ object DashboardLayoutManager {
         layout.forEach { item ->
             val obj = JSONObject()
             obj.put("widget", item.widgetId.name)
-            obj.put("size", if (item.widgetId == DashboardWidgetId.CLOCK) WidgetSize.MAX.name else item.size.name)
+            obj.put("size", item.size.name)
             jsonArray.put(obj)
         }
         val prefs = context.getSharedPreferences("buddygotchi_prefs", Context.MODE_PRIVATE)
@@ -201,7 +206,6 @@ object DashboardLayoutManager {
     }
 
     fun updateWidgetSize(layout: List<DashboardWidgetItem>, widgetId: DashboardWidgetId, newSize: WidgetSize): List<DashboardWidgetItem> {
-        if (widgetId == DashboardWidgetId.CLOCK) return layout // Clock is fixed size 4x3
         return layout.map { item ->
             if (item.widgetId == widgetId) {
                 item.copy(size = newSize)
@@ -223,23 +227,25 @@ object DashboardLayoutManager {
             DashboardWidgetId.TODAY -> WidgetSize.WIDE
             DashboardWidgetId.NEXT -> WidgetSize.HALF
             DashboardWidgetId.BUDDY -> WidgetSize.HALF
+            DashboardWidgetId.WATER -> WidgetSize.MAX
+            DashboardWidgetId.NOTES -> WidgetSize.WIDE
         }
         return layout + DashboardWidgetItem(widgetId, defaultSize)
     }
 
     fun getUnusedWidgets(layout: List<DashboardWidgetItem>): List<DashboardWidgetId> {
         return DashboardWidgetId.entries.filter { id ->
-            id != DashboardWidgetId.CLOCK && !layout.any { it.widgetId == id }
+            id != DashboardWidgetId.CLOCK && id != DashboardWidgetId.WATER && id != DashboardWidgetId.NOTES && !layout.any { it.widgetId == id }
         }
     }
 
     /**
      * Packs widgets into horizontal rows.
      * Each row has a capacity of 4 units:
-     * - MAX = 4 units (spans whole row, 276.dp tall)
-     * - WIDE = 4 units (spans whole row, 180.dp tall)
-     * - HALF = 2 units (spans half row, 120.dp tall)
-     * - CUBE = 1 unit (1x1 cube, 88.dp tall)
+     * - MAX = 4 units
+     * - WIDE = 4 units
+     * - HALF = 2 units
+     * - CUBE = 1 unit
      */
     fun packIntoRows(items: List<DashboardWidgetItem>): List<List<DashboardWidgetItem>> {
         val rows = mutableListOf<List<DashboardWidgetItem>>()
@@ -262,5 +268,151 @@ object DashboardLayoutManager {
             rows.add(currentRow)
         }
         return rows
+    }
+}
+
+object LeftDashboardLayoutManager {
+    private const val PREFS_KEY_LEFT_LAYOUT = "left_dashboard_widget_layout_v1"
+
+    fun getDefaultLayout(): List<DashboardWidgetItem> = listOf(
+        DashboardWidgetItem(DashboardWidgetId.WATER, WidgetSize.MAX), // 4x3 full water tracker
+        DashboardWidgetItem(DashboardWidgetId.NOTES, WidgetSize.WIDE)  // 4x2 notes card
+    )
+
+    fun loadLayout(context: Context): List<DashboardWidgetItem> {
+        val prefs = context.getSharedPreferences("buddygotchi_prefs", Context.MODE_PRIVATE)
+        val jsonString = prefs.getString(PREFS_KEY_LEFT_LAYOUT, null) ?: return getDefaultLayout()
+        return try {
+            val jsonArray = JSONArray(jsonString)
+            val list = mutableListOf<DashboardWidgetItem>()
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                val idStr = obj.optString("widget", "")
+                val sizeStr = obj.optString("size", "WIDE")
+                val id = try { DashboardWidgetId.valueOf(idStr) } catch (_: Exception) { null }
+                val size = WidgetSize.parse(sizeStr)
+                if (id != null) {
+                    list.add(DashboardWidgetItem(id, size))
+                }
+            }
+            if (list.isEmpty()) getDefaultLayout() else list
+        } catch (_: Exception) {
+            getDefaultLayout()
+        }
+    }
+
+    fun saveLayout(context: Context, layout: List<DashboardWidgetItem>) {
+        val jsonArray = JSONArray()
+        layout.forEach { item ->
+            val obj = JSONObject()
+            obj.put("widget", item.widgetId.name)
+            obj.put("size", item.size.name)
+            jsonArray.put(obj)
+        }
+        val prefs = context.getSharedPreferences("buddygotchi_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString(PREFS_KEY_LEFT_LAYOUT, jsonArray.toString()).apply()
+    }
+
+    fun updateWidgetSize(layout: List<DashboardWidgetItem>, widgetId: DashboardWidgetId, newSize: WidgetSize): List<DashboardWidgetItem> {
+        return layout.map { item ->
+            if (item.widgetId == widgetId) item.copy(size = newSize) else item
+        }
+    }
+
+    fun moveItem(layout: List<DashboardWidgetItem>, fromIndex: Int, toIndex: Int): List<DashboardWidgetItem> {
+        if (fromIndex < 0 || fromIndex > layout.lastIndex) return layout
+        if (toIndex < 0 || toIndex > layout.lastIndex) return layout
+        if (fromIndex == toIndex) return layout
+        val mutable = layout.toMutableList()
+        val item = mutable.removeAt(fromIndex)
+        mutable.add(toIndex, item)
+        return mutable
+    }
+
+    fun packIntoRows(items: List<DashboardWidgetItem>): List<List<DashboardWidgetItem>> {
+        return DashboardLayoutManager.packIntoRows(items)
+    }
+}
+
+object DashboardDragUtils {
+    fun getItemHeightPx(item: DashboardWidgetItem, density: Density): Float = with(density) {
+        DashboardGridDefaults.getWidgetHeight(item.size).toPx()
+    }
+
+    fun computeTargetIndex(
+        draggedIndex: Int,
+        dy: Float,
+        layout: List<DashboardWidgetItem>,
+        density: Density,
+        gapPx: Float
+    ): Int {
+        var target = draggedIndex
+        if (dy > 0) {
+            var threshold = 0f
+            for (i in (draggedIndex + 1)..layout.lastIndex) {
+                val h = getItemHeightPx(layout[i], density) + gapPx
+                if (dy > threshold + h * 0.45f) {
+                    target = i
+                    threshold += h
+                } else {
+                    break
+                }
+            }
+        } else if (dy < 0) {
+            var threshold = 0f
+            val absDy = kotlin.math.abs(dy)
+            for (i in (draggedIndex - 1) downTo 0) {
+                val h = getItemHeightPx(layout[i], density) + gapPx
+                if (absDy > threshold + h * 0.45f) {
+                    target = i
+                    threshold += h
+                } else {
+                    break
+                }
+            }
+        }
+        return target
+    }
+
+    fun computeLandingOffset(
+        draggedIndex: Int,
+        targetIndex: Int,
+        layout: List<DashboardWidgetItem>,
+        density: Density,
+        gapPx: Float
+    ): Float {
+        if (targetIndex > draggedIndex) {
+            var offset = 0f
+            for (k in (draggedIndex + 1)..targetIndex) {
+                offset += getItemHeightPx(layout[k], density) + gapPx
+            }
+            return offset
+        } else if (targetIndex < draggedIndex) {
+            var offset = 0f
+            for (k in targetIndex until draggedIndex) {
+                offset -= (getItemHeightPx(layout[k], density) + gapPx)
+            }
+            return offset
+        }
+        return 0f
+    }
+
+    fun computeDisplacementForIndex(
+        i: Int,
+        draggedIndex: Int?,
+        targetIndex: Int,
+        layout: List<DashboardWidgetItem>,
+        density: Density,
+        gapPx: Float
+    ): Float {
+        if (draggedIndex == null || i == draggedIndex) return 0f
+        val draggedHeight = getItemHeightPx(layout[draggedIndex], density) + gapPx
+        return if (targetIndex > draggedIndex) {
+            if (i in (draggedIndex + 1)..targetIndex) -draggedHeight else 0f
+        } else if (targetIndex < draggedIndex) {
+            if (i in targetIndex until draggedIndex) draggedHeight else 0f
+        } else {
+            0f
+        }
     }
 }

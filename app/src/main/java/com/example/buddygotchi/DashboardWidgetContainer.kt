@@ -107,7 +107,7 @@ fun DashboardWidgetContainer(
     }
 
     val isClock = item.widgetId == DashboardWidgetId.CLOCK
-    val isResizable = !isClock
+    val isResizable = true
 
     // Measured dimensions of the container card for accurate scale calculations
     var cardWidthPx by remember { mutableFloatStateOf(0f) }
