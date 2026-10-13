@@ -27,11 +27,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.buddygotchi.ui.theme.*
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -45,7 +47,13 @@ fun CreateEventDialog(
 ) {
     var titleInput by remember { mutableStateOf("") }
     var locationInput by remember { mutableStateOf("") }
+    var selectedLatitude by remember { mutableStateOf<Double?>(null) }
+    var selectedLongitude by remember { mutableStateOf<Double?>(null) }
+    var showMapPicker by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+    val clipboardManager = LocalClipboardManager.current
+    val coroutineScope = rememberCoroutineScope()
+    var isResolvingLocation by remember { mutableStateOf(false) }
 
     // Date offset: 0 = Today, 1 = Tomorrow, 2 = Day After
     var dateDaysOffset by remember { mutableIntStateOf(1) }
@@ -203,17 +211,110 @@ fun CreateEventDialog(
 
                 // Location Input & Presets
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "LOCATION // PIN",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NothingTextSecondary,
-                        letterSpacing = 1.sp
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "LOCATION // PIN",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NothingTextSecondary,
+                            letterSpacing = 1.sp
+                        )
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Quick Paste Link Button
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF202020))
+                                    .border(1.dp, Color(0xFF333333), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        val clip = clipboardManager.getText()?.text
+                                        if (!clip.isNullOrBlank()) {
+                                            if (GoogleMapsLinkResolver.isResolvable(clip)) {
+                                                isResolvingLocation = true
+                                                locationInput = "RESOLVING LINK..."
+                                                coroutineScope.launch {
+                                                    val res = GoogleMapsLinkResolver.resolve(clip)
+                                                    if (res != null) {
+                                                        locationInput = res.title
+                                                        selectedLatitude = res.latitude
+                                                        selectedLongitude = res.longitude
+                                                    } else {
+                                                        locationInput = clip.uppercase()
+                                                    }
+                                                    isResolvingLocation = false
+                                                }
+                                            } else {
+                                                locationInput = clip.uppercase()
+                                            }
+                                        }
+                                    }
+                                    .padding(horizontal = 7.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = if (isResolvingLocation) "● RESOLVING..." else "📋 PASTE LINK",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isResolvingLocation) NothingRed else NothingTextSecondary,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+
+                            // Map Picker Button
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (selectedLatitude != null) NothingRed.copy(alpha = 0.25f) else Color(0xFF202020))
+                                    .border(1.dp, if (selectedLatitude != null) NothingRed else Color(0xFF333333), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        focusManager.clearFocus()
+                                        showMapPicker = true
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = if (selectedLatitude != null) "📍 PIN SET [ ⌖ ]" else "📍 PICK ON MAP",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (selectedLatitude != null) NothingWhite else NothingTextSecondary,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+                        }
+                    }
+
                     BasicTextField(
                         value = locationInput,
-                        onValueChange = { locationInput = it.uppercase() },
+                        onValueChange = { input ->
+                            val trimmed = input.trim()
+                            if (GoogleMapsLinkResolver.isResolvable(trimmed)) {
+                                locationInput = "● RESOLVING LINK..."
+                                isResolvingLocation = true
+                                coroutineScope.launch {
+                                    val res = GoogleMapsLinkResolver.resolve(trimmed)
+                                    if (res != null) {
+                                        locationInput = res.title
+                                        selectedLatitude = res.latitude
+                                        selectedLongitude = res.longitude
+                                    } else {
+                                        locationInput = input.uppercase()
+                                    }
+                                    isResolvingLocation = false
+                                }
+                            } else {
+                                locationInput = input
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
@@ -229,7 +330,7 @@ fun CreateEventDialog(
                         ),
                         cursorBrush = SolidColor(NothingRed),
                         keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Characters,
+                            capitalization = KeyboardCapitalization.None,
                             imeAction = ImeAction.Done
                         ),
                         keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
@@ -237,16 +338,49 @@ fun CreateEventDialog(
                         decorationBox = { innerTextField ->
                             if (locationInput.isEmpty()) {
                                 Text(
-                                    text = "E.G. CENTRAL GYM / DISCORD",
+                                    text = "E.G. CENTRAL GYM OR PASTE LINK...",
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 13.sp,
+                                    fontSize = 11.5.sp,
                                     color = NothingTextTertiary.copy(alpha = 0.4f),
-                                    letterSpacing = 1.sp
+                                    letterSpacing = 0.8.sp
                                 )
                             }
                             innerTextField()
                         }
                     )
+
+                    // Pin coordinates attached badge
+                    if (selectedLatitude != null && selectedLongitude != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF181818))
+                                .border(1.dp, Color(0xFF2A2A2A), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = String.format(Locale.US, "📍 PIN: %.4f, %.4f", selectedLatitude, selectedLongitude),
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingRed,
+                                letterSpacing = 0.5.sp
+                            )
+                            Text(
+                                text = "✕ REMOVE PIN",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.sp,
+                                color = NothingTextTertiary,
+                                modifier = Modifier.clickable {
+                                    selectedLatitude = null
+                                    selectedLongitude = null
+                                }
+                            )
+                        }
+                    }
 
                     // Quick Location Chips
                     Row(
@@ -259,7 +393,13 @@ fun CreateEventDialog(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (locationInput == preset) Color(0xFF2C2C2C) else Color(0xFF1A1A1A))
                                     .border(1.dp, if (locationInput == preset) Color(0xFF666666) else Color(0xFF2A2A2A), RoundedCornerShape(8.dp))
-                                    .clickable { locationInput = preset }
+                                    .clickable {
+                                        locationInput = preset
+                                        if (preset == "DISCORD") {
+                                            selectedLatitude = null
+                                            selectedLongitude = null
+                                        }
+                                    }
                                     .padding(horizontal = 7.dp, vertical = 4.dp)
                             ) {
                                 Text(
@@ -567,6 +707,8 @@ fun CreateEventDialog(
                             val newEvent = GroupEvent(
                                 title = titleInput.trim(),
                                 location = if (locationInput.isNotBlank()) locationInput.trim() else "LOCATION TBD",
+                                latitude = selectedLatitude,
+                                longitude = selectedLongitude,
                                 eventTime = targetCal.timeInMillis,
                                 reminderOffsetMinutes = selectedOffsetMinutes,
                                 hostBuddyCode = currentUser.buddyCode,
@@ -590,5 +732,20 @@ fun CreateEventDialog(
                 }
             }
         }
+    }
+
+    if (showMapPicker) {
+        NothingMapPickerDialog(
+            initialLat = selectedLatitude,
+            initialLng = selectedLongitude,
+            initialLocationName = locationInput,
+            onDismiss = { showMapPicker = false },
+            onLocationSelected = { name, lat, lng ->
+                locationInput = name
+                selectedLatitude = lat
+                selectedLongitude = lng
+                showMapPicker = false
+            }
+        )
     }
 }

@@ -48,6 +48,7 @@ fun SquadDashboardPage(
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var showAddFriendDialog by remember { mutableStateOf(false) }
+    var viewingMapEvent by remember { mutableStateOf<GroupEvent?>(null) }
     val scrollState = rememberScrollState()
 
     LaunchedEffect(Unit) {
@@ -441,18 +442,112 @@ fun SquadDashboardPage(
                                     letterSpacing = 1.sp
                                 )
 
-                                // Location Row
+                                // Location Row & Map Navigation
                                 Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF181818))
+                                        .border(1.dp, if (event.latitude != null) Color(0xFF333333) else Color(0xFF252525), RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 10.dp, vertical = 7.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text(
-                                        text = "📍 ${event.location}",
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = NothingWhite
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text(
+                                            text = "📍",
+                                            fontSize = 11.sp
+                                        )
+                                        Column {
+                                            Text(
+                                                text = event.location,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = NothingWhite,
+                                                maxLines = 1
+                                            )
+                                            if (event.latitude != null && event.longitude != null) {
+                                                Text(
+                                                    text = String.format(Locale.US, "GPS: %.4f, %.4f", event.latitude, event.longitude),
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 8.sp,
+                                                    color = NothingRed,
+                                                    letterSpacing = 0.5.sp
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                        if (event.latitude != null && event.longitude != null) {
+                                            // Preview in Nothing OS map
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(Color(0xFF222222))
+                                                    .border(1.dp, Color(0xFF383838), RoundedCornerShape(6.dp))
+                                                    .clickable {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        viewingMapEvent = event
+                                                    }
+                                                    .padding(horizontal = 7.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "MAP ⌖",
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = NothingWhite
+                                                )
+                                            }
+
+                                            // External Navigation (Google Maps on Android, Apple Maps on iOS)
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(NothingRed)
+                                                    .clickable {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        SquadMapNavigationHelper.openNavigation(context, event.latitude, event.longitude, event.title)
+                                                    }
+                                                    .padding(horizontal = 7.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "NAV ↗",
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White
+                                                )
+                                            }
+                                        } else {
+                                            // Fallback text search in maps
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(Color(0xFF222222))
+                                                    .border(1.dp, Color(0xFF333333), RoundedCornerShape(6.dp))
+                                                    .clickable {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        SquadMapNavigationHelper.openSearch(context, event.location)
+                                                    }
+                                                    .padding(horizontal = 7.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "MAP ↗",
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = NothingTextSecondary
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
 
                                 // Alert & Host Pills
@@ -629,6 +724,19 @@ fun SquadDashboardPage(
             onEventCreated = { newEvent ->
                 events = SquadManager.createEvent(context, newEvent)
                 Toast.makeText(context, "EVENT DEPLOYED & ALARM SCHEDULED", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    if (viewingMapEvent != null) {
+        val ev = viewingMapEvent!!
+        NothingMapPickerDialog(
+            initialLat = ev.latitude,
+            initialLng = ev.longitude,
+            initialLocationName = ev.location,
+            onDismiss = { viewingMapEvent = null },
+            onLocationSelected = { _, _, _ ->
+                viewingMapEvent = null
             }
         )
     }

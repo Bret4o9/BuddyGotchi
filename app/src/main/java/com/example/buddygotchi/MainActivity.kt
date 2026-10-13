@@ -25,6 +25,20 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
 
+        val clipReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                val text = intent?.getStringExtra("text") ?: return
+                val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("test_clip", text))
+            }
+        }
+        androidx.core.content.ContextCompat.registerReceiver(
+            this,
+            clipReceiver,
+            android.content.IntentFilter("com.example.buddygotchi.SET_CLIPBOARD"),
+            androidx.core.content.ContextCompat.RECEIVER_EXPORTED
+        )
+
         setContent {
             BuddyGotchiTheme {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

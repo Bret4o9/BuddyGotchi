@@ -96,6 +96,8 @@ data class GroupEvent(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
     val location: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
     val eventTime: Long, // timestamp ms
     val reminderOffsetMinutes: Int = 15,
     val hostBuddyCode: String,
@@ -110,6 +112,8 @@ data class GroupEvent(
         put("id", id)
         put("title", title)
         put("location", location)
+        if (latitude != null) put("latitude", latitude)
+        if (longitude != null) put("longitude", longitude)
         put("eventTime", eventTime)
         put("reminderOffsetMinutes", reminderOffsetMinutes)
         put("hostBuddyCode", hostBuddyCode)
@@ -132,10 +136,14 @@ data class GroupEvent(
                     }
                 }
             }
+            val lat = if (json.has("latitude") && !json.isNull("latitude")) json.optDouble("latitude") else null
+            val lng = if (json.has("longitude") && !json.isNull("longitude")) json.optDouble("longitude") else null
             return GroupEvent(
                 id = json.optString("id", UUID.randomUUID().toString()),
                 title = json.getString("title"),
                 location = json.optString("location", "LOCATION"),
+                latitude = lat,
+                longitude = lng,
                 eventTime = json.getLong("eventTime"),
                 reminderOffsetMinutes = json.optInt("reminderOffsetMinutes", 15),
                 hostBuddyCode = json.getString("hostBuddyCode"),

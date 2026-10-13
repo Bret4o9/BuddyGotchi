@@ -52,10 +52,19 @@ fun LeftDashboardPage(
     onNotesUpdated: (List<NoteItem>) -> Unit,
     passwords: List<PasswordItem> = emptyList(),
     onPasswordsUpdated: (List<PasswordItem>) -> Unit = {},
+    tasks: List<ReminderTask> = emptyList(),
+    onToggleTask: (ReminderTask) -> Unit = {},
+    onClearDoneTasks: () -> Unit = {},
+    nextTask: ReminderTask? = null,
+    buddyXp: Int = 0,
+    buddyLevel: Int = 1,
+    onTaskCreated: (ReminderTask) -> Unit = {},
+    saveLayout: ((List<DashboardWidgetItem>) -> Unit)? = null,
     isEditMode: Boolean = false,
     onSetEditMode: (Boolean) -> Unit = {},
     onNotesExpandedChanged: (Boolean) -> Unit = {},
     onPasswordsExpandedChanged: (Boolean) -> Unit = {},
+    onDraggingChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -131,6 +140,9 @@ fun LeftDashboardPage(
 
     // Drag-and-drop vertical reordering state
     var draggedIndex by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(draggedIndex) {
+        onDraggingChanged(draggedIndex != null)
+    }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
     val dropAnimOffsetY = remember { Animatable(0f) }
     var isDropping by remember { mutableStateOf(false) }
@@ -148,7 +160,11 @@ fun LeftDashboardPage(
 
     fun updateLayout(newLayout: List<DashboardWidgetItem>) {
         onUpdateLayout(newLayout)
-        LeftDashboardLayoutManager.saveLayout(context, newLayout)
+        if (saveLayout != null) {
+            saveLayout(newLayout)
+        } else {
+            LeftDashboardLayoutManager.saveLayout(context, newLayout)
+        }
         triggerDropHaptic()
     }
 
@@ -383,68 +399,62 @@ fun LeftDashboardPage(
                                                 clip = false
                                             }
                                     ) { liveSize ->
-                                        when (item.widgetId) {
-                                            DashboardWidgetId.WATER -> {
-                                                WaterTrackerWidget(size = liveSize)
+                                        RenderDashboardWidgetContent(
+                                            item = item,
+                                            liveSize = liveSize,
+                                            tasks = tasks,
+                                            onToggleTask = onToggleTask,
+                                            onClearDoneTasks = onClearDoneTasks,
+                                            nextTask = nextTask,
+                                            buddyXp = buddyXp,
+                                            buddyLevel = buddyLevel,
+                                            onTaskCreated = onTaskCreated,
+                                            notes = notes,
+                                            onNotesUpdated = onNotesUpdated,
+                                            onExpandNotes = {
+                                                if (!isEditMode) {
+                                                    initialEditingNoteId = null
+                                                    expandedState = LeftPageExpandedState.NOTES
+                                                    onNotesExpandedChanged(true)
+                                                }
+                                            },
+                                            onQuickCreateNote = {
+                                                if (!isEditMode) {
+                                                    val newNote = NoteItem(
+                                                        title = "",
+                                                        content = "",
+                                                        updatedAt = System.currentTimeMillis()
+                                                    )
+                                                    onNotesUpdated(NotesManager.upsertNote(context, newNote))
+                                                    initialEditingNoteId = newNote.id
+                                                    expandedState = LeftPageExpandedState.NOTES
+                                                    onNotesExpandedChanged(true)
+                                                }
+                                            },
+                                            passwords = passwords,
+                                            onPasswordsUpdated = onPasswordsUpdated,
+                                            onExpandPasswords = {
+                                                if (!isEditMode) {
+                                                    initialEditingPasswordId = null
+                                                    expandedState = LeftPageExpandedState.PASSWORDS
+                                                    onPasswordsExpandedChanged(true)
+                                                }
+                                            },
+                                            onQuickCreatePassword = {
+                                                if (!isEditMode) {
+                                                    val newPass = PasswordItem(
+                                                        title = "",
+                                                        password = "",
+                                                        username = "",
+                                                        updatedAt = System.currentTimeMillis()
+                                                    )
+                                                    onPasswordsUpdated(PasswordsManager.upsertPassword(context, newPass))
+                                                    initialEditingPasswordId = newPass.id
+                                                    expandedState = LeftPageExpandedState.PASSWORDS
+                                                    onPasswordsExpandedChanged(true)
+                                                }
                                             }
-                                            DashboardWidgetId.NOTES -> {
-                                                NotesCollapsedWidget(
-                                                    notes = notes,
-                                                    size = liveSize,
-                                                    onExpand = {
-                                                        if (!isEditMode) {
-                                                            initialEditingNoteId = null
-                                                            expandedState = LeftPageExpandedState.NOTES
-                                                            onNotesExpandedChanged(true)
-                                                        }
-                                                    },
-                                                    onQuickCreate = {
-                                                        if (!isEditMode) {
-                                                            val newNote = NoteItem(
-                                                                title = "",
-                                                                content = "",
-                                                                updatedAt = System.currentTimeMillis()
-                                                            )
-                                                            onNotesUpdated(NotesManager.upsertNote(context, newNote))
-                                                            initialEditingNoteId = newNote.id
-                                                            expandedState = LeftPageExpandedState.NOTES
-                                                            onNotesExpandedChanged(true)
-                                                        }
-                                                    }
-                                                )
-                                            }
-                                            DashboardWidgetId.PASSWORDS -> {
-                                                PasswordsCollapsedWidget(
-                                                    passwords = passwords,
-                                                    size = liveSize,
-                                                    onExpand = {
-                                                        if (!isEditMode) {
-                                                            initialEditingPasswordId = null
-                                                            expandedState = LeftPageExpandedState.PASSWORDS
-                                                            onPasswordsExpandedChanged(true)
-                                                        }
-                                                    },
-                                                    onQuickCreate = {
-                                                        if (!isEditMode) {
-                                                            val newPass = PasswordItem(
-                                                                title = "",
-                                                                password = "",
-                                                                username = "",
-                                                                updatedAt = System.currentTimeMillis()
-                                                            )
-                                                            onPasswordsUpdated(PasswordsManager.upsertPassword(context, newPass))
-                                                            initialEditingPasswordId = newPass.id
-                                                            expandedState = LeftPageExpandedState.PASSWORDS
-                                                            onPasswordsExpandedChanged(true)
-                                                        }
-                                                    }
-                                                )
-                                            }
-                                            else -> {
-                                                // Fallback if other widget appears
-                                                Box(modifier = Modifier.size(80.dp))
-                                            }
-                                        }
+                                        )
                                     }
                                 }
                             } else {
@@ -559,67 +569,62 @@ fun LeftDashboardPage(
                                                         clip = false
                                                     }
                                             ) { liveSize ->
-                                                when (item.widgetId) {
-                                                    DashboardWidgetId.WATER -> {
-                                                        WaterTrackerWidget(size = liveSize)
+                                                RenderDashboardWidgetContent(
+                                                    item = item,
+                                                    liveSize = liveSize,
+                                                    tasks = tasks,
+                                                    onToggleTask = onToggleTask,
+                                                    onClearDoneTasks = onClearDoneTasks,
+                                                    nextTask = nextTask,
+                                                    buddyXp = buddyXp,
+                                                    buddyLevel = buddyLevel,
+                                                    onTaskCreated = onTaskCreated,
+                                                    notes = notes,
+                                                    onNotesUpdated = onNotesUpdated,
+                                                    onExpandNotes = {
+                                                        if (!isEditMode) {
+                                                            initialEditingNoteId = null
+                                                            expandedState = LeftPageExpandedState.NOTES
+                                                            onNotesExpandedChanged(true)
+                                                        }
+                                                    },
+                                                    onQuickCreateNote = {
+                                                        if (!isEditMode) {
+                                                            val newNote = NoteItem(
+                                                                title = "",
+                                                                content = "",
+                                                                updatedAt = System.currentTimeMillis()
+                                                            )
+                                                            onNotesUpdated(NotesManager.upsertNote(context, newNote))
+                                                            initialEditingNoteId = newNote.id
+                                                            expandedState = LeftPageExpandedState.NOTES
+                                                            onNotesExpandedChanged(true)
+                                                        }
+                                                    },
+                                                    passwords = passwords,
+                                                    onPasswordsUpdated = onPasswordsUpdated,
+                                                    onExpandPasswords = {
+                                                        if (!isEditMode) {
+                                                            initialEditingPasswordId = null
+                                                            expandedState = LeftPageExpandedState.PASSWORDS
+                                                            onPasswordsExpandedChanged(true)
+                                                        }
+                                                    },
+                                                    onQuickCreatePassword = {
+                                                        if (!isEditMode) {
+                                                            val newPass = PasswordItem(
+                                                                title = "",
+                                                                password = "",
+                                                                username = "",
+                                                                updatedAt = System.currentTimeMillis()
+                                                            )
+                                                            onPasswordsUpdated(PasswordsManager.upsertPassword(context, newPass))
+                                                            initialEditingPasswordId = newPass.id
+                                                            expandedState = LeftPageExpandedState.PASSWORDS
+                                                            onPasswordsExpandedChanged(true)
+                                                        }
                                                     }
-                                                    DashboardWidgetId.NOTES -> {
-                                                        NotesCollapsedWidget(
-                                                            notes = notes,
-                                                            size = liveSize,
-                                                            onExpand = {
-                                                                if (!isEditMode) {
-                                                                    initialEditingNoteId = null
-                                                                    expandedState = LeftPageExpandedState.NOTES
-                                                                    onNotesExpandedChanged(true)
-                                                                }
-                                                            },
-                                                            onQuickCreate = {
-                                                                if (!isEditMode) {
-                                                                    val newNote = NoteItem(
-                                                                        title = "",
-                                                                        content = "",
-                                                                        updatedAt = System.currentTimeMillis()
-                                                                    )
-                                                                    onNotesUpdated(NotesManager.upsertNote(context, newNote))
-                                                                    initialEditingNoteId = newNote.id
-                                                                    expandedState = LeftPageExpandedState.NOTES
-                                                                    onNotesExpandedChanged(true)
-                                                                }
-                                                            }
-                                                        )
-                                                    }
-                                                    DashboardWidgetId.PASSWORDS -> {
-                                                        PasswordsCollapsedWidget(
-                                                            passwords = passwords,
-                                                            size = liveSize,
-                                                            onExpand = {
-                                                                if (!isEditMode) {
-                                                                    initialEditingPasswordId = null
-                                                                    expandedState = LeftPageExpandedState.PASSWORDS
-                                                                    onPasswordsExpandedChanged(true)
-                                                                }
-                                                            },
-                                                            onQuickCreate = {
-                                                                if (!isEditMode) {
-                                                                    val newPass = PasswordItem(
-                                                                        title = "",
-                                                                        password = "",
-                                                                        username = "",
-                                                                        updatedAt = System.currentTimeMillis()
-                                                                    )
-                                                                    onPasswordsUpdated(PasswordsManager.upsertPassword(context, newPass))
-                                                                    initialEditingPasswordId = newPass.id
-                                                                    expandedState = LeftPageExpandedState.PASSWORDS
-                                                                    onPasswordsExpandedChanged(true)
-                                                                }
-                                                            }
-                                                        )
-                                                    }
-                                                    else -> {
-                                                        Box(modifier = Modifier.size(80.dp))
-                                                    }
-                                                }
+                                                )
                                             }
                                         }
                                     }

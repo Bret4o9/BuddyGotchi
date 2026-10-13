@@ -108,11 +108,23 @@ fun DashboardScreen() {
         } catch (_: Exception) {}
     }
 
-    val pagerState = rememberPagerState(initialPage = 1, pageCount = { 3 })
+    var pages by remember {
+        mutableStateOf(DashboardPagesManager.loadPages(context))
+    }
+    var customPageLayouts by remember {
+        mutableStateOf(DashboardPagesManager.loadAllCustomLayouts(context, pages))
+    }
+    var showPagesMenu by remember { mutableStateOf(false) }
+
+    val initialPageIndex = remember {
+        val idx = pages.indexOfFirst { it.type == DashboardPageType.MAIN }
+        if (idx != -1) idx else 1
+    }
+    val pagerState = rememberPagerState(initialPage = initialPageIndex, pageCount = { pages.size })
 
     val livePageFloat = pagerState.currentPage + pagerState.currentPageOffsetFraction
-    val currentSnappedPage = livePageFloat.roundToInt().coerceIn(0, 2)
-    var lastTickedPage by remember { mutableIntStateOf(1) }
+    val currentSnappedPage = livePageFloat.roundToInt().coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+    var lastTickedPage by remember { mutableIntStateOf(initialPageIndex) }
     var hasInitializedSettled by remember { mutableStateOf(false) }
     LaunchedEffect(currentSnappedPage) {
         if (currentSnappedPage != lastTickedPage) {
@@ -149,6 +161,7 @@ fun DashboardScreen() {
 
     // Edit Mode state
     var isEditMode by remember { mutableStateOf(false) }
+    var isChildPageDraggingWidget by remember { mutableStateOf(false) }
     var isNotesExpanded by remember { mutableStateOf(false) }
     var isPasswordsExpanded by remember { mutableStateOf(false) }
     var activeResizeWidgetId by remember { mutableStateOf<DashboardWidgetId?>(null) }
@@ -210,19 +223,27 @@ fun DashboardScreen() {
 
     var isShelfOpen by remember { mutableStateOf(false) }
 
-    val shelfWidgets = remember(layout, leftLayout) {
-        DashboardLayoutManager.getShelfWidgets(layout, leftLayout)
+    val shelfWidgets = remember(layout, leftLayout, customPageLayouts) {
+        val deployed = (layout.map { it.widgetId } + leftLayout.map { it.widgetId } + customPageLayouts.values.flatMap { it.map { w -> w.widgetId } }).toSet()
+        DashboardWidgetId.entries.filter { it !in deployed }
     }
 
     fun deployWidget(widgetId: DashboardWidgetId, targetPage: Int) {
-        when (targetPage) {
-            0 -> {
+        val targetPageItem = pages.getOrNull(targetPage)
+        when {
+            targetPageItem?.id == "page_left" -> {
                 val newLeft = LeftDashboardLayoutManager.addWidget(leftLayout, widgetId)
                 updateLeftLayout(newLeft)
             }
-            1 -> {
+            targetPageItem?.type == DashboardPageType.MAIN -> {
                 val newMain = DashboardLayoutManager.addWidget(layout, widgetId)
                 updateLayout(newMain)
+            }
+            targetPageItem?.type == DashboardPageType.CUSTOM_GRID -> {
+                val curr = customPageLayouts[targetPageItem.id] ?: emptyList()
+                val updated = LeftDashboardLayoutManager.addWidget(curr, widgetId)
+                customPageLayouts = customPageLayouts + (targetPageItem.id to updated)
+                DashboardPagesManager.saveCustomPageLayout(context, targetPageItem.id, updated)
             }
             else -> {
                 val newLeft = LeftDashboardLayoutManager.addWidget(leftLayout, widgetId)
@@ -332,7 +353,7 @@ fun DashboardScreen() {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        if (unusedWidgets.isNotEmpty() && pagerState.currentPage == 1) {
+                        if (unusedWidgets.isNotEmpty() && pages.getOrNull(pagerState.currentPage)?.type == DashboardPageType.MAIN) {
                             var showAddMenu by remember { mutableStateOf(false) }
                             Box {
                                 Surface(
@@ -370,10 +391,11 @@ fun DashboardScreen() {
                         // Drum Roll Page Indicator opposite to "BUDDYGOTCHI"
                         PageDrumRollIndicator(
                             pagerState = pagerState,
-                            onTabClick = { targetPage ->
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(targetPage)
-                                }
+                            pages = pages,
+                            isMenuOpen = showPagesMenu,
+                            onClick = {
+                                showPagesMenu = !showPagesMenu
+                                triggerTick()
                             }
                         )
                     }
@@ -395,7 +417,7 @@ fun DashboardScreen() {
             // HorizontalPager holding Left Page, Main Dashboard, Right Page
             HorizontalPager(
                 state = pagerState,
-                userScrollEnabled = !isEditMode && draggedIndex == null && !isNotesExpanded && !isPasswordsExpanded,
+                userScrollEnabled = !isEditMode && draggedIndex == null && !isChildPageDraggingWidget,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
@@ -431,20 +453,32 @@ fun DashboardScreen() {
                             alpha = (1f - absOffset * 0.45f).coerceIn(0.50f, 1f)
                         }
                 ) {
-                    when (pageIndex) {
-                    0 -> LeftDashboardPage(
-                        layout = leftLayout,
-                        onUpdateLayout = { updateLeftLayout(it) },
-                        notes = notes,
-                        onNotesUpdated = { notes = it },
-                        passwords = passwords,
-                        onPasswordsUpdated = { passwords = it },
-                        isEditMode = isEditMode,
-                        onSetEditMode = { isEditMode = it },
-                        onNotesExpandedChanged = { isNotesExpanded = it },
-                        onPasswordsExpandedChanged = { isPasswordsExpanded = it }
-                    )
-                    1 -> {
+                    val currentPageItem = pages.getOrNull(pageIndex)
+                    when {
+                        currentPageItem == null -> Box(Modifier.fillMaxSize())
+                        currentPageItem.id == "page_left" -> {
+                            LeftDashboardPage(
+                                layout = leftLayout,
+                                onUpdateLayout = { updateLeftLayout(it) },
+                                notes = notes,
+                                onNotesUpdated = { notes = it },
+                                passwords = passwords,
+                                onPasswordsUpdated = { passwords = it },
+                                tasks = tasks,
+                                onToggleTask = { task -> tasks = TaskManager.toggleTask(context, task.id) },
+                                onClearDoneTasks = { tasks = TaskManager.clearDoneTasks(context) },
+                                nextTask = nextTask,
+                                buddyXp = buddyXp,
+                                buddyLevel = buddyLevel,
+                                onTaskCreated = { task -> tasks = TaskManager.addTask(context, task) },
+                                isEditMode = isEditMode,
+                                onSetEditMode = { isEditMode = it },
+                                onNotesExpandedChanged = { isNotesExpanded = it },
+                                onPasswordsExpandedChanged = { isPasswordsExpanded = it },
+                                onDraggingChanged = { isChildPageDraggingWidget = it }
+                            )
+                        }
+                        currentPageItem.type == DashboardPageType.MAIN -> {
                         AnimatedContent(
                             targetState = mainExpandedState,
                             transitionSpec = {
@@ -841,8 +875,40 @@ fun DashboardScreen() {
                 }
             }
         }
-                    2 -> SquadDashboardPage()
-                }
+                        currentPageItem.type == DashboardPageType.SQUAD -> {
+                            SquadDashboardPage()
+                        }
+                        else -> {
+                            val pageId = currentPageItem.id
+                            val pageLayout = customPageLayouts[pageId] ?: emptyList()
+                            LeftDashboardPage(
+                                layout = pageLayout,
+                                onUpdateLayout = { newL ->
+                                    customPageLayouts = customPageLayouts + (pageId to newL)
+                                    DashboardPagesManager.saveCustomPageLayout(context, pageId, newL)
+                                },
+                                saveLayout = { newL ->
+                                    DashboardPagesManager.saveCustomPageLayout(context, pageId, newL)
+                                },
+                                notes = notes,
+                                onNotesUpdated = { notes = it },
+                                passwords = passwords,
+                                onPasswordsUpdated = { passwords = it },
+                                tasks = tasks,
+                                onToggleTask = { task -> tasks = TaskManager.toggleTask(context, task.id) },
+                                onClearDoneTasks = { tasks = TaskManager.clearDoneTasks(context) },
+                                nextTask = nextTask,
+                                buddyXp = buddyXp,
+                                buddyLevel = buddyLevel,
+                                onTaskCreated = { task -> tasks = TaskManager.addTask(context, task) },
+                                isEditMode = isEditMode,
+                                onSetEditMode = { isEditMode = it },
+                                onNotesExpandedChanged = { isNotesExpanded = it },
+                                onPasswordsExpandedChanged = { isPasswordsExpanded = it },
+                                onDraggingChanged = { isChildPageDraggingWidget = it }
+                            )
+                        }
+                    }
             }
         }
     }
@@ -900,6 +966,58 @@ fun DashboardScreen() {
             coroutineScope.launch {
                 pagerState.animateScrollToPage(0)
             }
+        }
+    )
+
+    PagesMenuDropdown(
+        isOpen = showPagesMenu,
+        pages = pages,
+        currentPageIndex = pagerState.currentPage,
+        onSelectPage = { pageIdx ->
+            showPagesMenu = false
+            coroutineScope.launch {
+                pagerState.animateScrollToPage(pageIdx)
+            }
+        },
+        onMovePage = { fromIdx, toIdx ->
+            if (fromIdx in pages.indices && toIdx in pages.indices && fromIdx != toIdx) {
+                val currentPageId = pages.getOrNull(pagerState.currentPage)?.id
+                val updatedPages = DashboardPagesManager.movePage(context, fromIdx, toIdx)
+                pages = updatedPages
+                triggerTick()
+                if (currentPageId != null) {
+                    val newCurrentPage = updatedPages.indexOfFirst { it.id == currentPageId }
+                    if (newCurrentPage != -1 && newCurrentPage != pagerState.currentPage) {
+                        coroutineScope.launch {
+                            pagerState.scrollToPage(newCurrentPage)
+                        }
+                    }
+                }
+            }
+        },
+        onCreatePage = { template ->
+            val newPage = DashboardPagesManager.createPage(context, template)
+            val updatedPages = DashboardPagesManager.loadPages(context)
+            pages = updatedPages
+            customPageLayouts = DashboardPagesManager.loadAllCustomLayouts(context, updatedPages)
+            showPagesMenu = false
+            coroutineScope.launch {
+                kotlinx.coroutines.delay(80)
+                pagerState.animateScrollToPage(updatedPages.lastIndex)
+            }
+        },
+        onDeletePage = { pageId ->
+            val updatedPages = DashboardPagesManager.deletePage(context, pageId)
+            pages = updatedPages
+            customPageLayouts = DashboardPagesManager.loadAllCustomLayouts(context, updatedPages)
+            val targetPage = pagerState.currentPage.coerceAtMost(updatedPages.lastIndex)
+            coroutineScope.launch {
+                kotlinx.coroutines.delay(50)
+                pagerState.scrollToPage(targetPage)
+            }
+        },
+        onDismiss = {
+            showPagesMenu = false
         }
     )
 }
@@ -1058,21 +1176,13 @@ fun RenderDashboardWidgetContent(
     }
 }
 
-data class PageTabInfo(val number: String, val title: String)
-
 @Composable
 fun PageDrumRollIndicator(
     pagerState: PagerState,
-    onTabClick: (Int) -> Unit
+    pages: List<DashboardPageItem>,
+    isMenuOpen: Boolean,
+    onClick: () -> Unit
 ) {
-    val tabs = remember {
-        listOf(
-            PageTabInfo("01", "LEFT"),
-            PageTabInfo("02", "MAIN"),
-            PageTabInfo("03", "SQUAD")
-        )
-    }
-
     val itemHeight = 24.dp
     val itemHeightPx = with(LocalDensity.current) { itemHeight.toPx() }
     val density = LocalDensity.current
@@ -1082,24 +1192,24 @@ fun PageDrumRollIndicator(
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = NothingCardSurface,
-        border = BorderStroke(1.dp, NothingBorder),
+        border = BorderStroke(1.dp, if (isMenuOpen) NothingRed else NothingBorder),
         modifier = Modifier
-            .width(106.dp)
+            .width(116.dp)
             .height(28.dp)
             .clip(RoundedCornerShape(14.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) {
-                val nextPage = (pagerState.currentPage + 1) % 3
-                onTabClick(nextPage)
+                onClick()
             }
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            tabs.forEachIndexed { i, tab ->
+            pages.forEachIndexed { i, page ->
+                val pageNumber = String.format(java.util.Locale.US, "%02d", i + 1)
                 val relPos = i - livePage
                 val yOffset = relPos * itemHeightPx
                 val absDist = abs(relPos)
@@ -1125,7 +1235,7 @@ fun PageDrumRollIndicator(
                             horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Text(
-                                text = tab.number,
+                                text = pageNumber,
                                 fontFamily = Dseg7FontFamily,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
@@ -1139,10 +1249,11 @@ fun PageDrumRollIndicator(
                                     .background(if (absDist < 0.45f) NothingRed else NothingTextTertiary)
                             )
                             Text(
-                                text = tab.title,
+                                text = page.title,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp,
+                                maxLines = 1,
                                 color = if (absDist < 0.45f) NothingWhite else NothingTextSecondary
                             )
                         }

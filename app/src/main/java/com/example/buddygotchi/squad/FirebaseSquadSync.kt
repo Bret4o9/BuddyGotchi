@@ -77,6 +77,8 @@ object FirebaseSquadSync {
             "id" to event.id,
             "title" to event.title,
             "location" to event.location,
+            "latitude" to event.latitude,
+            "longitude" to event.longitude,
             "eventTime" to event.eventTime,
             "reminderOffsetMinutes" to event.reminderOffsetMinutes,
             "hostBuddyCode" to event.hostBuddyCode,
@@ -147,6 +149,8 @@ object FirebaseSquadSync {
                         val id = doc.getString("id") ?: doc.id
                         val title = doc.getString("title") ?: continue
                         val location = doc.getString("location") ?: "LOCATION"
+                        val latitude = doc.getDouble("latitude")
+                        val longitude = doc.getDouble("longitude")
                         val eventTime = doc.getLong("eventTime") ?: continue
                         val offsetMinutes = doc.getLong("reminderOffsetMinutes")?.toInt() ?: 15
                         val hostCode = doc.getString("hostBuddyCode") ?: ""
@@ -172,6 +176,8 @@ object FirebaseSquadSync {
                             id = id,
                             title = title,
                             location = location,
+                            latitude = latitude,
+                            longitude = longitude,
                             eventTime = eventTime,
                             reminderOffsetMinutes = offsetMinutes,
                             hostBuddyCode = hostCode,
