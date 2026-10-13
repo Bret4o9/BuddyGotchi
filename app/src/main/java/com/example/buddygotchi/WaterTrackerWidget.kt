@@ -104,6 +104,7 @@ fun WaterTrackerWidget(
     val internalPadding = when {
         size.cols == 1 -> 8.dp
         size.rows == 1 -> 10.dp
+        size.cols == 3 -> 12.dp
         else -> 14.dp
     }
 
@@ -517,9 +518,9 @@ fun WaterTrackerWidget(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "WATER TRACKER",
-                                fontSize = 11.sp,
+                                fontSize = if (size.cols == 3) 10.sp else 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.5.sp,
+                                letterSpacing = if (size.cols == 3) 1.sp else 1.5.sp,
                                 color = NothingWhite
                             )
                         }
@@ -553,24 +554,30 @@ fun WaterTrackerWidget(
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(Color(0x1400E5FF))
                                 .border(0.5.dp, Color(0x3300E5FF), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                                .padding(horizontal = if (size.cols == 3) 8.dp else 10.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "RECOMMENDED: ${waterState.targetGlasses} GLASSES (${waterState.targetMl} ML)",
-                                fontSize = 9.sp,
+                                text = if (size.cols <= 3) "GOAL: ${waterState.targetGlasses} GLASSES (${waterState.targetMl} ML)"
+                                else "RECOMMENDED: ${waterState.targetGlasses} GLASSES (${waterState.targetMl} ML)",
+                                fontSize = if (size.cols <= 3) 8.5.sp else 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
-                                letterSpacing = 0.8.sp,
-                                color = Color(0xFF80D8FF)
+                                letterSpacing = if (size.cols <= 3) 0.5.sp else 0.8.sp,
+                                color = Color(0xFF80D8FF),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "35 ML/KG",
                                 fontSize = 8.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
-                                color = NothingTextTertiary
+                                color = NothingTextTertiary,
+                                maxLines = 1
                             )
                         }
                     }
@@ -584,7 +591,7 @@ fun WaterTrackerWidget(
                     ) {
                         Box(
                             modifier = Modifier
-                                .weight(if (size.rows >= 4) 1.25f else 1f)
+                                .weight(if (size.rows >= 4) 1.25f else if (size.cols == 3) 0.95f else 1f)
                                 .fillMaxHeight(),
                             contentAlignment = Alignment.Center
                         ) {
@@ -595,11 +602,11 @@ fun WaterTrackerWidget(
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(if (size.rows >= 4) 16.dp else 12.dp))
+                        Spacer(modifier = Modifier.width(if (size.rows >= 4) 16.dp else if (size.cols == 3) 8.dp else 12.dp))
 
                         Column(
                             modifier = Modifier
-                                .weight(if (size.rows >= 4) 1f else 1.1f)
+                                .weight(if (size.rows >= 4) 1f else if (size.cols == 3) 1.05f else 1.1f)
                                 .fillMaxHeight(),
                             verticalArrangement = Arrangement.Center
                         ) {
@@ -609,6 +616,7 @@ fun WaterTrackerWidget(
                                     fontFamily = Dseg7FontFamily,
                                     fontSize = when {
                                         size.rows == 2 -> 28.sp
+                                        size.cols == 3 && size.rows == 3 -> 30.sp
                                         size.rows >= 4 -> 44.sp
                                         else -> 38.sp
                                     },
@@ -619,7 +627,7 @@ fun WaterTrackerWidget(
                                 Text(
                                     text = "%",
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = if (size.rows >= 4) 18.sp else 14.sp,
+                                    fontSize = if (size.rows >= 4) 18.sp else if (size.cols == 3) 12.sp else 14.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF00E5FF),
                                     modifier = Modifier.padding(bottom = if (size.rows >= 4) 6.dp else 4.dp)
@@ -633,12 +641,15 @@ fun WaterTrackerWidget(
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = when {
                                     size.rows == 2 -> 11.sp
+                                    size.cols == 3 -> 10.5.sp
                                     size.rows >= 4 -> 13.sp
                                     else -> 12.sp
                                 },
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                color = NothingWhite.copy(alpha = 0.9f)
+                                letterSpacing = if (size.cols == 3) 0.5.sp else 1.sp,
+                                color = NothingWhite.copy(alpha = 0.9f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
 
                             Spacer(modifier = Modifier.height(if (size.rows >= 4) 4.dp else 2.dp))
@@ -646,26 +657,28 @@ fun WaterTrackerWidget(
                             Text(
                                 text = "${waterState.glassesCount} OF ${waterState.targetGlasses} GLASSES",
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = if (size.rows >= 4) 10.sp else 9.sp,
+                                fontSize = if (size.rows >= 4) 10.sp else if (size.cols == 3) 8.5.sp else 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                color = NothingTextSecondary
+                                letterSpacing = if (size.cols == 3) 0.5.sp else 1.sp,
+                                color = NothingTextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
 
                             if (size.rows >= 3) {
-                                Spacer(modifier = Modifier.height(if (size.rows >= 4) 12.dp else 6.dp))
+                                Spacer(modifier = Modifier.height(if (size.rows >= 4) 12.dp else if (size.cols == 3) 5.dp else 6.dp))
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(if (size.rows >= 4) 6.dp else 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(if (size.cols == 3) 3.dp else if (size.rows >= 4) 6.dp else 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    val maxDisplayGlasses = min(waterState.targetGlasses, 12)
+                                    val maxDisplayGlasses = if (size.cols == 3) min(waterState.targetGlasses, 8) else min(waterState.targetGlasses, 12)
                                     for (i in 0 until maxDisplayGlasses) {
                                         val isFilled = i < waterState.glassesCount
                                         Box(
                                             modifier = Modifier
                                                 .size(
-                                                    width = if (size.rows >= 4) 10.dp else 8.dp,
-                                                    height = if (size.rows >= 4) 16.dp else 12.dp
+                                                    width = if (size.cols == 3) 6.dp else if (size.rows >= 4) 10.dp else 8.dp,
+                                                    height = if (size.cols == 3) 10.dp else if (size.rows >= 4) 16.dp else 12.dp
                                                 )
                                                 .clip(RoundedCornerShape(2.dp))
                                                 .background(
@@ -692,11 +705,11 @@ fun WaterTrackerWidget(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(if (size.cols == 3) 5.dp else 8.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .weight(1.4f)
+                                .weight(if (size.cols == 3) 1.15f else 1.4f)
                                 .height(actionButtonHeight)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(Color(0xFF00E5FF).copy(alpha = 0.15f))
@@ -710,15 +723,15 @@ fun WaterTrackerWidget(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
                                     modifier = Modifier
-                                        .size(5.dp)
+                                        .size(if (size.cols == 3) 4.dp else 5.dp)
                                         .clip(CircleShape)
                                         .background(NothingRed)
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(if (size.cols == 3) 4.dp else 6.dp))
                                 Text(
-                                    text = "+ 250 ML",
+                                    text = if (size.cols == 3) "+ 250" else "+ 250 ML",
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = if (size.rows >= 4) 11.5.sp else 10.5.sp,
+                                    fontSize = if (size.rows >= 4) 11.5.sp else if (size.cols == 3) 9.5.sp else 10.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = NothingWhite
                                 )
@@ -727,7 +740,7 @@ fun WaterTrackerWidget(
 
                         Box(
                             modifier = Modifier
-                                .weight(1.1f)
+                                .weight(if (size.cols == 3) 1.0f else 1.1f)
                                 .height(actionButtonHeight)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(NothingSurfaceVariant)
@@ -739,9 +752,9 @@ fun WaterTrackerWidget(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "+ 500 ML",
+                                text = if (size.cols == 3) "+ 500" else "+ 500 ML",
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = if (size.rows >= 4) 11.sp else 10.sp,
+                                fontSize = if (size.rows >= 4) 11.sp else if (size.cols == 3) 9.sp else 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = NothingTextSecondary
                             )
@@ -764,7 +777,7 @@ fun WaterTrackerWidget(
                             Text(
                                 text = "- 250",
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = if (size.rows >= 4) 10.5.sp else 9.5.sp,
+                                fontSize = if (size.rows >= 4) 10.5.sp else if (size.cols == 3) 8.5.sp else 9.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = NothingTextTertiary
                             )
@@ -785,7 +798,7 @@ fun WaterTrackerWidget(
                             Text(
                                 text = "RESET",
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = if (size.rows >= 4) 10.sp else 8.5.sp,
+                                fontSize = if (size.rows >= 4) 10.sp else if (size.cols == 3) 8.sp else 8.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = NothingTextTertiary
                             )
