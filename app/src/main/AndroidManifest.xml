@@ -55,6 +55,18 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".BuddyTaskWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.example.buddygotchi.ACTION_PET_BUDDY" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/buddy_task_widget_info" />
+        </receiver>
+
     </application>
 
 </manifest>

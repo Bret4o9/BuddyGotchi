@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">BuddyGotchi</string>
+    <string name="widget_buddy_task_name">Buddy &amp; Next Task</string>
+    <string name="widget_buddy_task_description">Interactive Buddy companion with live blinking and next scheduled task.</string>
 </resources>

@@ -1,5 +1,7 @@
 package com.example.buddygotchi
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -288,26 +290,69 @@ fun ShelfOverlay(
                             )
                         }
 
-                        // Close button
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = NothingSurfaceVariant,
-                            border = BorderStroke(1.dp, NothingBorder),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    triggerSnap()
-                                    onClose()
-                                }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "✕ CLOSE",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NothingTextSecondary,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                            )
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFF1E1E1E),
+                                    border = BorderStroke(1.dp, NothingRed.copy(alpha = 0.7f)),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            triggerSnap()
+                                            val appWidgetManager = context.getSystemService(AppWidgetManager::class.java)
+                                            val provider = ComponentName(context, BuddyTaskWidgetProvider::class.java)
+                                            if (appWidgetManager != null && appWidgetManager.isRequestPinAppWidgetSupported) {
+                                                appWidgetManager.requestPinAppWidget(provider, null, null)
+                                            }
+                                        }
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(5.dp)
+                                                .clip(CircleShape)
+                                                .background(NothingRed)
+                                        )
+                                        Text(
+                                            text = "+ HOME",
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = NothingWhite
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Close button
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = NothingSurfaceVariant,
+                                border = BorderStroke(1.dp, NothingBorder),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        triggerSnap()
+                                        onClose()
+                                    }
+                            ) {
+                                Text(
+                                    text = "✕ CLOSE",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NothingTextSecondary,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
+                            }
                         }
                     }
 

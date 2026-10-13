@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:background="@drawable/widget_background"
+    android:padding="10dp"
+    android:gravity="center_vertical">
+
+    <!-- LEFT COLUMN: BUDDY COMPANION -->
+    <LinearLayout
+        android:id="@+id/widget_buddy_container"
+        android:layout_width="116dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="4dp">
+
+        <!-- Animated Eye Flipper -->
+        <ViewFlipper
+            android:id="@+id/widget_buddy_eyes_flipper"
+            android:layout_width="96dp"
+            android:layout_height="46dp"
+            android:autoStart="true"
+            android:flipInterval="2200">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/buddy_eyes_center"
+                android:contentDescription="Buddy Eyes Center" />
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/buddy_eyes_look_right"
+                android:contentDescription="Buddy Looking at Task" />
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/buddy_eyes_center"
+                android:contentDescription="Buddy Eyes Center" />
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/buddy_eyes_blink_half"
+                android:contentDescription="Buddy Eyes Half Blink" />
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/buddy_eyes_blink_closed"
+                android:contentDescription="Buddy Eyes Blink" />
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/buddy_eyes_blink_half"
+                android:contentDescription="Buddy Eyes Half Blink" />
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/buddy_eyes_center"
+                android:contentDescription="Buddy Eyes Center" />
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/buddy_eyes_look_left"
+                android:contentDescription="Buddy Looking Left" />
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/buddy_eyes_center"
+                android:contentDescription="Buddy Eyes Center" />
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/buddy_eyes_happy"
+                android:contentDescription="Buddy Happy Eyes" />
+
+        </ViewFlipper>
+
+        <!-- Level Text -->
+        <TextView
+            android:id="@+id/widget_buddy_level"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text="LVL 1 BUDDY"
+            android:textColor="@color/nothing_red"
+            android:textSize="10.5sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06" />
+
+        <!-- XP Progress Bar -->
+        <ProgressBar
+            android:id="@+id/widget_buddy_xp_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="66dp"
+            android:layout_height="4dp"
+            android:layout_marginTop="3dp"
+            android:max="50"
+            android:progress="20"
+            android:progressDrawable="@drawable/widget_progress_track" />
+
+        <!-- XP Text -->
+        <TextView
+            android:id="@+id/widget_buddy_xp_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="20 / 50 XP"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="8.5sp" />
+
+    </LinearLayout>
+
+    <!-- VERTICAL DIVIDER -->
+    <FrameLayout
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="6dp"
+        android:layout_marginStart="2dp"
+        android:layout_marginEnd="8dp"
+        android:background="@color/widget_stroke" />
+
+    <!-- RIGHT COLUMN: NEXT TASK -->
+    <LinearLayout
+        android:id="@+id/widget_task_container"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:background="@drawable/widget_task_bg"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:gravity="center_vertical">
+
+        <!-- Header: Next Task Label + Category Badge -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/widget_task_header"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="NEXT TASK"
+                android:textColor="@color/widget_text_muted"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08" />
+
+            <TextView
+                android:id="@+id/widget_task_category"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="WORK"
+                android:textColor="@color/nothing_red"
+                android:textSize="8.5sp"
+                android:textStyle="bold"
+                android:background="@drawable/widget_category_pill"
+                android:paddingStart="7dp"
+                android:paddingEnd="7dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp" />
+
+        </LinearLayout>
+
+        <!-- Time & Countdown -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="3dp">
+
+            <TextView
+                android:id="@+id/widget_task_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="14:30"
+                android:textColor="@color/white"
+                android:textSize="18.5sp"
+                android:textStyle="bold"
+                android:typeface="monospace" />
+
+            <TextView
+                android:id="@+id/widget_task_countdown"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="in 45m"
+                android:textColor="@color/nothing_red"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+        <!-- Task Description -->
+        <TextView
+            android:id="@+id/widget_task_description"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Sprint review &amp; presentation"
+            android:textColor="#D0D0D0"
+            android:textSize="11sp"
+            android:maxLines="2"
+            android:ellipsize="end" />
+
+        <!-- Footer Call-to-Action -->
+        <TextView
+            android:id="@+id/widget_task_footer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text="Tap to open in BuddyGotchi →"
+            android:textColor="@color/widget_text_muted"
+            android:textSize="8sp" />
+
+    </LinearLayout>
+
+</LinearLayout>

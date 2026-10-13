@@ -1,0 +1,27 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="48dp"
+    android:viewportWidth="96"
+    android:viewportHeight="48">
+    <!-- Left Eye Outer -->
+    <path
+        android:fillColor="#141414"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.8"
+        android:pathData="M 30,8 A 16,16 0 1,1 29.99,8 Z" />
+    <!-- Left Pupil (Glancing Left) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 24,18 A 6,6 0 1,1 23.99,18 Z" />
+
+    <!-- Right Eye Outer -->
+    <path
+        android:fillColor="#141414"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.8"
+        android:pathData="M 66,8 A 16,16 0 1,1 65.99,8 Z" />
+    <!-- Right Pupil (Glancing Left) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 60,18 A 6,6 0 1,1 59.99,18 Z" />
+</vector>

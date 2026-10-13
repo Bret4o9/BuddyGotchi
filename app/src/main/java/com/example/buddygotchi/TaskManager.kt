@@ -67,6 +67,7 @@ object TaskManager {
         }
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_TASKS, jsonArray.toString()).apply()
+        BuddyTaskWidgetProvider.updateAllWidgets(context)
     }
 
     fun addTask(context: Context, task: ReminderTask): List<ReminderTask> {
@@ -103,6 +104,7 @@ object TaskManager {
         val current = getBuddyXp(context) + xpAmount
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putInt(KEY_BUDDY_XP, current).apply()
+        BuddyTaskWidgetProvider.updateAllWidgets(context)
         return current
     }
 
