@@ -5,7 +5,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.*
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.example.buddygotchi.ui.nothingDotGrid
 import com.example.buddygotchi.ui.DashboardGridBackground
+import com.example.buddygotchi.ui.SlimScrollWheel
 import com.example.buddygotchi.ui.theme.*
 import com.example.buddygotchi.squad.SquadDashboardPage
 import kotlinx.coroutines.launch
@@ -149,6 +150,7 @@ fun DashboardScreen() {
     // Edit Mode state
     var isEditMode by remember { mutableStateOf(false) }
     var isNotesExpanded by remember { mutableStateOf(false) }
+    var isPasswordsExpanded by remember { mutableStateOf(false) }
     var activeResizeWidgetId by remember { mutableStateOf<DashboardWidgetId?>(null) }
     var activeResizePreviewSize by remember { mutableStateOf<WidgetSize?>(null) }
 
@@ -163,6 +165,42 @@ fun DashboardScreen() {
     }
 
     var notes by remember { mutableStateOf(NotesManager.getNotes(context)) }
+    var passwords by remember { mutableStateOf(PasswordsManager.getPasswords(context)) }
+
+    var mainExpandedState by remember { mutableStateOf(LeftPageExpandedState.COLLAPSED) }
+    var initialEditingMainNoteId by remember { mutableStateOf<String?>(null) }
+    var initialEditingMainPasswordId by remember { mutableStateOf<String?>(null) }
+
+    // Auto-expand if NOTES or PASSWORDS is the ONLY widget on Main page;
+    // Auto-collapse into a smaller widget when a second widget is added.
+    val mainSingleWidgetId = if (layout.size == 1) layout[0].widgetId else null
+    LaunchedEffect(layout.size, mainSingleWidgetId) {
+        if (layout.size == 1) {
+            when (layout[0].widgetId) {
+                DashboardWidgetId.NOTES -> {
+                    mainExpandedState = LeftPageExpandedState.NOTES
+                    isNotesExpanded = true
+                    isPasswordsExpanded = false
+                    if (isEditMode) isEditMode = false
+                }
+                DashboardWidgetId.PASSWORDS -> {
+                    mainExpandedState = LeftPageExpandedState.PASSWORDS
+                    isPasswordsExpanded = true
+                    isNotesExpanded = false
+                    if (isEditMode) isEditMode = false
+                }
+                else -> {
+                    mainExpandedState = LeftPageExpandedState.COLLAPSED
+                    isNotesExpanded = false
+                    isPasswordsExpanded = false
+                }
+            }
+        } else {
+            mainExpandedState = LeftPageExpandedState.COLLAPSED
+            isNotesExpanded = false
+            isPasswordsExpanded = false
+        }
+    }
 
     fun updateLayout(newLayout: List<DashboardWidgetItem>) {
         layout = newLayout
@@ -348,8 +386,8 @@ fun DashboardScreen() {
                 stashedCount = shelfWidgets.size,
                 onClick = { isShelfOpen = !isShelfOpen },
                 modifier = Modifier.padding(
-                    start = 16.dp,
-                    end = 16.dp,
+                    start = DashboardGridDefaults.HORIZONTAL_PADDING,
+                    end = DashboardGridDefaults.HORIZONTAL_PADDING,
                     bottom = 4.dp
                 )
             )
@@ -357,7 +395,7 @@ fun DashboardScreen() {
             // HorizontalPager holding Left Page, Main Dashboard, Right Page
             HorizontalPager(
                 state = pagerState,
-                userScrollEnabled = !isEditMode && draggedIndex == null && !isNotesExpanded,
+                userScrollEnabled = !isEditMode && draggedIndex == null && !isNotesExpanded && !isPasswordsExpanded,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
@@ -399,14 +437,66 @@ fun DashboardScreen() {
                         onUpdateLayout = { updateLeftLayout(it) },
                         notes = notes,
                         onNotesUpdated = { notes = it },
+                        passwords = passwords,
+                        onPasswordsUpdated = { passwords = it },
                         isEditMode = isEditMode,
                         onSetEditMode = { isEditMode = it },
-                        onNotesExpandedChanged = { isNotesExpanded = it }
+                        onNotesExpandedChanged = { isNotesExpanded = it },
+                        onPasswordsExpandedChanged = { isPasswordsExpanded = it }
                     )
                     1 -> {
-                        BoxWithConstraints(
-                            modifier = Modifier.fillMaxSize()
-                        ) {
+                        AnimatedContent(
+                            targetState = mainExpandedState,
+                            transitionSpec = {
+                                if (targetState != LeftPageExpandedState.COLLAPSED) {
+                                    (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) +
+                                            scaleIn(initialScale = 0.94f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)))
+                                        .togetherWith(
+                                            fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) +
+                                                    scaleOut(targetScale = 1.04f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                                        )
+                                } else {
+                                    (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) +
+                                            scaleIn(initialScale = 1.04f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)))
+                                        .togetherWith(
+                                            fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) +
+                                                    scaleOut(targetScale = 0.94f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                                        )
+                                }
+                            },
+                            label = "MainPageExpandTransition"
+                        ) { state ->
+                            when (state) {
+                                LeftPageExpandedState.NOTES -> {
+                                    NotesExpandedView(
+                                        notes = notes,
+                                        initialEditingNoteId = initialEditingMainNoteId,
+                                        onNotesUpdated = { notes = it },
+                                        onCollapse = {
+                                            mainExpandedState = LeftPageExpandedState.COLLAPSED
+                                            isNotesExpanded = false
+                                            initialEditingMainNoteId = null
+                                        },
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                LeftPageExpandedState.PASSWORDS -> {
+                                    PasswordsExpandedView(
+                                        passwords = passwords,
+                                        initialEditingPasswordId = initialEditingMainPasswordId,
+                                        onPasswordsUpdated = { passwords = it },
+                                        onCollapse = {
+                                            mainExpandedState = LeftPageExpandedState.COLLAPSED
+                                            isPasswordsExpanded = false
+                                            initialEditingMainPasswordId = null
+                                        },
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                LeftPageExpandedState.COLLAPSED -> {
+                                    BoxWithConstraints(
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
                             val contentWidth = maxWidth - (DashboardGridDefaults.HORIZONTAL_PADDING * 2)
 
                             // Aligned Modular Dot Grid Background (with connecting blueprint lines in edit mode & resize illumination)
@@ -445,7 +535,7 @@ fun DashboardScreen() {
                                         val isThisItemDragged = (itemIndex == draggedIndex && itemIndex != -1)
 
                                         val itemScale by animateFloatAsState(
-                                            targetValue = if (isThisItemDragged) 1.04f else 1f,
+                                            targetValue = if (isThisItemDragged) 0.94f else 1f,
                                             animationSpec = spring(
                                                 dampingRatio = Spring.DampingRatioLowBouncy,
                                                 stiffness = Spring.StiffnessMediumLow
@@ -484,6 +574,7 @@ fun DashboardScreen() {
                                                 onStashToShelf = {
                                                     updateLayout(DashboardLayoutManager.removeWidget(layout, item.widgetId))
                                                 },
+                                                isPickedUp = isThisItemDragged,
                                                 onDragReorderStart = {
                                                     if (itemIndex != -1) {
                                                         draggedIndex = itemIndex
@@ -533,7 +624,7 @@ fun DashboardScreen() {
                                                     .graphicsLayer {
                                                         scaleX = itemScale
                                                         scaleY = itemScale
-                                                        shadowElevation = if (isThisItemDragged) with(density) { 24.dp.toPx() } else 0f
+                                                        shadowElevation = if (isThisItemDragged) with(density) { 12.dp.toPx() } else 0f
                                                         shape = RoundedCornerShape(if (item.size.cols == 1 && item.size.rows == 1) 20.dp else 24.dp)
                                                         clip = false
                                                     }
@@ -574,7 +665,7 @@ fun DashboardScreen() {
                                                 val isThisItemDragged = (itemIndex == draggedIndex && itemIndex != -1)
 
                                                 val itemScale by animateFloatAsState(
-                                                    targetValue = if (isThisItemDragged) 1.04f else 1f,
+                                                    targetValue = if (isThisItemDragged) 0.94f else 1f,
                                                     animationSpec = spring(
                                                         dampingRatio = Spring.DampingRatioLowBouncy,
                                                         stiffness = Spring.StiffnessMediumLow
@@ -613,6 +704,7 @@ fun DashboardScreen() {
                                                         onStashToShelf = {
                                                             updateLayout(DashboardLayoutManager.removeWidget(layout, item.widgetId))
                                                         },
+                                                        isPickedUp = isThisItemDragged,
                                                         onDragReorderStart = {
                                                             if (itemIndex != -1) {
                                                                 draggedIndex = itemIndex
@@ -662,7 +754,7 @@ fun DashboardScreen() {
                                                             .graphicsLayer {
                                                                 scaleX = itemScale
                                                                 scaleY = itemScale
-                                                                shadowElevation = if (isThisItemDragged) with(density) { 24.dp.toPx() } else 0f
+                                                                shadowElevation = if (isThisItemDragged) with(density) { 12.dp.toPx() } else 0f
                                                                 shape = RoundedCornerShape(if (item.size.cols == 1 && item.size.rows == 1) 20.dp else 24.dp)
                                                                 clip = false
                                                             }
@@ -680,7 +772,52 @@ fun DashboardScreen() {
                                                                 tasks = TaskManager.addTask(context, newTask)
                                                                 buddyXp = TaskManager.getBuddyXp(context)
                                                             },
-                                                            getTouchPosition = { globalTouchPosition.value }
+                                                            getTouchPosition = { globalTouchPosition.value },
+                                                            notes = notes,
+                                                            onNotesUpdated = { notes = it },
+                                                            onExpandNotes = {
+                                                                if (!isEditMode) {
+                                                                    initialEditingMainNoteId = null
+                                                                    mainExpandedState = LeftPageExpandedState.NOTES
+                                                                    isNotesExpanded = true
+                                                                }
+                                                            },
+                                                            onQuickCreateNote = {
+                                                                if (!isEditMode) {
+                                                                    val newNote = NoteItem(
+                                                                        title = "",
+                                                                        content = "",
+                                                                        updatedAt = System.currentTimeMillis()
+                                                                    )
+                                                                    notes = NotesManager.upsertNote(context, newNote)
+                                                                    initialEditingMainNoteId = newNote.id
+                                                                    mainExpandedState = LeftPageExpandedState.NOTES
+                                                                    isNotesExpanded = true
+                                                                }
+                                                            },
+                                                            passwords = passwords,
+                                                            onPasswordsUpdated = { passwords = it },
+                                                            onExpandPasswords = {
+                                                                if (!isEditMode) {
+                                                                    initialEditingMainPasswordId = null
+                                                                    mainExpandedState = LeftPageExpandedState.PASSWORDS
+                                                                    isPasswordsExpanded = true
+                                                                }
+                                                            },
+                                                            onQuickCreatePassword = {
+                                                                if (!isEditMode) {
+                                                                    val newPass = PasswordItem(
+                                                                        title = "",
+                                                                        password = "",
+                                                                        username = "",
+                                                                        updatedAt = System.currentTimeMillis()
+                                                                    )
+                                                                    passwords = PasswordsManager.upsertPassword(context, newPass)
+                                                                    initialEditingMainPasswordId = newPass.id
+                                                                    mainExpandedState = LeftPageExpandedState.PASSWORDS
+                                                                    isPasswordsExpanded = true
+                                                                }
+                                                            }
                                                         )
                                                     }
                                                 }
@@ -689,8 +826,21 @@ fun DashboardScreen() {
                                     }
                                 }
                             }
+
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                    SlimScrollWheel(
+                                        scrollState = scrollState,
+                                        modifier = Modifier
+                                            .align(Alignment.CenterEnd)
+                                            .padding(top = 16.dp, bottom = 48.dp, end = 3.dp)
+                                            .fillMaxHeight()
+                                    )
+                                }
                         }
                     }
+                }
+            }
+        }
                     2 -> SquadDashboardPage()
                 }
             }
@@ -726,6 +876,26 @@ fun DashboardScreen() {
                 updatedAt = System.currentTimeMillis()
             )
             notes = NotesManager.upsertNote(context, newNote)
+            isShelfOpen = false
+            coroutineScope.launch {
+                pagerState.animateScrollToPage(0)
+            }
+        },
+        passwords = passwords,
+        onExpandPasswords = {
+            isShelfOpen = false
+            coroutineScope.launch {
+                pagerState.animateScrollToPage(0)
+            }
+        },
+        onQuickCreatePassword = {
+            val newPass = PasswordItem(
+                title = "",
+                password = "",
+                username = "",
+                updatedAt = System.currentTimeMillis()
+            )
+            passwords = PasswordsManager.upsertPassword(context, newPass)
             isShelfOpen = false
             coroutineScope.launch {
                 pagerState.animateScrollToPage(0)
@@ -827,7 +997,15 @@ fun RenderDashboardWidgetContent(
     buddyXp: Int,
     buddyLevel: Int,
     onTaskCreated: (ReminderTask) -> Unit,
-    getTouchPosition: () -> Offset? = { null }
+    getTouchPosition: () -> Offset? = { null },
+    notes: List<NoteItem> = emptyList(),
+    onNotesUpdated: (List<NoteItem>) -> Unit = {},
+    onExpandNotes: () -> Unit = {},
+    onQuickCreateNote: () -> Unit = {},
+    passwords: List<PasswordItem> = emptyList(),
+    onPasswordsUpdated: (List<PasswordItem>) -> Unit = {},
+    onExpandPasswords: () -> Unit = {},
+    onQuickCreatePassword: () -> Unit = {}
 ) {
     when (item.widgetId) {
         DashboardWidgetId.CLOCK -> {
@@ -862,13 +1040,19 @@ fun RenderDashboardWidgetContent(
             WaterTrackerWidget(size = liveSize)
         }
         DashboardWidgetId.NOTES -> {
-            val context = androidx.compose.ui.platform.LocalContext.current
-            val notes = remember { NotesManager.getNotes(context) }
             NotesCollapsedWidget(
                 size = liveSize,
                 notes = notes,
-                onExpand = {},
-                onQuickCreate = {}
+                onExpand = onExpandNotes,
+                onQuickCreate = onQuickCreateNote
+            )
+        }
+        DashboardWidgetId.PASSWORDS -> {
+            PasswordsCollapsedWidget(
+                size = liveSize,
+                passwords = passwords,
+                onExpand = onExpandPasswords,
+                onQuickCreate = onQuickCreatePassword
             )
         }
     }

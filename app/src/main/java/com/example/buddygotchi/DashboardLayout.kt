@@ -9,7 +9,7 @@ import org.json.JSONObject
 
 object DashboardGridDefaults {
     const val COLUMNS = 4
-    val HORIZONTAL_PADDING: Dp = 16.dp
+    val HORIZONTAL_PADDING: Dp = 20.dp
     val GAP: Dp = 14.dp
     val UNIT_HEIGHT: Dp = 88.dp // True modular grid: ALL height-1 widgets are exactly 88dp!
 
@@ -43,7 +43,8 @@ enum class DashboardWidgetId(
     NEXT("Next", canRemove = true),
     BUDDY("Buddy", canRemove = true),
     WATER("Water", canRemove = true),
-    NOTES("Notes", canRemove = true)
+    NOTES("Notes", canRemove = true),
+    PASSWORDS("Passwords", canRemove = true)
 }
 
 enum class WidgetSize(val cols: Int, val rows: Int) {
@@ -123,6 +124,7 @@ data class DashboardWidgetItem(
         DashboardWidgetId.BUDDY -> WidgetSize.HALF
         DashboardWidgetId.WATER -> WidgetSize.MAX
         DashboardWidgetId.NOTES -> WidgetSize.WIDE
+        DashboardWidgetId.PASSWORDS -> WidgetSize.WIDE
     }
 )
 
@@ -155,7 +157,7 @@ object DashboardLayoutManager {
                     val idStr = obj.optString("widget", "")
                     val sizeStr = obj.optString("size", "WIDE")
                     val id = try { DashboardWidgetId.valueOf(idStr) } catch (_: Exception) { null }
-                    val size = WidgetSize.parse(sizeStr)
+                    val size = if (id == DashboardWidgetId.CLOCK) WidgetSize.MAX else WidgetSize.parse(sizeStr)
                     if (id != null) {
                         list.add(DashboardWidgetItem(id, size))
                     }
@@ -172,10 +174,6 @@ object DashboardLayoutManager {
                         list.add(DashboardWidgetItem(second, WidgetSize.HALF))
                     }
                 }
-            }
-            // Ensure CLOCK is always present and never duplicated
-            if (!list.any { it.widgetId == DashboardWidgetId.CLOCK }) {
-                list.add(0, DashboardWidgetItem(DashboardWidgetId.CLOCK, WidgetSize.MAX))
             }
             if (list.isEmpty()) getDefaultLayout() else list
         } catch (_: Exception) {
@@ -206,6 +204,7 @@ object DashboardLayoutManager {
     }
 
     fun updateWidgetSize(layout: List<DashboardWidgetItem>, widgetId: DashboardWidgetId, newSize: WidgetSize): List<DashboardWidgetItem> {
+        if (widgetId == DashboardWidgetId.CLOCK) return layout
         return layout.map { item ->
             if (item.widgetId == widgetId) {
                 item.copy(size = newSize)
@@ -216,7 +215,6 @@ object DashboardLayoutManager {
     }
 
     fun removeWidget(layout: List<DashboardWidgetItem>, widgetId: DashboardWidgetId): List<DashboardWidgetItem> {
-        if (widgetId == DashboardWidgetId.CLOCK) return layout
         return layout.filter { it.widgetId != widgetId }
     }
 
@@ -229,19 +227,20 @@ object DashboardLayoutManager {
             DashboardWidgetId.BUDDY -> WidgetSize.HALF
             DashboardWidgetId.WATER -> WidgetSize.MAX
             DashboardWidgetId.NOTES -> WidgetSize.WIDE
+            DashboardWidgetId.PASSWORDS -> WidgetSize.WIDE
         }
         return layout + DashboardWidgetItem(widgetId, defaultSize)
     }
 
     fun getUnusedWidgets(layout: List<DashboardWidgetItem>): List<DashboardWidgetId> {
         return DashboardWidgetId.entries.filter { id ->
-            id != DashboardWidgetId.CLOCK && !layout.any { it.widgetId == id }
+            !layout.any { it.widgetId == id }
         }
     }
 
     fun getShelfWidgets(mainLayout: List<DashboardWidgetItem>, leftLayout: List<DashboardWidgetItem>): List<DashboardWidgetId> {
         val deployed = (mainLayout.map { it.widgetId } + leftLayout.map { it.widgetId }).toSet()
-        return DashboardWidgetId.entries.filter { it != DashboardWidgetId.CLOCK && it !in deployed }
+        return DashboardWidgetId.entries.filter { it !in deployed }
     }
 
     /**
@@ -279,7 +278,7 @@ object DashboardLayoutManager {
 object LeftDashboardLayoutManager {
     private const val PREFS_KEY_LEFT_LAYOUT = "left_dashboard_widget_layout_v2"
 
-    fun getDefaultLayout(): List<DashboardWidgetItem> = emptyList() // Water and Notes start in the Shelf!
+    fun getDefaultLayout(): List<DashboardWidgetItem> = emptyList() // Water, Notes, and Passwords start in the Shelf!
 
     fun loadLayout(context: Context): List<DashboardWidgetItem> {
         val prefs = context.getSharedPreferences("buddygotchi_prefs", Context.MODE_PRIVATE)
@@ -292,7 +291,7 @@ object LeftDashboardLayoutManager {
                 val idStr = obj.optString("widget", "")
                 val sizeStr = obj.optString("size", "WIDE")
                 val id = try { DashboardWidgetId.valueOf(idStr) } catch (_: Exception) { null }
-                val size = WidgetSize.parse(sizeStr)
+                val size = if (id == DashboardWidgetId.CLOCK) WidgetSize.MAX else WidgetSize.parse(sizeStr)
                 if (id != null) {
                     list.add(DashboardWidgetItem(id, size))
                 }
@@ -316,6 +315,7 @@ object LeftDashboardLayoutManager {
     }
 
     fun updateWidgetSize(layout: List<DashboardWidgetItem>, widgetId: DashboardWidgetId, newSize: WidgetSize): List<DashboardWidgetItem> {
+        if (widgetId == DashboardWidgetId.CLOCK) return layout
         return layout.map { item ->
             if (item.widgetId == widgetId) item.copy(size = newSize) else item
         }
@@ -326,6 +326,7 @@ object LeftDashboardLayoutManager {
         val size = defaultSize ?: when (widgetId) {
             DashboardWidgetId.WATER -> WidgetSize.MAX
             DashboardWidgetId.NOTES -> WidgetSize.WIDE
+            DashboardWidgetId.PASSWORDS -> WidgetSize.WIDE
             DashboardWidgetId.TODAY -> WidgetSize.WIDE
             DashboardWidgetId.NEXT -> WidgetSize.HALF
             DashboardWidgetId.BUDDY -> WidgetSize.HALF

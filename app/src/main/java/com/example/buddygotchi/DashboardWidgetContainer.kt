@@ -15,6 +15,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -65,6 +66,7 @@ fun DashboardWidgetContainer(
     onDragReorderEnd: () -> Unit,
     onResizePreview: ((WidgetSize?, ResizeDotType?) -> Unit)? = null,
     onStashToShelf: (() -> Unit)? = null,
+    isPickedUp: Boolean = false,
     modifier: Modifier = Modifier,
     content: @Composable (liveSize: WidgetSize) -> Unit
 ) {
@@ -112,7 +114,7 @@ fun DashboardWidgetContainer(
     }
 
     val isClock = item.widgetId == DashboardWidgetId.CLOCK
-    val isResizable = true
+    val isResizable = !isClock
 
     // Measured dimensions of the container card for accurate scale calculations
     var cardWidthPx by remember { mutableFloatStateOf(0f) }
@@ -225,7 +227,7 @@ fun DashboardWidgetContainer(
             // 2. In edit mode: Card body dragging for reordering widgets (disabled while resizing)
             .pointerInput(isEditMode, activeDot, isSettling) {
                 if (isEditMode && activeDot == null && !isSettling) {
-                    detectDragGestures(
+                    detectDragGesturesAfterLongPress(
                         onDragStart = {
                             triggerTick()
                             onDragReorderStart()
@@ -253,8 +255,11 @@ fun DashboardWidgetContainer(
             .then(
                 if (isEditMode) {
                     Modifier.border(
-                        width = 1.5.dp,
-                        color = if (activeDot != null) Color.Transparent else if (isSettling) NothingRed else MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                        width = if (isPickedUp) 2.dp else 1.5.dp,
+                        color = if (activeDot != null) Color.Transparent
+                        else if (isPickedUp) NothingRed.copy(alpha = 0.85f)
+                        else if (isSettling) NothingRed
+                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
                         shape = RoundedCornerShape(cornerRadius)
                     )
                 } else {

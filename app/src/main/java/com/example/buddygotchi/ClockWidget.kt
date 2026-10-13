@@ -120,6 +120,18 @@ fun ClockWidget(
         }
     }
 
+    fun triggerSnap() {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(VibrationEffect.createOneShot(28, VibrationEffect.DEFAULT_AMPLITUDE))
+            }
+        } catch (_: Exception) {}
+    }
+
     var stage by remember { mutableStateOf(ClockStage.TIME) }
     var baseDate by remember { mutableStateOf(Date()) }
     var selectedDayOffset by remember { mutableIntStateOf(0) }
@@ -134,6 +146,9 @@ fun ClockWidget(
 
     val hourVelocityTracker = remember { VelocityTracker() }
     val minuteVelocityTracker = remember { VelocityTracker() }
+    var accumulatedFastMinuteDragY by remember { mutableFloatStateOf(0f) }
+    var smoothedMinuteVelocityY by remember { mutableFloatStateOf(0f) }
+    var wasFastMinuteDrag by remember { mutableStateOf(false) }
 
     val offsetOptions = remember { listOf(0, 5, 10, 15, 30, 45, 60) }
     var offsetIndex by remember { mutableIntStateOf(3) } // default 15 min
@@ -652,63 +667,171 @@ fun ClockWidget(
                                         .fillMaxHeight()
                                         .pointerInput(Unit) {
                                             detectDragGestures(
-                                                onDragStart = { minuteVelocityTracker.resetTracking() },
+                                                onDragStart = {
+                                                    minuteVelocityTracker.resetTracking()
+                                                    accumulatedFastMinuteDragY = 0f
+                                                    smoothedMinuteVelocityY = 0f
+                                                    wasFastMinuteDrag = false
+                                                },
                                                 onDrag = { change, dragAmount ->
                                                     change.consume()
                                                     minuteVelocityTracker.addPosition(change.uptimeMillis, change.position)
                                                     val deltaY = dragAmount.y
-                                                    val speed = abs(deltaY)
-                                                    // Continuous dynamic acceleration: 1.0x for slow single-minute precision, scaling smoothly up to 3.2x on fast swipes
-                                                    val excessSpeed = (speed - 5f).coerceAtLeast(0f)
-                                                    val acceleration = (1.0f + (excessSpeed / 12f)).coerceIn(1.0f, 3.2f)
+                                                    val rawVelocity = abs(minuteVelocityTracker.calculateVelocity().y)
 
-                                                    // Calibrated base speed: 16.dp (~44px) per minute for precise single-minute dialing
-                                                    val basePxPerMinute = with(density) { 16.dp.toPx() }
-                                                    val minuteDelta = (-deltaY / basePxPerMinute) * acceleration
-                                                    minuteFloat += minuteDelta
+                                                    // Fast attack, gentle decay filter for smooth velocity tracking without jitter
+                                                    smoothedMinuteVelocityY = if (rawVelocity > smoothedMinuteVelocityY) {
+                                                        smoothedMinuteVelocityY * 0.30f + rawVelocity * 0.70f
+                                                    } else {
+                                                        smoothedMinuteVelocityY * 0.75f + rawVelocity * 0.25f
+                                                    }
 
-                                                    val m = ((minuteFloat.roundToInt() % 60) + 60) % 60
-                                                    if (m != lastTickedMinute) {
-                                                        triggerTick()
-                                                        lastTickedMinute = m
+                                                    val fastDeltaThreshold = with(density) { 7.dp.toPx() }
+                                                    val slowDeltaThreshold = with(density) { 3.5.dp.toPx() }
+                                                    val fastVelocityThreshold = with(density) { 360.dp.toPx() }
+                                                    val slowVelocityThreshold = with(density) { 180.dp.toPx() }
+
+                                                    // Dynamic hysteresis: enter fast snapping quickly on brisk drag, exit cleanly when user decelerates
+                                                    val isEnteringFast = smoothedMinuteVelocityY >= fastVelocityThreshold || abs(deltaY) >= fastDeltaThreshold
+                                                    val isExitingFast = smoothedMinuteVelocityY < slowVelocityThreshold && abs(deltaY) < slowDeltaThreshold
+
+                                                    val isFastMode = if (isEnteringFast) {
+                                                        true
+                                                    } else if (isExitingFast) {
+                                                        false
+                                                    } else {
+                                                        wasFastMinuteDrag
+                                                    }
+                                                    wasFastMinuteDrag = isFastMode
+
+                                                    if (isFastMode) {
+                                                        // --- FAST DRAG: Snapping to 5-minute intervals ---
+                                                        val dragY = -deltaY
+                                                        accumulatedFastMinuteDragY += dragY
+                                                        val stepPx = with(density) { 22.dp.toPx() }
+
+                                                        if (accumulatedFastMinuteDragY >= stepPx) {
+                                                            val steps = (accumulatedFastMinuteDragY / stepPx).toInt()
+                                                            accumulatedFastMinuteDragY -= steps * stepPx
+
+                                                            val curInt = minuteFloat.roundToInt()
+                                                            val rem = ((curInt % 5) + 5) % 5
+                                                            val nextTarget = if (rem != 0) {
+                                                                curInt + (5 - rem) + (steps - 1) * 5
+                                                            } else {
+                                                                curInt + steps * 5
+                                                            }
+                                                            minuteFloat = nextTarget.toFloat()
+
+                                                            val m = ((minuteFloat.roundToInt() % 60) + 60) % 60
+                                                            if (m != lastTickedMinute) {
+                                                                triggerSnap()
+                                                                lastTickedMinute = m
+                                                            }
+                                                        } else if (accumulatedFastMinuteDragY <= -stepPx) {
+                                                            val steps = (abs(accumulatedFastMinuteDragY) / stepPx).toInt()
+                                                            accumulatedFastMinuteDragY += steps * stepPx
+
+                                                            val curInt = minuteFloat.roundToInt()
+                                                            val rem = ((curInt % 5) + 5) % 5
+                                                            val prevTarget = if (rem != 0) {
+                                                                curInt - rem - (steps - 1) * 5
+                                                            } else {
+                                                                curInt - steps * 5
+                                                            }
+                                                            minuteFloat = prevTarget.toFloat()
+
+                                                            val m = ((minuteFloat.roundToInt() % 60) + 60) % 60
+                                                            if (m != lastTickedMinute) {
+                                                                triggerSnap()
+                                                                lastTickedMinute = m
+                                                            }
+                                                        }
+                                                    } else {
+                                                        // --- SLOW DRAG: Fine continuous 1-minute precision ---
+                                                        // Flush any leftover accumulated fast drag into continuous float smoothly
+                                                        if (accumulatedFastMinuteDragY != 0f) {
+                                                            val basePxPerMinute = with(density) { 16.dp.toPx() }
+                                                            minuteFloat += (accumulatedFastMinuteDragY / basePxPerMinute)
+                                                            accumulatedFastMinuteDragY = 0f
+                                                        }
+
+                                                        val basePxPerMinute = with(density) { 16.dp.toPx() }
+                                                        val minuteDelta = -deltaY / basePxPerMinute
+                                                        minuteFloat += minuteDelta
+
+                                                        val m = ((minuteFloat.roundToInt() % 60) + 60) % 60
+                                                        if (m != lastTickedMinute) {
+                                                            if (m % 5 == 0) {
+                                                                triggerSnap()
+                                                            } else {
+                                                                triggerTick()
+                                                            }
+                                                            lastTickedMinute = m
+                                                        }
                                                     }
                                                 },
                                                 onDragEnd = {
                                                     val velocity = minuteVelocityTracker.calculateVelocity().y
-                                                    val flingMinutes = if (abs(velocity) > 600f) {
-                                                        val sign = if (velocity < 0) 1f else -1f
-                                                        val excessVelocity = abs(velocity) - 600f
-                                                        sign * (excessVelocity / 240f).coerceIn(0f, 15f)
+                                                    val isFastFling = abs(velocity) > 600f || wasFastMinuteDrag
+
+                                                    val targetMinute = if (isFastFling) {
+                                                        val flingSteps = if (abs(velocity) > 600f) {
+                                                            val sign = if (velocity < 0) 1f else -1f
+                                                            val excessVelocity = abs(velocity) - 600f
+                                                            sign * (excessVelocity / 300f).coerceIn(0f, 12f)
+                                                        } else {
+                                                            0f
+                                                        }
+                                                        val rawTarget = minuteFloat + flingSteps * 5f
+                                                        // Fast release snaps directly to nearest 5-minute milestone (:00, :05, :10...)
+                                                        ((rawTarget / 5f).roundToInt() * 5)
                                                     } else {
-                                                        0f
+                                                        // Slow release settles onto exact chosen single minute (:42, :47...)
+                                                        minuteFloat.roundToInt()
                                                     }
-                                                    val targetMinute = (minuteFloat + flingMinutes).roundToInt()
+
+                                                    accumulatedFastMinuteDragY = 0f
+                                                    wasFastMinuteDrag = false
+                                                    smoothedMinuteVelocityY = 0f
 
                                                     coroutineScope.launch {
                                                         Animatable(minuteFloat).animateTo(
                                                             targetValue = targetMinute.toFloat(),
                                                             animationSpec = spring(
                                                                 dampingRatio = Spring.DampingRatioLowBouncy,
-                                                                stiffness = Spring.StiffnessMediumLow
+                                                                stiffness = if (isFastFling) Spring.StiffnessMediumLow else Spring.StiffnessMedium
                                                             )
                                                         ) {
                                                             minuteFloat = this.value
                                                             val m = ((minuteFloat.roundToInt() % 60) + 60) % 60
                                                             if (m != lastTickedMinute) {
-                                                                triggerTick()
+                                                                if (m % 5 == 0) triggerSnap() else triggerTick()
                                                                 lastTickedMinute = m
                                                             }
                                                         }
                                                         minuteFloat = targetMinute.toFloat()
-                                                        triggerConfirmPulse()
+                                                        if (targetMinute % 5 == 0) triggerSnap() else triggerConfirmPulse()
                                                     }
+                                                },
+                                                onDragCancel = {
+                                                    accumulatedFastMinuteDragY = 0f
+                                                    wasFastMinuteDrag = false
+                                                    smoothedMinuteVelocityY = 0f
                                                 }
                                             )
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    val centerIntMinute = minuteFloat.roundToInt()
-                                    val subMinuteFraction = minuteFloat - centerIntMinute
+                                    val stepPx = with(density) { 22.dp.toPx() }
+                                    val detentDeflection = if (wasFastMinuteDrag) {
+                                        (accumulatedFastMinuteDragY / stepPx) * 0.32f
+                                    } else {
+                                        0f
+                                    }
+                                    val visualMinute = minuteFloat + detentDeflection
+                                    val centerIntMinute = visualMinute.roundToInt()
+                                    val subMinuteFraction = visualMinute - centerIntMinute
 
                                     for (k in -2..2) {
                                         val relPos = k - subMinuteFraction
@@ -1224,6 +1347,8 @@ fun ClockWidget(
                         val resetCal = Calendar.getInstance()
                         hourFloat = resetCal.get(Calendar.HOUR_OF_DAY).toFloat()
                         minuteFloat = resetCal.get(Calendar.MINUTE).toFloat()
+                        accumulatedFastMinuteDragY = 0f
+                        wasFastMinuteDrag = false
                         offsetIndex = 3
                         selectedDayOffset = 0
                         baseDate = Date()

@@ -33,9 +33,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.example.buddygotchi.ui.DashboardGridBackground
+import com.example.buddygotchi.ui.SlimScrollWheel
 import com.example.buddygotchi.ui.theme.*
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+
+enum class LeftPageExpandedState {
+    COLLAPSED,
+    NOTES,
+    PASSWORDS
+}
 
 @Composable
 fun LeftDashboardPage(
@@ -43,9 +50,12 @@ fun LeftDashboardPage(
     onUpdateLayout: (List<DashboardWidgetItem>) -> Unit,
     notes: List<NoteItem>,
     onNotesUpdated: (List<NoteItem>) -> Unit,
+    passwords: List<PasswordItem> = emptyList(),
+    onPasswordsUpdated: (List<PasswordItem>) -> Unit = {},
     isEditMode: Boolean = false,
     onSetEditMode: (Boolean) -> Unit = {},
     onNotesExpandedChanged: (Boolean) -> Unit = {},
+    onPasswordsExpandedChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -75,8 +85,40 @@ fun LeftDashboardPage(
         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
 
-    var isNotesExpanded by remember { mutableStateOf(false) }
+    var expandedState by remember { mutableStateOf(LeftPageExpandedState.COLLAPSED) }
     var initialEditingNoteId by remember { mutableStateOf<String?>(null) }
+    var initialEditingPasswordId by remember { mutableStateOf<String?>(null) }
+
+    // Auto-expand if NOTES or PASSWORDS is the ONLY widget on the page;
+    // Auto-collapse into a smaller widget when a second widget is added.
+    val singleWidgetId = if (layout.size == 1) layout[0].widgetId else null
+    LaunchedEffect(layout.size, singleWidgetId) {
+        if (layout.size == 1) {
+            when (layout[0].widgetId) {
+                DashboardWidgetId.NOTES -> {
+                    expandedState = LeftPageExpandedState.NOTES
+                    onNotesExpandedChanged(true)
+                    onPasswordsExpandedChanged(false)
+                    if (isEditMode) onSetEditMode(false)
+                }
+                DashboardWidgetId.PASSWORDS -> {
+                    expandedState = LeftPageExpandedState.PASSWORDS
+                    onPasswordsExpandedChanged(true)
+                    onNotesExpandedChanged(false)
+                    if (isEditMode) onSetEditMode(false)
+                }
+                else -> {
+                    expandedState = LeftPageExpandedState.COLLAPSED
+                    onNotesExpandedChanged(false)
+                    onPasswordsExpandedChanged(false)
+                }
+            }
+        } else {
+            expandedState = LeftPageExpandedState.COLLAPSED
+            onNotesExpandedChanged(false)
+            onPasswordsExpandedChanged(false)
+        }
+    }
     val scrollState = rememberScrollState()
 
     val packedRows = remember(layout) {
@@ -116,9 +158,9 @@ fun LeftDashboardPage(
             .background(NothingDarkBackground)
     ) {
         AnimatedContent(
-            targetState = isNotesExpanded,
+            targetState = expandedState,
             transitionSpec = {
-                if (targetState) {
+                if (targetState != LeftPageExpandedState.COLLAPSED) {
                     (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) +
                             scaleIn(initialScale = 0.94f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)))
                         .togetherWith(
@@ -134,25 +176,43 @@ fun LeftDashboardPage(
                         )
                 }
             },
-            label = "NotesExpandTransition"
-        ) { expanded ->
-            if (expanded) {
-                // Occupies the entire page
-                NotesExpandedView(
-                    notes = notes,
-                    initialEditingNoteId = initialEditingNoteId,
-                    onNotesUpdated = { updated ->
-                        onNotesUpdated(updated)
-                    },
-                    onCollapse = {
-                        isNotesExpanded = false
-                        onNotesExpandedChanged(false)
-                        initialEditingNoteId = null
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                // Modular Grid Dashboard layout for Left Page
+            label = "LeftPageExpandTransition"
+        ) { state ->
+            when (state) {
+                LeftPageExpandedState.NOTES -> {
+                    // Occupies the entire page for Notes
+                    NotesExpandedView(
+                        notes = notes,
+                        initialEditingNoteId = initialEditingNoteId,
+                        onNotesUpdated = { updated ->
+                            onNotesUpdated(updated)
+                        },
+                        onCollapse = {
+                            expandedState = LeftPageExpandedState.COLLAPSED
+                            onNotesExpandedChanged(false)
+                            initialEditingNoteId = null
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                LeftPageExpandedState.PASSWORDS -> {
+                    // Occupies the entire page for Passwords Vault
+                    PasswordsExpandedView(
+                        passwords = passwords,
+                        initialEditingPasswordId = initialEditingPasswordId,
+                        onPasswordsUpdated = { updated ->
+                            onPasswordsUpdated(updated)
+                        },
+                        onCollapse = {
+                            expandedState = LeftPageExpandedState.COLLAPSED
+                            onPasswordsExpandedChanged(false)
+                            initialEditingPasswordId = null
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                LeftPageExpandedState.COLLAPSED -> {
+                    // Modular Grid Dashboard layout for Left Page
                 BoxWithConstraints(
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -230,7 +290,7 @@ fun LeftDashboardPage(
                                 val isThisItemDragged = (itemIndex == draggedIndex && itemIndex != -1)
 
                                 val itemScale by animateFloatAsState(
-                                    targetValue = if (isThisItemDragged) 1.04f else 1f,
+                                    targetValue = if (isThisItemDragged) 0.94f else 1f,
                                     animationSpec = spring(
                                         dampingRatio = Spring.DampingRatioLowBouncy,
                                         stiffness = Spring.StiffnessMediumLow
@@ -269,6 +329,7 @@ fun LeftDashboardPage(
                                         onStashToShelf = {
                                             updateLayout(LeftDashboardLayoutManager.removeWidget(layout, item.widgetId))
                                         },
+                                        isPickedUp = isThisItemDragged,
                                         onDragReorderStart = {
                                             if (itemIndex != -1) {
                                                 draggedIndex = itemIndex
@@ -317,7 +378,7 @@ fun LeftDashboardPage(
                                             .graphicsLayer {
                                                 scaleX = itemScale
                                                 scaleY = itemScale
-                                                shadowElevation = if (isThisItemDragged) with(density) { 24.dp.toPx() } else 0f
+                                                shadowElevation = if (isThisItemDragged) with(density) { 12.dp.toPx() } else 0f
                                                 shape = RoundedCornerShape(if (item.size.cols == 1 && item.size.rows == 1) 20.dp else 24.dp)
                                                 clip = false
                                             }
@@ -333,7 +394,7 @@ fun LeftDashboardPage(
                                                     onExpand = {
                                                         if (!isEditMode) {
                                                             initialEditingNoteId = null
-                                                            isNotesExpanded = true
+                                                            expandedState = LeftPageExpandedState.NOTES
                                                             onNotesExpandedChanged(true)
                                                         }
                                                     },
@@ -346,8 +407,35 @@ fun LeftDashboardPage(
                                                             )
                                                             onNotesUpdated(NotesManager.upsertNote(context, newNote))
                                                             initialEditingNoteId = newNote.id
-                                                            isNotesExpanded = true
+                                                            expandedState = LeftPageExpandedState.NOTES
                                                             onNotesExpandedChanged(true)
+                                                        }
+                                                    }
+                                                )
+                                            }
+                                            DashboardWidgetId.PASSWORDS -> {
+                                                PasswordsCollapsedWidget(
+                                                    passwords = passwords,
+                                                    size = liveSize,
+                                                    onExpand = {
+                                                        if (!isEditMode) {
+                                                            initialEditingPasswordId = null
+                                                            expandedState = LeftPageExpandedState.PASSWORDS
+                                                            onPasswordsExpandedChanged(true)
+                                                        }
+                                                    },
+                                                    onQuickCreate = {
+                                                        if (!isEditMode) {
+                                                            val newPass = PasswordItem(
+                                                                title = "",
+                                                                password = "",
+                                                                username = "",
+                                                                updatedAt = System.currentTimeMillis()
+                                                            )
+                                                            onPasswordsUpdated(PasswordsManager.upsertPassword(context, newPass))
+                                                            initialEditingPasswordId = newPass.id
+                                                            expandedState = LeftPageExpandedState.PASSWORDS
+                                                            onPasswordsExpandedChanged(true)
                                                         }
                                                     }
                                                 )
@@ -378,7 +466,7 @@ fun LeftDashboardPage(
                                         val isThisItemDragged = (itemIndex == draggedIndex && itemIndex != -1)
 
                                         val itemScale by animateFloatAsState(
-                                            targetValue = if (isThisItemDragged) 1.04f else 1f,
+                                            targetValue = if (isThisItemDragged) 0.94f else 1f,
                                             animationSpec = spring(
                                                 dampingRatio = Spring.DampingRatioLowBouncy,
                                                 stiffness = Spring.StiffnessMediumLow
@@ -417,6 +505,7 @@ fun LeftDashboardPage(
                                                 onStashToShelf = {
                                                     updateLayout(LeftDashboardLayoutManager.removeWidget(layout, item.widgetId))
                                                 },
+                                                isPickedUp = isThisItemDragged,
                                                 onDragReorderStart = {
                                                     if (itemIndex != -1) {
                                                         draggedIndex = itemIndex
@@ -465,7 +554,7 @@ fun LeftDashboardPage(
                                                     .graphicsLayer {
                                                         scaleX = itemScale
                                                         scaleY = itemScale
-                                                        shadowElevation = if (isThisItemDragged) with(density) { 24.dp.toPx() } else 0f
+                                                        shadowElevation = if (isThisItemDragged) with(density) { 12.dp.toPx() } else 0f
                                                         shape = RoundedCornerShape(if (item.size.cols == 1 && item.size.rows == 1) 20.dp else 24.dp)
                                                         clip = false
                                                     }
@@ -481,7 +570,7 @@ fun LeftDashboardPage(
                                                             onExpand = {
                                                                 if (!isEditMode) {
                                                                     initialEditingNoteId = null
-                                                                    isNotesExpanded = true
+                                                                    expandedState = LeftPageExpandedState.NOTES
                                                                     onNotesExpandedChanged(true)
                                                                 }
                                                             },
@@ -494,8 +583,35 @@ fun LeftDashboardPage(
                                                                     )
                                                                     onNotesUpdated(NotesManager.upsertNote(context, newNote))
                                                                     initialEditingNoteId = newNote.id
-                                                                    isNotesExpanded = true
+                                                                    expandedState = LeftPageExpandedState.NOTES
                                                                     onNotesExpandedChanged(true)
+                                                                }
+                                                            }
+                                                        )
+                                                    }
+                                                    DashboardWidgetId.PASSWORDS -> {
+                                                        PasswordsCollapsedWidget(
+                                                            passwords = passwords,
+                                                            size = liveSize,
+                                                            onExpand = {
+                                                                if (!isEditMode) {
+                                                                    initialEditingPasswordId = null
+                                                                    expandedState = LeftPageExpandedState.PASSWORDS
+                                                                    onPasswordsExpandedChanged(true)
+                                                                }
+                                                            },
+                                                            onQuickCreate = {
+                                                                if (!isEditMode) {
+                                                                    val newPass = PasswordItem(
+                                                                        title = "",
+                                                                        password = "",
+                                                                        username = "",
+                                                                        updatedAt = System.currentTimeMillis()
+                                                                    )
+                                                                    onPasswordsUpdated(PasswordsManager.upsertPassword(context, newPass))
+                                                                    initialEditingPasswordId = newPass.id
+                                                                    expandedState = LeftPageExpandedState.PASSWORDS
+                                                                    onPasswordsExpandedChanged(true)
                                                                 }
                                                             }
                                                         )
@@ -511,8 +627,19 @@ fun LeftDashboardPage(
                             }
                         }
                     }
+                    }
+
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        SlimScrollWheel(
+                            scrollState = scrollState,
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(top = 16.dp, bottom = 48.dp, end = 3.dp)
+                                .fillMaxHeight()
+                        )
+                    }
                 }
-            }
         }
     }
+}
 }

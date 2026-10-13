@@ -150,6 +150,9 @@ fun ShelfOverlay(
     notes: List<NoteItem> = emptyList(),
     onExpandNotes: () -> Unit = {},
     onQuickCreateNote: () -> Unit = {},
+    passwords: List<PasswordItem> = emptyList(),
+    onExpandPasswords: () -> Unit = {},
+    onQuickCreatePassword: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -384,7 +387,10 @@ fun ShelfOverlay(
                                     buddyLevel = buddyLevel,
                                     notes = notes,
                                     onExpandNotes = onExpandNotes,
-                                    onQuickCreateNote = onQuickCreateNote
+                                    onQuickCreateNote = onQuickCreateNote,
+                                    passwords = passwords,
+                                    onExpandPasswords = onExpandPasswords,
+                                    onQuickCreatePassword = onQuickCreatePassword
                                 )
                             }
                         }
@@ -438,7 +444,10 @@ private fun ShelfRackItem(
     buddyLevel: Int,
     notes: List<NoteItem>,
     onExpandNotes: () -> Unit,
-    onQuickCreateNote: () -> Unit
+    onQuickCreateNote: () -> Unit,
+    passwords: List<PasswordItem> = emptyList(),
+    onExpandPasswords: () -> Unit = {},
+    onQuickCreatePassword: () -> Unit = {}
 ) {
     val activePageTitle = when (currentPageIndex) {
         0 -> "LEFT"
@@ -558,6 +567,14 @@ private fun ShelfRackItem(
                         size = WidgetSize.WIDE,
                         onExpand = onExpandNotes,
                         onQuickCreate = onQuickCreateNote
+                    )
+                }
+                DashboardWidgetId.PASSWORDS -> {
+                    PasswordsCollapsedWidget(
+                        passwords = passwords,
+                        size = WidgetSize.WIDE,
+                        onExpand = onExpandPasswords,
+                        onQuickCreate = onQuickCreatePassword
                     )
                 }
                 DashboardWidgetId.TODAY -> {
