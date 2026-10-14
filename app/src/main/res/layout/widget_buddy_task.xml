@@ -254,15 +254,16 @@
 
         </LinearLayout>
 
-        <!-- Task Description -->
+        <!-- Task / Event Title -->
         <TextView
             android:id="@+id/widget_task_description"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="3dp"
             android:text="Sprint review &amp; presentation"
-            android:textColor="#D0D0D0"
-            android:textSize="11sp"
+            android:textColor="@color/white"
+            android:textSize="12.5sp"
+            android:textStyle="bold"
             android:maxLines="2"
             android:ellipsize="end" />
 

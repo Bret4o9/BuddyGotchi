@@ -131,44 +131,25 @@ class BuddyTaskWidgetProvider : AppWidgetProvider() {
 
                 if (nextItem.isSquad && nextItem.squadEvent != null) {
                     val event = nextItem.squadEvent
-                    val otherTasksCount = activeTasks.count { it.taskTime.time >= now }
-                    val headerExtra = if (otherTasksCount > 0) " (+${otherTasksCount} TASK)" else ""
-                    views.setTextViewText(R.id.widget_task_header, "● SQUAD EVENT$headerExtra")
-
-                    val isUserHost = event.hostBuddyCode.equals(profile.buddyCode, ignoreCase = true)
-                    val userStatus = event.participants.find { it.buddyCode.equals(profile.buddyCode, ignoreCase = true) }?.status
-                    val categoryLabel = when {
-                        isUserHost -> "HOST: YOU"
-                        userStatus == ParticipantStatus.PENDING -> "RSVP PENDING"
-                        else -> "SQUAD // ${event.hostDisplayName.uppercase(Locale.getDefault())}"
-                    }
-                    views.setTextViewText(R.id.widget_task_category, categoryLabel)
+                    views.setTextViewText(R.id.widget_task_header, "UPCOMING EVENT")
+                    views.setTextViewText(R.id.widget_task_category, "SQUAD")
                     views.setTextViewText(R.id.widget_task_time, timeFormat.format(Date(event.eventTime)))
                     views.setTextViewText(R.id.widget_task_countdown, countdownText)
-
-                    val locationClean = if (event.location.isNotBlank()) {
-                        " • 📍 " + event.location.replace("https://maps.google.com/?q=", "")
-                    } else ""
-                    val acceptedCount = event.participants.count { it.status == ParticipantStatus.ACCEPTED }
-                    val desc = "${event.title.uppercase(Locale.getDefault())}$locationClean [${acceptedCount} ATTENDING]"
-                    views.setTextViewText(R.id.widget_task_description, desc)
-                    views.setTextViewText(R.id.widget_task_footer, "Tap to open Squad Hub →")
+                    views.setTextViewText(R.id.widget_task_description, event.title)
+                    views.setTextViewText(R.id.widget_task_footer, "Tap to open →")
 
                     appIntent.putExtra("target_page", "SQUAD")
                     appIntent.putExtra("event_id", event.id)
                 } else if (nextItem.task != null) {
                     val task = nextItem.task
-                    val otherSquadCount = activeSquadEvents.count { it.eventTime >= now }
-                    val headerExtra = if (otherSquadCount > 0) " (+${otherSquadCount} SQUAD)" else ""
-                    views.setTextViewText(R.id.widget_task_header, "NEXT TASK$headerExtra")
-
+                    views.setTextViewText(R.id.widget_task_header, "UPCOMING TASK")
                     views.setTextViewText(R.id.widget_task_category, task.category.label.uppercase(Locale.getDefault()))
                     views.setTextViewText(R.id.widget_task_time, timeFormat.format(task.taskTime))
                     views.setTextViewText(R.id.widget_task_countdown, countdownText)
 
-                    val desc = if (task.description.isNotBlank()) task.description else "No description"
-                    views.setTextViewText(R.id.widget_task_description, desc)
-                    views.setTextViewText(R.id.widget_task_footer, "Tap to open in BuddyGotchi →")
+                    val title = if (task.description.isNotBlank()) task.description else "Untitled Task"
+                    views.setTextViewText(R.id.widget_task_description, title)
+                    views.setTextViewText(R.id.widget_task_footer, "Tap to open →")
 
                     appIntent.putExtra("target_page", "MAIN")
                 }
@@ -183,11 +164,11 @@ class BuddyTaskWidgetProvider : AppWidgetProvider() {
             } else {
                 // Empty state: All tasks and squad events completed / none scheduled
                 views.setTextViewText(R.id.widget_task_header, "STATUS")
-                views.setTextViewText(R.id.widget_task_category, "ALL CLEAR ✓")
+                views.setTextViewText(R.id.widget_task_category, "ALL CLEAR")
                 views.setTextViewText(R.id.widget_task_time, "ALL DONE")
                 views.setTextViewText(R.id.widget_task_countdown, "")
-                views.setTextViewText(R.id.widget_task_description, "No pending tasks or squad events today. Great job!")
-                views.setTextViewText(R.id.widget_task_footer, "Tap to schedule new task +")
+                views.setTextViewText(R.id.widget_task_description, "No upcoming tasks or events")
+                views.setTextViewText(R.id.widget_task_footer, "Tap to schedule +")
 
                 val appIntent = Intent(context, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
