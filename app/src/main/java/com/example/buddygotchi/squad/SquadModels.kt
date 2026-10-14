@@ -38,7 +38,8 @@ data class SquadFriend(
     val displayName: String,
     val level: Int,
     val isOnline: Boolean = true,
-    val avatarEmoji: String = "👾"
+    val avatarEmoji: String = "👾",
+    val buddyColorHex: String? = null
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("buddyCode", buddyCode)
@@ -46,6 +47,7 @@ data class SquadFriend(
         put("level", level)
         put("isOnline", isOnline)
         put("avatarEmoji", avatarEmoji)
+        if (buddyColorHex != null) put("buddyColorHex", buddyColorHex)
     }
 
     companion object {
@@ -54,7 +56,8 @@ data class SquadFriend(
             displayName = json.getString("displayName"),
             level = json.optInt("level", 1),
             isOnline = json.optBoolean("isOnline", true),
-            avatarEmoji = json.optString("avatarEmoji", "👾")
+            avatarEmoji = json.optString("avatarEmoji", "👾"),
+            buddyColorHex = if (json.has("buddyColorHex") && !json.isNull("buddyColorHex")) json.optString("buddyColorHex") else null
         )
     }
 }

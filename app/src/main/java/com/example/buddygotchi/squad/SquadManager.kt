@@ -52,9 +52,9 @@ object SquadManager {
         val jsonStr = prefs.getString(KEY_FRIENDS, null)
         if (jsonStr == null) {
             val defaults = listOf(
-                SquadFriend("BG-4182", "ALEX", 12, isOnline = true),
-                SquadFriend("BG-7731", "MAYA", 16, isOnline = true),
-                SquadFriend("BG-9055", "KAI", 8, isOnline = false)
+                SquadFriend("BG-4182", "POLI", 12, isOnline = true, buddyColorHex = "#FF7A00"),
+                SquadFriend("BG-7731", "SANI", 16, isOnline = true, buddyColorHex = "#00E676"),
+                SquadFriend("BG-9055", "GERI", 8, isOnline = false, buddyColorHex = "#FF4081")
             )
             saveFriends(context, defaults)
             return defaults
@@ -65,7 +65,46 @@ object SquadManager {
             for (i in 0 until array.length()) {
                 list.add(SquadFriend.fromJson(array.getJSONObject(i)))
             }
-            list
+            var modified = false
+            val updated = list.map { friend ->
+                when (friend.displayName.trim().uppercase()) {
+                    "ALEX" -> {
+                        modified = true
+                        friend.copy(displayName = "POLI", buddyColorHex = "#FF7A00")
+                    }
+                    "MAYA" -> {
+                        modified = true
+                        friend.copy(displayName = "SANI", buddyColorHex = "#00E676")
+                    }
+                    "KAI" -> {
+                        modified = true
+                        friend.copy(displayName = "GERI", buddyColorHex = "#FF4081")
+                    }
+                    "POLI" -> {
+                        if (friend.buddyColorHex != "#FF7A00") {
+                            modified = true
+                            friend.copy(buddyColorHex = "#FF7A00")
+                        } else friend
+                    }
+                    "SANI" -> {
+                        if (friend.buddyColorHex != "#00E676") {
+                            modified = true
+                            friend.copy(buddyColorHex = "#00E676")
+                        } else friend
+                    }
+                    "GERI" -> {
+                        if (friend.buddyColorHex != "#FF4081") {
+                            modified = true
+                            friend.copy(buddyColorHex = "#FF4081")
+                        } else friend
+                    }
+                    else -> friend
+                }
+            }
+            if (modified) {
+                saveFriends(context, updated)
+            }
+            updated
         } catch (_: Exception) {
             emptyList()
         }
@@ -122,11 +161,11 @@ object SquadManager {
                 eventTime = cal.timeInMillis,
                 reminderOffsetMinutes = 30,
                 hostBuddyCode = "BG-7731",
-                hostDisplayName = "MAYA",
+                hostDisplayName = "SANI",
                 participants = listOf(
-                    EventParticipant("BG-7731", "MAYA", ParticipantStatus.ACCEPTED, isHost = true),
+                    EventParticipant("BG-7731", "SANI", ParticipantStatus.ACCEPTED, isHost = true),
                     EventParticipant(profile.buddyCode, profile.displayName, ParticipantStatus.ACCEPTED),
-                    EventParticipant("BG-4182", "ALEX", ParticipantStatus.PENDING)
+                    EventParticipant("BG-4182", "POLI", ParticipantStatus.PENDING)
                 )
             )
             val defaults = listOf(defaultEvent)
@@ -140,7 +179,33 @@ object SquadManager {
             for (i in 0 until array.length()) {
                 list.add(GroupEvent.fromJson(array.getJSONObject(i)))
             }
-            list.sortedBy { it.eventTime }
+            var eventsChanged = false
+            val migratedList = list.map { ev ->
+                var evChanged = false
+                val newHost = when (ev.hostDisplayName.trim().uppercase()) {
+                    "MAYA" -> { evChanged = true; "SANI" }
+                    "ALEX" -> { evChanged = true; "POLI" }
+                    "KAI" -> { evChanged = true; "GERI" }
+                    else -> ev.hostDisplayName
+                }
+                val newParts = ev.participants.map { p ->
+                    val pName = when (p.displayName.trim().uppercase()) {
+                        "MAYA" -> { evChanged = true; "SANI" }
+                        "ALEX" -> { evChanged = true; "POLI" }
+                        "KAI" -> { evChanged = true; "GERI" }
+                        else -> p.displayName
+                    }
+                    if (pName != p.displayName) p.copy(displayName = pName) else p
+                }
+                if (evChanged) {
+                    eventsChanged = true
+                    ev.copy(hostDisplayName = newHost, participants = newParts)
+                } else ev
+            }
+            if (eventsChanged) {
+                saveEvents(context, migratedList)
+            }
+            migratedList.sortedBy { it.eventTime }
         } catch (_: Exception) {
             emptyList()
         }

@@ -185,7 +185,7 @@ fun AddFriendDialog(
                         decorationBox = { innerTextField ->
                             if (nameInput.isEmpty()) {
                                 Text(
-                                    text = "E.G. ALEX",
+                                    text = "E.G. POLI",
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 13.sp,
                                     color = NothingTextTertiary.copy(alpha = 0.4f),

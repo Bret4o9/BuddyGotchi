@@ -4,7 +4,13 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateOffsetAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,8 +26,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
@@ -237,27 +247,49 @@ fun SquadDashboardPage(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     items(friends) { friend ->
+                        val buddyColor = getSquadBuddyColor(friend)
+                        var tapBlink by remember { mutableStateOf(false) }
+
                         Surface(
                             shape = RoundedCornerShape(14.dp),
                             color = NothingCardSurface,
-                            border = BorderStroke(1.dp, NothingBorder),
-                            modifier = Modifier.width(130.dp)
+                            border = BorderStroke(1.dp, buddyColor.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .width(146.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable {
+                                    tapBlink = true
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                }
                         ) {
                             Column(
-                                modifier = Modifier.padding(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalArrangement = Arrangement.spacedBy(7.dp)
                             ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(6.dp)
-                                            .clip(CircleShape)
-                                            .background(if (friend.isOnline) Color(0xFF00E676) else Color.Gray)
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .clip(CircleShape)
+                                                .background(if (friend.isOnline) Color(0xFF00E676) else Color.Gray)
+                                        )
+                                        Text(
+                                            text = if (friend.isOnline) "LIVE" else "AWAY",
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 7.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (friend.isOnline) Color(0xFF00E676) else Color.Gray,
+                                            letterSpacing = 0.5.sp
+                                        )
+                                    }
                                     Text(
                                         text = "LVL ${friend.level}",
                                         fontFamily = FontFamily.Monospace,
@@ -265,20 +297,37 @@ fun SquadDashboardPage(
                                         color = NothingTextTertiary
                                     )
                                 }
-                                Text(
-                                    text = friend.displayName,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = NothingWhite
-                                )
-                                Text(
-                                    text = friend.buddyCode,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 9.sp,
-                                    color = NothingTextSecondary,
-                                    letterSpacing = 0.5.sp
-                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text(
+                                            text = friend.displayName,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 12.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = NothingWhite
+                                        )
+                                        Text(
+                                            text = friend.buddyCode,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 8.5.sp,
+                                            color = NothingTextSecondary,
+                                            letterSpacing = 0.5.sp
+                                        )
+                                    }
+
+                                    SquadMemberBuddy(
+                                        buddyColor = buddyColor,
+                                        manualBlinkTrigger = tapBlink,
+                                        onBlinkFinished = { tapBlink = false }
+                                    )
+                                }
                             }
                         }
                     }
@@ -741,3 +790,147 @@ fun SquadDashboardPage(
         )
     }
 }
+
+/**
+ * Returns member-specific buddy color:
+ * - Poli: Orange (#FF7A00)
+ * - Sani: Green (#00E676)
+ * - Geri: Pink (#FF4081)
+ */
+fun getSquadBuddyColor(friend: SquadFriend): Color {
+    if (!friend.buddyColorHex.isNullOrBlank()) {
+        try {
+            return Color(android.graphics.Color.parseColor(friend.buddyColorHex))
+        } catch (_: Exception) {}
+    }
+    return when (friend.displayName.trim().uppercase()) {
+        "POLI" -> Color(0xFFFF7A00) // Orange
+        "SANI" -> Color(0xFF00E676) // Green
+        "GERI" -> Color(0xFFFF4081) // Pink
+        else -> Color(0xFF00E676)
+    }
+}
+
+/**
+ * Mini animated BuddyGotchi companion eyes for squad members.
+ * Custom tinted per member with natural blinking and idle looking around.
+ */
+@Composable
+fun SquadMemberBuddy(
+    buddyColor: Color,
+    manualBlinkTrigger: Boolean = false,
+    onBlinkFinished: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    var isBlinking by remember { mutableStateOf(false) }
+
+    // Manual blink when card is tapped
+    LaunchedEffect(manualBlinkTrigger) {
+        if (manualBlinkTrigger) {
+            isBlinking = true
+            delay(120)
+            isBlinking = false
+            onBlinkFinished()
+        }
+    }
+
+    // Natural random blinking loop with staggered delays
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(kotlin.random.Random.nextLong(2800, 6500))
+            isBlinking = true
+            delay(115)
+            isBlinking = false
+            if (kotlin.random.Random.nextFloat() < 0.22f) {
+                delay(90)
+                isBlinking = true
+                delay(100)
+                isBlinking = false
+            }
+        }
+    }
+
+    val blinkScaleY by animateFloatAsState(
+        targetValue = if (isBlinking) 0.08f else 1f,
+        animationSpec = tween(durationMillis = 60, easing = FastOutLinearInEasing),
+        label = "squadBuddyBlink"
+    )
+
+    // Gentle idle glance shift
+    var gazeOffset by remember { mutableStateOf(Offset.Zero) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(kotlin.random.Random.nextLong(3200, 7000))
+            val choices = listOf(
+                Offset.Zero,
+                Offset.Zero,
+                Offset(-1.8f, 0f),
+                Offset(1.8f, 0f),
+                Offset(0f, -1.2f)
+            )
+            gazeOffset = choices.random()
+        }
+    }
+
+    val animatedGaze by animateOffsetAsState(
+        targetValue = gazeOffset,
+        animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing),
+        label = "squadBuddyGaze"
+    )
+
+    Canvas(
+        modifier = modifier.size(width = 38.dp, height = 20.dp)
+    ) {
+        val eyeRadius = 7.dp.toPx()
+        val eyeSpacing = 17.5.dp.toPx()
+        val strokeWidth = 2.dp.toPx()
+        val pupilRadius = 3.dp.toPx()
+
+        val centerCanvas = Offset(size.width / 2f, size.height / 2f)
+        val leftCenter = Offset(centerCanvas.x - eyeSpacing / 2f, centerCanvas.y)
+        val rightCenter = Offset(centerCanvas.x + eyeSpacing / 2f, centerCanvas.y)
+
+        val gazePx = Offset(animatedGaze.x * (density / 2.75f), animatedGaze.y * (density / 2.75f))
+
+        // Left Eye
+        scale(scaleX = 1f, scaleY = blinkScaleY, pivot = leftCenter) {
+            drawCircle(
+                color = Color(0xFF101010),
+                radius = eyeRadius,
+                center = leftCenter
+            )
+            drawCircle(
+                color = buddyColor,
+                radius = eyeRadius,
+                center = leftCenter,
+                style = Stroke(width = strokeWidth)
+            )
+            drawCircle(
+                color = buddyColor,
+                radius = pupilRadius,
+                center = leftCenter + gazePx
+            )
+        }
+
+        // Right Eye
+        scale(scaleX = 1f, scaleY = blinkScaleY, pivot = rightCenter) {
+            drawCircle(
+                color = Color(0xFF101010),
+                radius = eyeRadius,
+                center = rightCenter
+            )
+            drawCircle(
+                color = buddyColor,
+                radius = eyeRadius,
+                center = rightCenter,
+                style = Stroke(width = strokeWidth)
+            )
+            drawCircle(
+                color = buddyColor,
+                radius = pupilRadius,
+                center = rightCenter + gazePx
+            )
+        }
+    }
+}
+
