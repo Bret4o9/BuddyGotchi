@@ -1,14 +1,27 @@
 <animation-list xmlns:android="http://schemas.android.com/apk/res/android"
     android:oneshot="false">
-    <item android:drawable="@drawable/buddy_eyes_center" android:duration="2400" />
-    <item android:drawable="@drawable/buddy_eyes_look_right" android:duration="1800" />
+    <item android:drawable="@drawable/buddy_eyes_center" android:duration="2100" />
+    <item android:drawable="@drawable/buddy_eyes_blink_quarter" android:duration="100" />
+    <item android:drawable="@drawable/buddy_eyes_blink_half" android:duration="90" />
+    <item android:drawable="@drawable/buddy_eyes_blink_closed" android:duration="120" />
+    <item android:drawable="@drawable/buddy_eyes_blink_quarter" android:duration="90" />
     <item android:drawable="@drawable/buddy_eyes_center" android:duration="1400" />
+    <item android:drawable="@drawable/buddy_eyes_look_right_soft" android:duration="120" />
+    <item android:drawable="@drawable/buddy_eyes_look_right" android:duration="1400" />
+    <item android:drawable="@drawable/buddy_eyes_look_right_soft" android:duration="120" />
+    <item android:drawable="@drawable/buddy_eyes_center" android:duration="1200" />
     <item android:drawable="@drawable/buddy_eyes_blink_half" android:duration="90" />
-    <item android:drawable="@drawable/buddy_eyes_blink_closed" android:duration="140" />
-    <item android:drawable="@drawable/buddy_eyes_blink_half" android:duration="90" />
-    <item android:drawable="@drawable/buddy_eyes_center" android:duration="1600" />
-    <item android:drawable="@drawable/buddy_eyes_look_left" android:duration="1600" />
-    <item android:drawable="@drawable/buddy_eyes_center" android:duration="2000" />
-    <item android:drawable="@drawable/buddy_eyes_blink_closed" android:duration="140" />
+    <item android:drawable="@drawable/buddy_eyes_blink_closed" android:duration="120" />
+    <item android:drawable="@drawable/buddy_eyes_blink_quarter" android:duration="80" />
+    <item android:drawable="@drawable/buddy_eyes_center" android:duration="160" />
+    <item android:drawable="@drawable/buddy_eyes_blink_closed" android:duration="120" />
+    <item android:drawable="@drawable/buddy_eyes_blink_half" android:duration="80" />
+    <item android:drawable="@drawable/buddy_eyes_center" android:duration="1000" />
+    <item android:drawable="@drawable/buddy_eyes_look_left_soft" android:duration="120" />
+    <item android:drawable="@drawable/buddy_eyes_look_left" android:duration="1300" />
+    <item android:drawable="@drawable/buddy_eyes_look_left_soft" android:duration="120" />
+    <item android:drawable="@drawable/buddy_eyes_center" android:duration="900" />
+    <item android:drawable="@drawable/buddy_eyes_blink_quarter" android:duration="90" />
     <item android:drawable="@drawable/buddy_eyes_happy" android:duration="1200" />
+    <item android:drawable="@drawable/buddy_eyes_blink_quarter" android:duration="90" />
 </animation-list>

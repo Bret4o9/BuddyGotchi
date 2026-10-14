@@ -57,7 +57,9 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @Composable
-fun DashboardScreen() {
+fun DashboardScreen(
+    initialTargetPage: String? = null
+) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
@@ -116,11 +118,24 @@ fun DashboardScreen() {
     }
     var showPagesMenu by remember { mutableStateOf(false) }
 
-    val initialPageIndex = remember {
+    val initialPageIndex = remember(initialTargetPage) {
+        if (initialTargetPage == "SQUAD") {
+            val squadIdx = pages.indexOfFirst { it.type == DashboardPageType.SQUAD }
+            if (squadIdx != -1) return@remember squadIdx
+        }
         val idx = pages.indexOfFirst { it.type == DashboardPageType.MAIN }
         if (idx != -1) idx else 1
     }
     val pagerState = rememberPagerState(initialPage = initialPageIndex, pageCount = { pages.size })
+
+    LaunchedEffect(initialTargetPage) {
+        if (initialTargetPage == "SQUAD") {
+            val squadIdx = pages.indexOfFirst { it.type == DashboardPageType.SQUAD }
+            if (squadIdx != -1 && squadIdx != pagerState.currentPage) {
+                pagerState.animateScrollToPage(squadIdx)
+            }
+        }
+    }
 
     val livePageFloat = pagerState.currentPage + pagerState.currentPageOffsetFraction
     val currentSnappedPage = livePageFloat.roundToInt().coerceIn(0, (pages.size - 1).coerceAtLeast(0))

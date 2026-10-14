@@ -1,6 +1,7 @@
 package com.example.buddygotchi.squad
 
 import android.content.Context
+import com.example.buddygotchi.BuddyTaskWidgetProvider
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
@@ -150,6 +151,9 @@ object SquadManager {
         val array = JSONArray()
         events.forEach { array.put(it.toJson()) }
         prefs.edit().putString(KEY_EVENTS, array.toString()).apply()
+        try {
+            BuddyTaskWidgetProvider.updateAllWidgets(context)
+        } catch (_: Exception) {}
     }
 
     fun createEvent(context: Context, event: GroupEvent): List<GroupEvent> {

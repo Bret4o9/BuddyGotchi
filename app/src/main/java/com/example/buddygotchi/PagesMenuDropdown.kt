@@ -737,6 +737,39 @@ fun PagesMenuDropdown(
                                 }
                             }
                         }
+
+                        if (!isTemplateSelectorOpen) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(NothingDarkBackground)
+                                    .border(1.dp, NothingBorder, RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            val appWidgetManager = context.getSystemService(android.appwidget.AppWidgetManager::class.java)
+                                            val myProvider = android.content.ComponentName(context, BuddyTaskWidgetProvider::class.java)
+                                            if (appWidgetManager != null && appWidgetManager.isRequestPinAppWidgetSupported) {
+                                                appWidgetManager.requestPinAppWidget(myProvider, null, null)
+                                            }
+                                        }
+                                        onDismiss()
+                                    }
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "⊞ PIN WIDGET TO HOME SCREEN",
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    letterSpacing = 1.sp,
+                                    color = NothingTextSecondary
+                                )
+                            }
+                        }
                     }
                 }
             }

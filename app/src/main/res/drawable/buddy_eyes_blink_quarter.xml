@@ -1,0 +1,27 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="48dp"
+    android:viewportWidth="96"
+    android:viewportHeight="48">
+    <!-- Left Eye Quarter Blink Outer -->
+    <path
+        android:fillColor="#141414"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.8"
+        android:pathData="M 30,13 A 16,11 0 1,1 29.99,13 Z" />
+    <!-- Left Pupil Quarter -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 30,19 A 6,4.5 0 1,1 29.99,19 Z" />
+
+    <!-- Right Eye Quarter Blink Outer -->
+    <path
+        android:fillColor="#141414"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.8"
+        android:pathData="M 66,13 A 16,11 0 1,1 65.99,13 Z" />
+    <!-- Right Pupil Quarter -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 66,19 A 6,4.5 0 1,1 65.99,19 Z" />
+</vector>

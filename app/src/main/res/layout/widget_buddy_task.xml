@@ -17,75 +17,119 @@
         android:gravity="center"
         android:padding="4dp">
 
-        <!-- Animated Eye Flipper -->
+        <!-- Animated Eye Flipper (Smooth 140ms frames with easing transitions) -->
         <ViewFlipper
             android:id="@+id/widget_buddy_eyes_flipper"
             android:layout_width="96dp"
             android:layout_height="46dp"
             android:autoStart="true"
-            android:flipInterval="2200">
+            android:flipInterval="140">
 
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/buddy_eyes_center"
-                android:contentDescription="Buddy Eyes Center" />
+            <!-- 1. Center resting (14 frames = ~1.96s) -->
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
 
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/buddy_eyes_look_right"
-                android:contentDescription="Buddy Looking at Task" />
+            <!-- 2. Smooth Blink 1 (4 frames = ~560ms) -->
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_blink_quarter" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_blink_closed" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_blink_half" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_blink_quarter" />
 
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/buddy_eyes_center"
-                android:contentDescription="Buddy Eyes Center" />
+            <!-- 3. Center resting (9 frames = ~1.26s) -->
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
 
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/buddy_eyes_blink_half"
-                android:contentDescription="Buddy Eyes Half Blink" />
+            <!-- 4. Glance Right at Task (10 frames = ~1.40s with ease-in and ease-out) -->
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_right_soft" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_right" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_right" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_right" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_right" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_right" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_right" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_right" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_right_soft" />
 
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/buddy_eyes_blink_closed"
-                android:contentDescription="Buddy Eyes Blink" />
+            <!-- 5. Center resting (8 frames = ~1.12s) -->
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
 
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/buddy_eyes_blink_half"
-                android:contentDescription="Buddy Eyes Half Blink" />
+            <!-- 6. Playful Double Blink (6 frames = ~840ms) -->
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_blink_half" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_blink_closed" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_blink_quarter" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_blink_closed" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_blink_half" />
 
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/buddy_eyes_center"
-                android:contentDescription="Buddy Eyes Center" />
+            <!-- 7. Glance Left (8 frames = ~1.12s with ease-in and ease-out) -->
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_left_soft" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_left" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_left" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_left" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_left" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_left" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_look_left_soft" />
 
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/buddy_eyes_look_left"
-                android:contentDescription="Buddy Looking Left" />
+            <!-- 8. Center resting (6 frames = ~840ms) -->
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
 
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/buddy_eyes_center"
-                android:contentDescription="Buddy Eyes Center" />
+            <!-- 9. Happy Expression (10 frames = ~1.40s) -->
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_blink_quarter" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_blink_half" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_happy" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_happy" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_happy" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_happy" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_happy" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_happy" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_blink_half" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_blink_quarter" />
 
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/buddy_eyes_happy"
-                android:contentDescription="Buddy Happy Eyes" />
+            <!-- 10. Center resting before repeating loop (10 frames = ~1.40s) -->
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/buddy_eyes_center" />
 
         </ViewFlipper>
+
 
         <!-- Level Text -->
         <TextView
