@@ -273,10 +273,6 @@ fun DashboardScreen(
         }
     }
 
-    val unusedWidgets = remember(layout) {
-        DashboardLayoutManager.getUnusedWidgets(layout)
-    }
-
     val scrollState = rememberScrollState()
     var draggedIndex by remember { mutableStateOf<Int?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
@@ -370,56 +366,16 @@ fun DashboardScreen(
                         )
                     }
                 } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (unusedWidgets.isNotEmpty() && pages.getOrNull(pagerState.currentPage)?.type == DashboardPageType.MAIN) {
-                            var showAddMenu by remember { mutableStateOf(false) }
-                            Box {
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable { showAddMenu = true }
-                                ) {
-                                    Text(
-                                        text = "+ Add",
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = showAddMenu,
-                                    onDismissRequest = { showAddMenu = false }
-                                ) {
-                                    unusedWidgets.forEach { widgetId ->
-                                        DropdownMenuItem(
-                                            text = { Text("Add ${widgetId.title}") },
-                                            onClick = {
-                                                updateLayout(DashboardLayoutManager.addWidget(layout, widgetId))
-                                                showAddMenu = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
+                    // Drum Roll Page Indicator opposite to "BUDDYGOTCHI"
+                    PageDrumRollIndicator(
+                        pagerState = pagerState,
+                        pages = pages,
+                        isMenuOpen = showPagesMenu,
+                        onClick = {
+                            showPagesMenu = !showPagesMenu
+                            triggerTick()
                         }
-
-                        // Drum Roll Page Indicator opposite to "BUDDYGOTCHI"
-                        PageDrumRollIndicator(
-                            pagerState = pagerState,
-                            pages = pages,
-                            isMenuOpen = showPagesMenu,
-                            onClick = {
-                                showPagesMenu = !showPagesMenu
-                                triggerTick()
-                            }
-                        )
-                    }
+                    )
                 }
             }
 

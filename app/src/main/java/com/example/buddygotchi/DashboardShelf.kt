@@ -282,7 +282,7 @@ fun ShelfOverlay(
                                 )
                             }
                             Text(
-                                text = "STASHED WIDGETS · TAP TO DEPLOY TO ANY PAGE",
+                                text = "STASHED WIDGETS · TAP TO DEPLOY TO CURRENT PAGE",
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 8.5.sp,
                                 letterSpacing = 0.5.sp,
@@ -494,12 +494,6 @@ private fun ShelfRackItem(
     onExpandPasswords: () -> Unit = {},
     onQuickCreatePassword: () -> Unit = {}
 ) {
-    val activePageTitle = when (currentPageIndex) {
-        0 -> "LEFT"
-        1 -> "MAIN"
-        else -> "RIGHT"
-    }
-
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -530,68 +524,34 @@ private fun ShelfRackItem(
                 )
             }
 
-            // Deployment Actions
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            // Single Deploy button: adds widget to current page
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = NothingRed.copy(alpha = 0.18f),
+                border = BorderStroke(1.dp, NothingRed.copy(alpha = 0.75f)),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onDeploy(currentPageIndex) }
             ) {
-                // Primary quick deploy to active page
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = NothingRed.copy(alpha = 0.18f),
-                    border = BorderStroke(1.dp, NothingRed.copy(alpha = 0.7f)),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { onDeploy(currentPageIndex) }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
-                    Text(
-                        text = "+ DEPLOY TO $activePageTitle",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NothingWhite,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .clip(CircleShape)
+                            .background(NothingRed)
                     )
-                }
-
-                // If not already deploying to left or main, provide quick target pills
-                if (currentPageIndex != 0) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = NothingSurfaceVariant,
-                        border = BorderStroke(1.dp, NothingBorder),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onDeploy(0) }
-                    ) {
-                        Text(
-                            text = "LEFT",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = NothingTextSecondary,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                        )
-                    }
-                }
-                if (currentPageIndex != 1) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = NothingSurfaceVariant,
-                        border = BorderStroke(1.dp, NothingBorder),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onDeploy(1) }
-                    ) {
-                        Text(
-                            text = "MAIN",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = NothingTextSecondary,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                        )
-                    }
+                    Text(
+                        text = "+ DEPLOY",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
+                        color = NothingWhite
+                    )
                 }
             }
         }
