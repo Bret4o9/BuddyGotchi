@@ -139,6 +139,7 @@ fun DashboardScreen(
 
     val livePageFloat = pagerState.currentPage + pagerState.currentPageOffsetFraction
     val currentSnappedPage = livePageFloat.roundToInt().coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+    val isCurrentPageSquad = pages.getOrNull(currentSnappedPage)?.type == DashboardPageType.SQUAD
     var lastTickedPage by remember { mutableIntStateOf(initialPageIndex) }
     var hasInitializedSettled by remember { mutableStateOf(false) }
     LaunchedEffect(currentSnappedPage) {
@@ -237,6 +238,11 @@ fun DashboardScreen(
     }
 
     var isShelfOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(isCurrentPageSquad) {
+        if (isCurrentPageSquad && isShelfOpen) {
+            isShelfOpen = false
+        }
+    }
 
     val shelfWidgets = remember(layout, leftLayout, customPageLayouts) {
         val deployed = (layout.map { it.widgetId } + leftLayout.map { it.widgetId } + customPageLayouts.values.flatMap { it.map { w -> w.widgetId } }).toSet()
@@ -417,17 +423,23 @@ fun DashboardScreen(
                 }
             }
 
-            // Shelf Strip (resides below the title and above the widgets grid)
-            ShelfStrip(
-                isOpen = isShelfOpen,
-                stashedCount = shelfWidgets.size,
-                onClick = { isShelfOpen = !isShelfOpen },
-                modifier = Modifier.padding(
-                    start = DashboardGridDefaults.HORIZONTAL_PADDING,
-                    end = DashboardGridDefaults.HORIZONTAL_PADDING,
-                    bottom = 4.dp
+            // Shelf Strip (resides below the title and above the widgets grid; hidden on dedicated Squad page)
+            AnimatedVisibility(
+                visible = !isCurrentPageSquad,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                ShelfStrip(
+                    isOpen = isShelfOpen,
+                    stashedCount = shelfWidgets.size,
+                    onClick = { isShelfOpen = !isShelfOpen },
+                    modifier = Modifier.padding(
+                        start = DashboardGridDefaults.HORIZONTAL_PADDING,
+                        end = DashboardGridDefaults.HORIZONTAL_PADDING,
+                        bottom = 4.dp
+                    )
                 )
-            )
+            }
 
             // HorizontalPager holding Left Page, Main Dashboard, Right Page
             HorizontalPager(
@@ -930,7 +942,7 @@ fun DashboardScreen(
 
     // Shelf Overlay (extends down over everything else when opened)
     ShelfOverlay(
-        isOpen = isShelfOpen,
+        isOpen = isShelfOpen && !isCurrentPageSquad,
         shelfWidgets = shelfWidgets,
         currentPageIndex = pagerState.currentPage,
         onClose = { isShelfOpen = false },

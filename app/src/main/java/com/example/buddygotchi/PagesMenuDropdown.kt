@@ -509,6 +509,16 @@ fun PagesMenuDropdown(
                                                 // Position relative to MAIN badge
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 when {
+                                                    page.type == DashboardPageType.SQUAD -> {
+                                                        Text(
+                                                            text = "◈ DEDICATED SQUAD HUB",
+                                                            fontSize = 7.5.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontFamily = FontFamily.Monospace,
+                                                            color = NothingRed.copy(alpha = 0.9f),
+                                                            letterSpacing = 0.3.sp
+                                                        )
+                                                    }
                                                     distFromMain < 0 -> {
                                                         val stepsLeft = -distFromMain
                                                         Text(
