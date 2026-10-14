@@ -188,20 +188,20 @@
         android:paddingEnd="10dp"
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
-        android:gravity="center_vertical">
+        android:gravity="center">
 
         <!-- Header: Next Task Label + Category Badge -->
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
+            android:layout_gravity="center_horizontal"
             android:gravity="center_vertical">
 
             <TextView
                 android:id="@+id/widget_task_header"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:text="NEXT TASK"
                 android:textColor="@color/widget_text_muted"
                 android:textSize="9sp"
@@ -212,6 +212,7 @@
                 android:id="@+id/widget_task_category"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
                 android:text="WORK"
                 android:textColor="@color/nothing_red"
                 android:textSize="8.5sp"
@@ -226,9 +227,10 @@
 
         <!-- Time & Countdown -->
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
+            android:layout_gravity="center_horizontal"
             android:gravity="center_vertical"
             android:layout_marginTop="3dp">
 
@@ -264,6 +266,8 @@
             android:textColor="@color/white"
             android:textSize="12.5sp"
             android:textStyle="bold"
+            android:gravity="center"
+            android:textAlignment="center"
             android:maxLines="2"
             android:ellipsize="end" />
 
@@ -272,7 +276,10 @@
             android:id="@+id/widget_task_footer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
             android:layout_marginTop="3dp"
+            android:gravity="center"
+            android:textAlignment="center"
             android:text="Tap to open in BuddyGotchi →"
             android:textColor="@color/widget_text_muted"
             android:textSize="8sp" />
