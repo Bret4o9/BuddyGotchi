@@ -304,6 +304,8 @@ fun DashboardScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .navigationBarsPadding()
+            .padding(bottom = 16.dp)
             .pointerInput(Unit) {
                 try {
                     awaitPointerEventScope {
