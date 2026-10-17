@@ -154,6 +154,7 @@ fun PasswordsCollapsedWidget(
                         color = NothingRed,
                         lineHeight = 22.sp
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "KEYS",
                         fontSize = 8.sp,
@@ -161,24 +162,6 @@ fun PasswordsCollapsedWidget(
                         letterSpacing = 1.sp,
                         color = NothingTextSecondary
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(NothingSurfaceVariant)
-                            .border(1.dp, NothingBorder, RoundedCornerShape(6.dp))
-                            .clickable { onExpand() }
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "EXPAND ↗",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 7.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = NothingWhite
-                        )
-                    }
                 }
             }
 
@@ -207,41 +190,11 @@ fun PasswordsCollapsedWidget(
                         )
                     }
 
-                    // Centered Expand Button
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(NothingSurfaceVariant)
-                            .border(1.dp, NothingBorder, RoundedCornerShape(8.dp))
-                            .clickable { onExpand() }
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(
-                                text = "⚿",
-                                fontSize = 12.sp,
-                                color = NothingRed
-                            )
-                            Text(
-                                text = "EXPAND",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NothingWhite
-                            )
-                            Text(
-                                text = "↗",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NothingWhite
-                            )
-                        }
-                    }
+                    Text(
+                        text = "⚿",
+                        fontSize = 18.sp,
+                        color = NothingRed
+                    )
 
                     Text(
                         text = "SECURED",
@@ -255,41 +208,34 @@ fun PasswordsCollapsedWidget(
 
             // === 3. HALF ROW (2x1, 88dp height) ===
             isHalfRow -> {
-                Box(
+                Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Centered Expand Button
                     Box(
                         modifier = Modifier
-                            .align(Alignment.Center)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(NothingSurfaceVariant)
-                            .border(1.dp, NothingBorder, RoundedCornerShape(10.dp))
-                            .clickable { onExpand() }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(NothingRed)
-                            )
-                            Text(
-                                text = "EXPAND VAULT [${passwords.size}] ↗",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                color = NothingWhite
-                            )
-                        }
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(NothingRed)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
+                        Text(
+                            text = "PASSWORDS [${passwords.size}]",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NothingWhite
+                        )
+                        Text(
+                            text = "SECURED // ENCRYPTED",
+                            fontSize = 8.5.sp,
+                            color = NothingTextSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
@@ -334,15 +280,15 @@ fun PasswordsCollapsedWidget(
                         )
                     }
 
-                    // Centered Expand Button
+                    // Centered Vault Status Box (no expand button)
                     Box(
                         modifier = Modifier
+                            .fillMaxWidth()
                             .align(Alignment.Center)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(NothingSurfaceVariant)
+                            .background(NothingDarkBackground)
                             .border(1.dp, NothingBorder, RoundedCornerShape(10.dp))
-                            .clickable { onExpand() }
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(
@@ -355,12 +301,12 @@ fun PasswordsCollapsedWidget(
                                 color = NothingRed
                             )
                             Text(
-                                text = "EXPAND VAULT ↗",
+                                text = "${passwords.size} KEYS SECURED",
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 10.5.sp,
+                                fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp,
-                                color = NothingWhite
+                                color = NothingTextSecondary
                             )
                         }
                     }
@@ -403,14 +349,15 @@ fun PasswordsCollapsedWidget(
 
             // === 5. SLIM BANNER (4x1) ===
             isSlim -> {
-                Box(
+                Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(
-                        modifier = Modifier
-                            .align(Alignment.CenterStart),
+                        modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
@@ -429,40 +376,8 @@ fun PasswordsCollapsedWidget(
                         )
                     }
 
-                    // Centered Expand Button
                     Box(
                         modifier = Modifier
-                            .align(Alignment.Center)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(NothingSurfaceVariant)
-                            .border(1.dp, NothingBorder, RoundedCornerShape(8.dp))
-                            .clickable { onExpand() }
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = "⚿",
-                                fontSize = 11.sp,
-                                color = NothingRed
-                            )
-                            Text(
-                                text = "EXPAND ↗",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                color = NothingWhite
-                            )
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
                             .clip(RoundedCornerShape(6.dp))
                             .background(NothingRed.copy(alpha = 0.15f))
                             .border(1.dp, NothingRed, RoundedCornerShape(6.dp))
@@ -529,15 +444,15 @@ fun PasswordsCollapsedWidget(
                         )
                     }
 
-                    // Centered Expand Button at the center of the widget
+                    // Centered Vault Status Box (no EXPAND button)
                     Box(
                         modifier = Modifier
+                            .fillMaxWidth()
+                            .height(55.dp)
                             .align(Alignment.Center)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(NothingSurfaceVariant)
-                            .border(1.dp, NothingBorder, RoundedCornerShape(12.dp))
-                            .clickable { onExpand() }
-                            .padding(horizontal = 24.dp, vertical = 12.dp),
+                            .background(NothingDarkBackground)
+                            .border(1.dp, NothingBorder, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(
@@ -550,12 +465,12 @@ fun PasswordsCollapsedWidget(
                                 color = NothingRed
                             )
                             Text(
-                                text = "EXPAND VAULT ↗",
+                                text = "VAULT SECURED // TAP CARD TO OPEN",
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 11.5.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.5.sp,
-                                color = NothingWhite
+                                letterSpacing = 1.sp,
+                                color = NothingTextTertiary
                             )
                         }
                     }

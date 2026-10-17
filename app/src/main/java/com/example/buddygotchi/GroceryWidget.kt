@@ -133,6 +133,9 @@ fun GroceryCollapsedWidget(
         mutableStateOf(false)
     }
 
+    var fallbackMode by remember { mutableStateOf(GroceryViewMode.LIST) }
+    val currentViewMode = latestList?.viewMode ?: fallbackMode
+
     fun toggleEntryOnWidget(entryId: String) {
         val current = latestList ?: return
         val updatedEntries = GroceryManager.sortEntries(
@@ -145,6 +148,7 @@ fun GroceryCollapsedWidget(
     }
 
     fun toggleModeOnWidget(newMode: GroceryViewMode) {
+        fallbackMode = newMode
         val current = latestList ?: return
         if (current.viewMode == newMode) return
         val updatedList = current.copy(viewMode = newMode)
@@ -195,7 +199,7 @@ fun GroceryCollapsedWidget(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = latestList?.viewMode?.name ?: "LIST",
+                        text = currentViewMode.name,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 7.sp,
                         color = NothingTextTertiary
@@ -258,9 +262,9 @@ fun GroceryCollapsedWidget(
                     }
 
                     Text(
-                        text = "EXPAND ↗",
+                        text = currentViewMode.name,
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 8.sp,
+                        fontSize = 7.5.sp,
                         color = NothingTextTertiary
                     )
                 }
@@ -272,11 +276,10 @@ fun GroceryCollapsedWidget(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
@@ -305,14 +308,6 @@ fun GroceryCollapsedWidget(
                             )
                         }
                     }
-
-                    Text(
-                        text = "↗",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NothingTextSecondary
-                    )
                 }
             }
 
@@ -326,7 +321,7 @@ fun GroceryCollapsedWidget(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -346,15 +341,13 @@ fun GroceryCollapsedWidget(
                             )
                         }
 
-                        if (latestList != null) {
-                            Text(
-                                text = latestList.viewMode.name,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NothingRed
-                            )
-                        }
+                        Text(
+                            text = currentViewMode.name,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NothingRed
+                        )
                     }
 
                     if (latestList != null && allChecked && !hasReviewedCompletedList) {
@@ -501,15 +494,9 @@ fun GroceryCollapsedWidget(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.End,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "EXPAND ↗",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 8.sp,
-                            color = NothingTextTertiary
-                        )
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
@@ -570,31 +557,21 @@ fun GroceryCollapsedWidget(
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(NothingRed.copy(alpha = 0.15f))
+                            .border(1.dp, NothingRed, RoundedCornerShape(6.dp))
+                            .clickable { onQuickCreate() }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
                         Text(
-                            text = "EXPAND ↗",
+                            text = "+ NEW",
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 9.sp,
+                            fontSize = 8.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = NothingWhite,
-                            modifier = Modifier.padding(vertical = 4.dp)
+                            color = NothingWhite
                         )
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(NothingRed.copy(alpha = 0.15f))
-                                .border(1.dp, NothingRed, RoundedCornerShape(6.dp))
-                                .clickable { onQuickCreate() }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "+ NEW",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NothingWhite
-                            )
-                        }
                     }
                 }
             }
@@ -607,10 +584,10 @@ fun GroceryCollapsedWidget(
                         .padding(internalPadding),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Header Row with Mode Toggle (LIST / GRID) & Expand
+                    // Header Row: Title and LIST / GRID buttons on the left with equal spacing (no EXPAND button)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -620,19 +597,19 @@ fun GroceryCollapsedWidget(
                                     .clip(CircleShape)
                                     .background(NothingRed)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "GROCERIES",
-                                fontSize = 10.5.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.2.sp,
+                                letterSpacing = 1.5.sp,
                                 color = NothingWhite,
                                 maxLines = 1,
                                 softWrap = false
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "[$checkedItems/$totalItems]",
+                                text = "[ $checkedItems/$totalItems ]",
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
@@ -642,76 +619,52 @@ fun GroceryCollapsedWidget(
                             )
                         }
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            if (latestList != null) {
-                                // Quick Mode Switcher Pill (LIST | GRID)
-                                Row(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(NothingDarkBackground)
-                                        .border(1.dp, NothingBorder, RoundedCornerShape(8.dp))
-                                        .padding(2.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    val isListMode = latestList.viewMode == GroceryViewMode.LIST
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(if (isListMode) NothingRed else Color.Transparent)
-                                            .clickable { toggleModeOnWidget(GroceryViewMode.LIST) }
-                                            .padding(horizontal = 5.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = "≡ LIST",
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 7.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isListMode) NothingWhite else NothingTextSecondary,
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(if (!isListMode) NothingRed else Color.Transparent)
-                                            .clickable { toggleModeOnWidget(GroceryViewMode.GRID) }
-                                            .padding(horizontal = 5.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = "⊞ GRID",
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 7.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (!isListMode) NothingWhite else NothingTextSecondary,
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
-                                    }
-                                }
-                            }
-
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(NothingSurfaceVariant)
-                                    .border(1.dp, NothingBorder, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 6.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "EXPAND ↗",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = NothingTextSecondary,
-                                    maxLines = 1,
-                                    softWrap = false
+                        // Mode Switcher Buttons (LIST | GRID) moved to the left with equal spacing
+                        val isListMode = currentViewMode == GroceryViewMode.LIST
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(7.dp))
+                                .background(if (isListMode) NothingRed else NothingDarkBackground)
+                                .border(
+                                    1.dp,
+                                    if (isListMode) NothingRed else NothingBorder,
+                                    RoundedCornerShape(7.dp)
                                 )
-                            }
+                                .clickable { toggleModeOnWidget(GroceryViewMode.LIST) }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "≡ LIST",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isListMode) NothingWhite else NothingTextSecondary,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(7.dp))
+                                .background(if (!isListMode) NothingRed else NothingDarkBackground)
+                                .border(
+                                    1.dp,
+                                    if (!isListMode) NothingRed else NothingBorder,
+                                    RoundedCornerShape(7.dp)
+                                )
+                                .clickable { toggleModeOnWidget(GroceryViewMode.GRID) }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "⊞ GRID",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (!isListMode) NothingWhite else NothingTextSecondary,
+                                maxLines = 1,
+                                softWrap = false
+                            )
                         }
                     }
 

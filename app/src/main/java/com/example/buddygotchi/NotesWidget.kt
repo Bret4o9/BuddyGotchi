@@ -103,19 +103,13 @@ fun NotesCollapsedWidget(
                         color = NothingRed,
                         lineHeight = 24.sp
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = if (notes.isEmpty()) "EMPTY" else "NOTES",
                         fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp,
                         color = NothingTextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "EXPAND ↗",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 7.5.sp,
-                        color = NothingTextTertiary
                     )
                 }
             }
@@ -156,13 +150,6 @@ fun NotesCollapsedWidget(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-
-                    Text(
-                        text = "EXPAND ↗",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 8.sp,
-                        color = NothingTextTertiary
-                    )
                 }
             }
 
@@ -172,11 +159,10 @@ fun NotesCollapsedWidget(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
@@ -205,14 +191,6 @@ fun NotesCollapsedWidget(
                             }
                         }
                     }
-
-                    Text(
-                        text = "EXPAND ↗",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NothingTextSecondary
-                    )
                 }
             }
 
@@ -226,31 +204,21 @@ fun NotesCollapsedWidget(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(NothingRed)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "NOTES [${notes.size}]",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NothingWhite
-                            )
-                        }
-
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(NothingRed)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "EXPAND ↗",
+                            text = "NOTES [${notes.size}]",
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 8.5.sp,
-                            color = NothingTextSecondary
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NothingWhite
                         )
                     }
 
@@ -353,31 +321,21 @@ fun NotesCollapsedWidget(
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(NothingRed.copy(alpha = 0.15f))
+                            .border(1.dp, NothingRed, RoundedCornerShape(6.dp))
+                            .clickable { onQuickCreate() }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
                         Text(
-                            text = "EXPAND ↗",
+                            text = "+ NEW",
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 9.sp,
+                            fontSize = 8.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = NothingWhite,
-                            modifier = Modifier.padding(vertical = 4.dp)
+                            color = NothingWhite
                         )
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(NothingRed.copy(alpha = 0.15f))
-                                .border(1.dp, NothingRed, RoundedCornerShape(6.dp))
-                                .clickable { onQuickCreate() }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "+ NEW",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NothingWhite
-                            )
-                        }
                     }
                 }
             }
@@ -390,54 +348,33 @@ fun NotesCollapsedWidget(
                         .padding(internalPadding),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Header Row
+                    // Header Row (no EXPAND button)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(NothingRed)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "NOTES",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.5.sp,
-                                color = NothingWhite
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "[ ${String.format("%02d", notes.size)} ]",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NothingTextSecondary
-                            )
-                        }
-
-                        Row(
+                        Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(NothingSurfaceVariant)
-                                .border(1.dp, NothingBorder, RoundedCornerShape(8.dp))
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "EXPAND ↗",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                color = NothingTextSecondary
-                            )
-                        }
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(NothingRed)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "NOTES",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.5.sp,
+                            color = NothingWhite
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "[ ${String.format("%02d", notes.size)} ]",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NothingTextSecondary
+                        )
                     }
 
                     if (latestNote != null) {

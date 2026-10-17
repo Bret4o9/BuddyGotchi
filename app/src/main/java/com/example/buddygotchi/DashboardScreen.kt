@@ -203,7 +203,7 @@ fun DashboardScreen(
     var initialEditingMainPasswordId by remember { mutableStateOf<String?>(null) }
     var initialEditingMainGroceryId by remember { mutableStateOf<String?>(null) }
 
-    // Auto-expand if NOTES or PASSWORDS is the ONLY widget on Main page;
+    // Auto-expand if NOTES, PASSWORDS, or GROCERY is the ONLY widget on Main page;
     // Auto-collapse into a smaller widget when a second widget is added.
     val mainSingleWidgetId = if (layout.size == 1) layout[0].widgetId else null
     LaunchedEffect(layout.size, mainSingleWidgetId) {
@@ -221,6 +221,13 @@ fun DashboardScreen(
                     isPasswordsExpanded = true
                     isNotesExpanded = false
                     isGroceryExpanded = false
+                    if (isEditMode) isEditMode = false
+                }
+                DashboardWidgetId.GROCERY -> {
+                    mainExpandedState = LeftPageExpandedState.GROCERY
+                    isGroceryExpanded = true
+                    isNotesExpanded = false
+                    isPasswordsExpanded = false
                     if (isEditMode) isEditMode = false
                 }
                 else -> {
