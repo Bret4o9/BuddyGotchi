@@ -584,7 +584,7 @@ fun GroceryCollapsedWidget(
                         .padding(internalPadding),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Header Row: Title, LIST, and GRID buttons equally spaced across the full width
+                    // Header Row: Title on the left, grouped [ ≡ LIST | ⊞ GRID ] switcher on the right (like expanded view)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -619,52 +619,50 @@ fun GroceryCollapsedWidget(
                             )
                         }
 
-                        // Mode Switcher Buttons (LIST | GRID) moved to the left with equal spacing
-                        val isListMode = currentViewMode == GroceryViewMode.LIST
-                        Box(
+                        // Grouped Mode Switcher Pill (≡ LIST | ⊞ GRID) matching the expanded view
+                        Row(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(7.dp))
-                                .background(if (isListMode) NothingRed else NothingDarkBackground)
-                                .border(
-                                    1.dp,
-                                    if (isListMode) NothingRed else NothingBorder,
-                                    RoundedCornerShape(7.dp)
-                                )
-                                .clickable { toggleModeOnWidget(GroceryViewMode.LIST) }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(NothingDarkBackground)
+                                .border(1.dp, NothingBorder, RoundedCornerShape(10.dp))
+                                .padding(3.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "≡ LIST",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isListMode) NothingWhite else NothingTextSecondary,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(7.dp))
-                                .background(if (!isListMode) NothingRed else NothingDarkBackground)
-                                .border(
-                                    1.dp,
-                                    if (!isListMode) NothingRed else NothingBorder,
-                                    RoundedCornerShape(7.dp)
+                            val isListMode = currentViewMode == GroceryViewMode.LIST
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(7.dp))
+                                    .background(if (isListMode) NothingRed else Color.Transparent)
+                                    .clickable { toggleModeOnWidget(GroceryViewMode.LIST) }
+                                    .padding(horizontal = 9.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "≡ LIST",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isListMode) NothingWhite else NothingTextSecondary,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
-                                .clickable { toggleModeOnWidget(GroceryViewMode.GRID) }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "⊞ GRID",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (!isListMode) NothingWhite else NothingTextSecondary,
-                                maxLines = 1,
-                                softWrap = false
-                            )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(7.dp))
+                                    .background(if (!isListMode) NothingRed else Color.Transparent)
+                                    .clickable { toggleModeOnWidget(GroceryViewMode.GRID) }
+                                    .padding(horizontal = 9.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "⊞ GRID",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (!isListMode) NothingWhite else NothingTextSecondary,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
                         }
                     }
 
