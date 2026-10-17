@@ -584,10 +584,10 @@ fun GroceryCollapsedWidget(
                         .padding(internalPadding),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Header Row: Title and LIST / GRID buttons on the left with equal spacing (no EXPAND button)
+                    // Header Row: Title, LIST, and GRID buttons equally spaced across the full width
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
