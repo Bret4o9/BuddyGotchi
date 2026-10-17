@@ -41,7 +41,8 @@ import kotlin.math.roundToInt
 enum class LeftPageExpandedState {
     COLLAPSED,
     NOTES,
-    PASSWORDS
+    PASSWORDS,
+    GROCERY
 }
 
 @Composable
@@ -52,6 +53,9 @@ fun LeftDashboardPage(
     onNotesUpdated: (List<NoteItem>) -> Unit,
     passwords: List<PasswordItem> = emptyList(),
     onPasswordsUpdated: (List<PasswordItem>) -> Unit = {},
+    groceryLists: List<GroceryList> = emptyList(),
+    onGroceryListsUpdated: (List<GroceryList>) -> Unit = {},
+    onFinishGroceryTaskReward: () -> Unit = {},
     tasks: List<ReminderTask> = emptyList(),
     onToggleTask: (ReminderTask) -> Unit = {},
     onClearDoneTasks: () -> Unit = {},
@@ -64,6 +68,7 @@ fun LeftDashboardPage(
     onSetEditMode: (Boolean) -> Unit = {},
     onNotesExpandedChanged: (Boolean) -> Unit = {},
     onPasswordsExpandedChanged: (Boolean) -> Unit = {},
+    onGroceryExpandedChanged: (Boolean) -> Unit = {},
     onDraggingChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -97,6 +102,7 @@ fun LeftDashboardPage(
     var expandedState by remember { mutableStateOf(LeftPageExpandedState.COLLAPSED) }
     var initialEditingNoteId by remember { mutableStateOf<String?>(null) }
     var initialEditingPasswordId by remember { mutableStateOf<String?>(null) }
+    var initialEditingGroceryId by remember { mutableStateOf<String?>(null) }
 
     // Auto-expand if NOTES or PASSWORDS is the ONLY widget on the page;
     // Auto-collapse into a smaller widget when a second widget is added.
@@ -108,24 +114,28 @@ fun LeftDashboardPage(
                     expandedState = LeftPageExpandedState.NOTES
                     onNotesExpandedChanged(true)
                     onPasswordsExpandedChanged(false)
+                    onGroceryExpandedChanged(false)
                     if (isEditMode) onSetEditMode(false)
                 }
                 DashboardWidgetId.PASSWORDS -> {
                     expandedState = LeftPageExpandedState.PASSWORDS
                     onPasswordsExpandedChanged(true)
                     onNotesExpandedChanged(false)
+                    onGroceryExpandedChanged(false)
                     if (isEditMode) onSetEditMode(false)
                 }
                 else -> {
                     expandedState = LeftPageExpandedState.COLLAPSED
                     onNotesExpandedChanged(false)
                     onPasswordsExpandedChanged(false)
+                    onGroceryExpandedChanged(false)
                 }
             }
         } else {
             expandedState = LeftPageExpandedState.COLLAPSED
             onNotesExpandedChanged(false)
             onPasswordsExpandedChanged(false)
+            onGroceryExpandedChanged(false)
         }
     }
     val scrollState = rememberScrollState()
@@ -223,6 +233,23 @@ fun LeftDashboardPage(
                             expandedState = LeftPageExpandedState.COLLAPSED
                             onPasswordsExpandedChanged(false)
                             initialEditingPasswordId = null
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                LeftPageExpandedState.GROCERY -> {
+                    // Occupies the entire page for Grocery Lists
+                    GroceryExpandedView(
+                        groceryLists = groceryLists,
+                        initialEditingListId = initialEditingGroceryId,
+                        onListsUpdated = { updated ->
+                            onGroceryListsUpdated(updated)
+                        },
+                        onFinishTaskReward = onFinishGroceryTaskReward,
+                        onCollapse = {
+                            expandedState = LeftPageExpandedState.COLLAPSED
+                            onGroceryExpandedChanged(false)
+                            initialEditingGroceryId = null
                         },
                         modifier = Modifier.fillMaxSize()
                     )
@@ -453,7 +480,31 @@ fun LeftDashboardPage(
                                                     expandedState = LeftPageExpandedState.PASSWORDS
                                                     onPasswordsExpandedChanged(true)
                                                 }
-                                            }
+                                            },
+                                            groceryLists = groceryLists,
+                                            onGroceryListsUpdated = onGroceryListsUpdated,
+                                            onExpandGrocery = {
+                                                if (!isEditMode) {
+                                                    initialEditingGroceryId = null
+                                                    expandedState = LeftPageExpandedState.GROCERY
+                                                    onGroceryExpandedChanged(true)
+                                                }
+                                            },
+                                            onQuickCreateGrocery = {
+                                                if (!isEditMode) {
+                                                    val newGrocery = GroceryList(
+                                                        title = "GROCERY LIST",
+                                                        entries = emptyList(),
+                                                        viewMode = GroceryViewMode.LIST,
+                                                        updatedAt = System.currentTimeMillis()
+                                                    )
+                                                    onGroceryListsUpdated(GroceryManager.upsertList(context, newGrocery))
+                                                    initialEditingGroceryId = newGrocery.id
+                                                    expandedState = LeftPageExpandedState.GROCERY
+                                                    onGroceryExpandedChanged(true)
+                                                }
+                                            },
+                                            onFinishGroceryTaskReward = onFinishGroceryTaskReward
                                         )
                                     }
                                 }
@@ -623,7 +674,31 @@ fun LeftDashboardPage(
                                                             expandedState = LeftPageExpandedState.PASSWORDS
                                                             onPasswordsExpandedChanged(true)
                                                         }
-                                                    }
+                                                    },
+                                                    groceryLists = groceryLists,
+                                                    onGroceryListsUpdated = onGroceryListsUpdated,
+                                                    onExpandGrocery = {
+                                                        if (!isEditMode) {
+                                                            initialEditingGroceryId = null
+                                                            expandedState = LeftPageExpandedState.GROCERY
+                                                            onGroceryExpandedChanged(true)
+                                                        }
+                                                    },
+                                                    onQuickCreateGrocery = {
+                                                        if (!isEditMode) {
+                                                            val newGrocery = GroceryList(
+                                                                title = "GROCERY LIST",
+                                                                entries = emptyList(),
+                                                                viewMode = GroceryViewMode.LIST,
+                                                                updatedAt = System.currentTimeMillis()
+                                                            )
+                                                            onGroceryListsUpdated(GroceryManager.upsertList(context, newGrocery))
+                                                            initialEditingGroceryId = newGrocery.id
+                                                            expandedState = LeftPageExpandedState.GROCERY
+                                                            onGroceryExpandedChanged(true)
+                                                        }
+                                                    },
+                                                    onFinishGroceryTaskReward = onFinishGroceryTaskReward
                                                 )
                                             }
                                         }

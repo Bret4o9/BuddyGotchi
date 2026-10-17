@@ -180,6 +180,7 @@ fun DashboardScreen(
     var isChildPageDraggingWidget by remember { mutableStateOf(false) }
     var isNotesExpanded by remember { mutableStateOf(false) }
     var isPasswordsExpanded by remember { mutableStateOf(false) }
+    var isGroceryExpanded by remember { mutableStateOf(false) }
     var activeResizeWidgetId by remember { mutableStateOf<DashboardWidgetId?>(null) }
     var activeResizePreviewSize by remember { mutableStateOf<WidgetSize?>(null) }
 
@@ -195,10 +196,12 @@ fun DashboardScreen(
 
     var notes by remember { mutableStateOf(NotesManager.getNotes(context)) }
     var passwords by remember { mutableStateOf(PasswordsManager.getPasswords(context)) }
+    var groceryLists by remember { mutableStateOf(GroceryManager.getLists(context)) }
 
     var mainExpandedState by remember { mutableStateOf(LeftPageExpandedState.COLLAPSED) }
     var initialEditingMainNoteId by remember { mutableStateOf<String?>(null) }
     var initialEditingMainPasswordId by remember { mutableStateOf<String?>(null) }
+    var initialEditingMainGroceryId by remember { mutableStateOf<String?>(null) }
 
     // Auto-expand if NOTES or PASSWORDS is the ONLY widget on Main page;
     // Auto-collapse into a smaller widget when a second widget is added.
@@ -210,24 +213,28 @@ fun DashboardScreen(
                     mainExpandedState = LeftPageExpandedState.NOTES
                     isNotesExpanded = true
                     isPasswordsExpanded = false
+                    isGroceryExpanded = false
                     if (isEditMode) isEditMode = false
                 }
                 DashboardWidgetId.PASSWORDS -> {
                     mainExpandedState = LeftPageExpandedState.PASSWORDS
                     isPasswordsExpanded = true
                     isNotesExpanded = false
+                    isGroceryExpanded = false
                     if (isEditMode) isEditMode = false
                 }
                 else -> {
                     mainExpandedState = LeftPageExpandedState.COLLAPSED
                     isNotesExpanded = false
                     isPasswordsExpanded = false
+                    isGroceryExpanded = false
                 }
             }
         } else {
             mainExpandedState = LeftPageExpandedState.COLLAPSED
             isNotesExpanded = false
             isPasswordsExpanded = false
+            isGroceryExpanded = false
         }
     }
 
@@ -447,6 +454,9 @@ fun DashboardScreen(
                                 onNotesUpdated = { notes = it },
                                 passwords = passwords,
                                 onPasswordsUpdated = { passwords = it },
+                                groceryLists = groceryLists,
+                                onGroceryListsUpdated = { groceryLists = it },
+                                onFinishGroceryTaskReward = { buddyXp = TaskManager.getBuddyXp(context) },
                                 tasks = tasks,
                                 onToggleTask = { task -> tasks = TaskManager.toggleTask(context, task.id) },
                                 onClearDoneTasks = { tasks = TaskManager.clearDoneTasks(context) },
@@ -458,6 +468,7 @@ fun DashboardScreen(
                                 onSetEditMode = { isEditMode = it },
                                 onNotesExpandedChanged = { isNotesExpanded = it },
                                 onPasswordsExpandedChanged = { isPasswordsExpanded = it },
+                                onGroceryExpandedChanged = { isGroceryExpanded = it },
                                 onDraggingChanged = { isChildPageDraggingWidget = it }
                             )
                         }
@@ -506,6 +517,20 @@ fun DashboardScreen(
                                             mainExpandedState = LeftPageExpandedState.COLLAPSED
                                             isPasswordsExpanded = false
                                             initialEditingMainPasswordId = null
+                                        },
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                LeftPageExpandedState.GROCERY -> {
+                                    GroceryExpandedView(
+                                        groceryLists = groceryLists,
+                                        initialEditingListId = initialEditingMainGroceryId,
+                                        onListsUpdated = { groceryLists = it },
+                                        onFinishTaskReward = { buddyXp = TaskManager.getBuddyXp(context) },
+                                        onCollapse = {
+                                            mainExpandedState = LeftPageExpandedState.COLLAPSED
+                                            isGroceryExpanded = false
+                                            initialEditingMainGroceryId = null
                                         },
                                         modifier = Modifier.fillMaxSize()
                                     )
@@ -659,7 +684,76 @@ fun DashboardScreen(
                                                         tasks = TaskManager.addTask(context, newTask)
                                                         buddyXp = TaskManager.getBuddyXp(context)
                                                     },
-                                                    getTouchPosition = { globalTouchPosition.value }
+                                                    getTouchPosition = { globalTouchPosition.value },
+                                                    notes = notes,
+                                                    onNotesUpdated = { notes = it },
+                                                    onExpandNotes = {
+                                                        if (!isEditMode) {
+                                                            initialEditingMainNoteId = null
+                                                            mainExpandedState = LeftPageExpandedState.NOTES
+                                                            isNotesExpanded = true
+                                                        }
+                                                    },
+                                                    onQuickCreateNote = {
+                                                        if (!isEditMode) {
+                                                            val newNote = NoteItem(
+                                                                title = "",
+                                                                content = "",
+                                                                updatedAt = System.currentTimeMillis()
+                                                            )
+                                                            notes = NotesManager.upsertNote(context, newNote)
+                                                            initialEditingMainNoteId = newNote.id
+                                                            mainExpandedState = LeftPageExpandedState.NOTES
+                                                            isNotesExpanded = true
+                                                        }
+                                                    },
+                                                    passwords = passwords,
+                                                    onPasswordsUpdated = { passwords = it },
+                                                    onExpandPasswords = {
+                                                        if (!isEditMode) {
+                                                            initialEditingMainPasswordId = null
+                                                            mainExpandedState = LeftPageExpandedState.PASSWORDS
+                                                            isPasswordsExpanded = true
+                                                        }
+                                                    },
+                                                    onQuickCreatePassword = {
+                                                        if (!isEditMode) {
+                                                            val newPass = PasswordItem(
+                                                                title = "",
+                                                                password = "",
+                                                                username = "",
+                                                                updatedAt = System.currentTimeMillis()
+                                                            )
+                                                            passwords = PasswordsManager.upsertPassword(context, newPass)
+                                                            initialEditingMainPasswordId = newPass.id
+                                                            mainExpandedState = LeftPageExpandedState.PASSWORDS
+                                                            isPasswordsExpanded = true
+                                                        }
+                                                    },
+                                                    groceryLists = groceryLists,
+                                                    onGroceryListsUpdated = { groceryLists = it },
+                                                    onExpandGrocery = {
+                                                        if (!isEditMode) {
+                                                            initialEditingMainGroceryId = null
+                                                            mainExpandedState = LeftPageExpandedState.GROCERY
+                                                            isGroceryExpanded = true
+                                                        }
+                                                    },
+                                                    onQuickCreateGrocery = {
+                                                        if (!isEditMode) {
+                                                            val newGrocery = GroceryList(
+                                                                title = "GROCERY LIST",
+                                                                entries = emptyList(),
+                                                                viewMode = GroceryViewMode.LIST,
+                                                                updatedAt = System.currentTimeMillis()
+                                                            )
+                                                            groceryLists = GroceryManager.upsertList(context, newGrocery)
+                                                            initialEditingMainGroceryId = newGrocery.id
+                                                            mainExpandedState = LeftPageExpandedState.GROCERY
+                                                            isGroceryExpanded = true
+                                                        }
+                                                    },
+                                                    onFinishGroceryTaskReward = { buddyXp = TaskManager.getBuddyXp(context) }
                                                 )
                                             }
                                         }
@@ -834,7 +928,31 @@ fun DashboardScreen(
                                                                     mainExpandedState = LeftPageExpandedState.PASSWORDS
                                                                     isPasswordsExpanded = true
                                                                 }
-                                                            }
+                                                            },
+                                                            groceryLists = groceryLists,
+                                                            onGroceryListsUpdated = { groceryLists = it },
+                                                            onExpandGrocery = {
+                                                                if (!isEditMode) {
+                                                                    initialEditingMainGroceryId = null
+                                                                    mainExpandedState = LeftPageExpandedState.GROCERY
+                                                                    isGroceryExpanded = true
+                                                                }
+                                                            },
+                                                            onQuickCreateGrocery = {
+                                                                if (!isEditMode) {
+                                                                    val newGrocery = GroceryList(
+                                                                        title = "GROCERY LIST",
+                                                                        entries = emptyList(),
+                                                                        viewMode = GroceryViewMode.LIST,
+                                                                        updatedAt = System.currentTimeMillis()
+                                                                    )
+                                                                    groceryLists = GroceryManager.upsertList(context, newGrocery)
+                                                                    initialEditingMainGroceryId = newGrocery.id
+                                                                    mainExpandedState = LeftPageExpandedState.GROCERY
+                                                                    isGroceryExpanded = true
+                                                                }
+                                                            },
+                                                            onFinishGroceryTaskReward = { buddyXp = TaskManager.getBuddyXp(context) }
                                                         )
                                                     }
                                                 }
@@ -877,6 +995,9 @@ fun DashboardScreen(
                                 onNotesUpdated = { notes = it },
                                 passwords = passwords,
                                 onPasswordsUpdated = { passwords = it },
+                                groceryLists = groceryLists,
+                                onGroceryListsUpdated = { groceryLists = it },
+                                onFinishGroceryTaskReward = { buddyXp = TaskManager.getBuddyXp(context) },
                                 tasks = tasks,
                                 onToggleTask = { task -> tasks = TaskManager.toggleTask(context, task.id) },
                                 onClearDoneTasks = { tasks = TaskManager.clearDoneTasks(context) },
@@ -888,6 +1009,7 @@ fun DashboardScreen(
                                 onSetEditMode = { isEditMode = it },
                                 onNotesExpandedChanged = { isNotesExpanded = it },
                                 onPasswordsExpandedChanged = { isPasswordsExpanded = it },
+                                onGroceryExpandedChanged = { isGroceryExpanded = it },
                                 onDraggingChanged = { isChildPageDraggingWidget = it }
                             )
                         }
@@ -949,6 +1071,23 @@ fun DashboardScreen(
             coroutineScope.launch {
                 pagerState.animateScrollToPage(0)
             }
+        },
+        groceryLists = groceryLists,
+        onGroceryListsUpdated = { groceryLists = it },
+        onExpandGrocery = {
+            isShelfOpen = false
+            deployWidget(DashboardWidgetId.GROCERY, pagerState.currentPage)
+        },
+        onQuickCreateGrocery = {
+            val newGrocery = GroceryList(
+                title = "GROCERY LIST",
+                entries = emptyList(),
+                viewMode = GroceryViewMode.LIST,
+                updatedAt = System.currentTimeMillis()
+            )
+            groceryLists = GroceryManager.upsertList(context, newGrocery)
+            isShelfOpen = false
+            deployWidget(DashboardWidgetId.GROCERY, pagerState.currentPage)
         }
     )
 
@@ -1106,7 +1245,12 @@ fun RenderDashboardWidgetContent(
     passwords: List<PasswordItem> = emptyList(),
     onPasswordsUpdated: (List<PasswordItem>) -> Unit = {},
     onExpandPasswords: () -> Unit = {},
-    onQuickCreatePassword: () -> Unit = {}
+    onQuickCreatePassword: () -> Unit = {},
+    groceryLists: List<GroceryList> = emptyList(),
+    onGroceryListsUpdated: (List<GroceryList>) -> Unit = {},
+    onExpandGrocery: () -> Unit = {},
+    onQuickCreateGrocery: () -> Unit = {},
+    onFinishGroceryTaskReward: () -> Unit = {}
 ) {
     when (item.widgetId) {
         DashboardWidgetId.CLOCK -> {
@@ -1154,6 +1298,16 @@ fun RenderDashboardWidgetContent(
                 passwords = passwords,
                 onExpand = onExpandPasswords,
                 onQuickCreate = onQuickCreatePassword
+            )
+        }
+        DashboardWidgetId.GROCERY -> {
+            GroceryCollapsedWidget(
+                size = liveSize,
+                groceryLists = groceryLists,
+                onListsUpdated = onGroceryListsUpdated,
+                onExpand = onExpandGrocery,
+                onQuickCreate = onQuickCreateGrocery,
+                onFinishTaskReward = onFinishGroceryTaskReward
             )
         }
     }

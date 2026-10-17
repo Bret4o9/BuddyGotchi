@@ -155,6 +155,10 @@ fun ShelfOverlay(
     passwords: List<PasswordItem> = emptyList(),
     onExpandPasswords: () -> Unit = {},
     onQuickCreatePassword: () -> Unit = {},
+    groceryLists: List<GroceryList> = emptyList(),
+    onGroceryListsUpdated: (List<GroceryList>) -> Unit = {},
+    onExpandGrocery: () -> Unit = {},
+    onQuickCreateGrocery: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -435,7 +439,11 @@ fun ShelfOverlay(
                                     onQuickCreateNote = onQuickCreateNote,
                                     passwords = passwords,
                                     onExpandPasswords = onExpandPasswords,
-                                    onQuickCreatePassword = onQuickCreatePassword
+                                    onQuickCreatePassword = onQuickCreatePassword,
+                                    groceryLists = groceryLists,
+                                    onGroceryListsUpdated = onGroceryListsUpdated,
+                                    onExpandGrocery = onExpandGrocery,
+                                    onQuickCreateGrocery = onQuickCreateGrocery
                                 )
                             }
                         }
@@ -492,7 +500,11 @@ private fun ShelfRackItem(
     onQuickCreateNote: () -> Unit,
     passwords: List<PasswordItem> = emptyList(),
     onExpandPasswords: () -> Unit = {},
-    onQuickCreatePassword: () -> Unit = {}
+    onQuickCreatePassword: () -> Unit = {},
+    groceryLists: List<GroceryList> = emptyList(),
+    onGroceryListsUpdated: (List<GroceryList>) -> Unit = {},
+    onExpandGrocery: () -> Unit = {},
+    onQuickCreateGrocery: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -580,6 +592,15 @@ private fun ShelfRackItem(
                         size = WidgetSize.WIDE,
                         onExpand = onExpandPasswords,
                         onQuickCreate = onQuickCreatePassword
+                    )
+                }
+                DashboardWidgetId.GROCERY -> {
+                    GroceryCollapsedWidget(
+                        groceryLists = groceryLists,
+                        onListsUpdated = onGroceryListsUpdated,
+                        size = WidgetSize.WIDE,
+                        onExpand = onExpandGrocery,
+                        onQuickCreate = onQuickCreateGrocery
                     )
                 }
                 DashboardWidgetId.TODAY -> {
