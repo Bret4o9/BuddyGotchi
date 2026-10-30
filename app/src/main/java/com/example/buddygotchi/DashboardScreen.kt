@@ -416,7 +416,7 @@ fun DashboardScreen(
             // HorizontalPager holding Left Page, Main Dashboard, Right Page
             HorizontalPager(
                 state = pagerState,
-                userScrollEnabled = !isEditMode && draggedIndex == null && !isChildPageDraggingWidget,
+                userScrollEnabled = !isEditMode && draggedIndex == null && !isChildPageDraggingWidget && !Buddy3DManager.isInteractingWith3DState.value,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
@@ -563,7 +563,7 @@ fun DashboardScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .verticalScroll(scrollState, enabled = draggedIndex == null)
+                                    .verticalScroll(scrollState, enabled = draggedIndex == null && !Buddy3DManager.isInteractingWith3DState.value)
                                     .padding(
                                         start = DashboardGridDefaults.HORIZONTAL_PADDING,
                                         end = DashboardGridDefaults.HORIZONTAL_PADDING,

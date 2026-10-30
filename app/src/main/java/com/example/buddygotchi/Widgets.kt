@@ -9,6 +9,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -34,6 +35,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -1116,6 +1118,28 @@ fun BuddyEyes(
 }
 
 @Composable
+private fun BuddyCompanionVisual(
+    size: WidgetSize,
+    displayMode: BuddyDisplayMode,
+    getTouchPosition: () -> Offset? = { null },
+    modifier: Modifier = Modifier
+) {
+    if (displayMode == BuddyDisplayMode.CLASSIC_2D) {
+        BuddyEyes(
+            size = size,
+            getTouchPosition = getTouchPosition,
+            modifier = modifier
+        )
+    } else {
+        Buddy3DView(
+            size = size,
+            getTouchPosition = getTouchPosition,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
 fun BuddyWidget(
     xp: Int = 0,
     level: Int = 1,
@@ -1124,11 +1148,95 @@ fun BuddyWidget(
     getTouchPosition: () -> Offset? = { null },
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        Buddy3DManager.ensureInitialized(context)
+    }
+    val displayMode by Buddy3DManager.displayModeState
+    val activeCharIndex by Buddy3DManager.activeCharacterIndexState
+    val detectedChars = Buddy3DManager.detectedCharactersState
+    var show3DStudioDialog by remember { mutableStateOf(false) }
+
+    if (show3DStudioDialog) {
+        Buddy3DStudioDialog(onDismiss = { show3DStudioDialog = false })
+    }
+
     WidgetCard(
-        title = if (size.rows >= 3 && size.cols >= 2) "BUDDYGOTCHI COMPANION" else "BUDDY",
+        title = if (size.rows >= 3 && size.cols >= 2) "BUDDYGOTCHI" else "BUDDY",
         height = height,
         size = size,
-        modifier = modifier
+        modifier = modifier,
+        headerAction = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (size.cols >= 2 && displayMode == BuddyDisplayMode.THREE_D && detectedChars.size > 1) {
+                    val charLabel = remember(activeCharIndex, detectedChars.size) {
+                        Buddy3DManager.getActiveCharacterLabel()
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF1F1F1F))
+                            .border(0.8.dp, Color(0xFF3A3A3A), RoundedCornerShape(6.dp))
+                            .clickable { Buddy3DManager.cycleCharacter(context) }
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "$charLabel ↻",
+                            fontSize = 8.5.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                if (size.cols >= 2) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF1F1F1F))
+                            .border(0.8.dp, Color(0xFF3A3A3A), RoundedCornerShape(6.dp))
+                            .clickable { show3DStudioDialog = true }
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "MODELS",
+                            fontSize = 8.5.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
+
+                // 2D / 3D Mode Switcher Pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            if (displayMode == BuddyDisplayMode.THREE_D) NothingRed else Color(0xFF222222)
+                        )
+                        .border(
+                            0.8.dp,
+                            if (displayMode == BuddyDisplayMode.THREE_D) NothingRed else Color(0xFF444444),
+                            RoundedCornerShape(6.dp)
+                        )
+                        .clickable { Buddy3DManager.toggleDisplayMode(context) }
+                        .padding(horizontal = if (size.cols == 1) 4.dp else 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = if (displayMode == BuddyDisplayMode.THREE_D) "3D" else "2D",
+                        fontSize = if (size.cols == 1) 8.sp else 8.5.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+        }
     ) {
         when {
             size.cols == 1 && size.rows == 1 -> {
@@ -1138,21 +1246,17 @@ fun BuddyWidget(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    BuddyEyes(
+                    BuddyCompanionVisual(
                         size = size,
+                        displayMode = displayMode,
                         getTouchPosition = getTouchPosition
                     )
-                    Spacer(modifier = Modifier.height(3.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Lv $level",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp,
+                        fontSize = 9.5.sp,
                         color = NothingRed
-                    )
-                    Text(
-                        text = "$xp XP",
-                        fontSize = 8.5.sp,
-                        color = MaterialTheme.colorScheme.secondary
                     )
                 }
             }
@@ -1162,17 +1266,18 @@ fun BuddyWidget(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(vertical = if (size.rows == 2) 8.dp else 12.dp),
+                        .padding(vertical = if (size.rows == 2) 4.dp else 8.dp),
                     verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    BuddyEyes(
+                    BuddyCompanionVisual(
                         size = size,
+                        displayMode = displayMode,
                         getTouchPosition = getTouchPosition
                     )
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Text(
                             text = "LVL $level",
@@ -1199,37 +1304,45 @@ fun BuddyWidget(
                         }
                     }
                     Text(
-                        text = "BUDDY",
-                        fontSize = 9.sp,
+                        text = if (displayMode == BuddyDisplayMode.THREE_D) Buddy3DManager.getActiveCharacterLabel() else "BUDDY",
+                        fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = MaterialTheme.colorScheme.outline
+                        letterSpacing = 0.8.sp,
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
             size.cols == 2 -> {
-                // 2x1 Half-width Layout
+                // 2x1 or 2x2 Half-width Layout
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    BuddyEyes(
+                    BuddyCompanionVisual(
                         size = size,
+                        displayMode = displayMode,
                         getTouchPosition = getTouchPosition
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Level $level",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp
-                    )
-                    Text(
-                        text = "$xp XP",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "Level $level",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            text = "• $xp XP",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
                 }
             }
 
@@ -1244,10 +1357,11 @@ fun BuddyWidget(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        BuddyEyes(
+                        BuddyCompanionVisual(
                             size = size,
+                            displayMode = displayMode,
                             getTouchPosition = getTouchPosition
                         )
                         Column {
@@ -1300,23 +1414,24 @@ fun BuddyWidget(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        BuddyEyes(
+                        BuddyCompanionVisual(
                             size = size,
+                            displayMode = displayMode,
                             getTouchPosition = getTouchPosition
                         )
                         Column {
                             Text(
-                                text = "BUDDYGOTCHI",
+                                text = if (displayMode == BuddyDisplayMode.THREE_D) Buddy3DManager.getActiveCharacterLabel() else "BUDDYGOTCHI",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp,
-                                color = MaterialTheme.colorScheme.secondary
+                                color = NothingRed
                             )
                             Text(
                                 text = "Level $level Companion",
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
@@ -1355,23 +1470,24 @@ fun BuddyWidget(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.SpaceAround
                 ) {
-                    BuddyEyes(
+                    BuddyCompanionVisual(
                         size = size,
+                        displayMode = displayMode,
                         getTouchPosition = getTouchPosition
                     )
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "Level $level Companion",
-                            fontSize = 20.sp,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
                         val progress = ((xp % 50) / 50f).coerceIn(0f, 1f)
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         LinearProgressIndicator(
                             progress = { progress },
                             modifier = Modifier
@@ -1381,7 +1497,7 @@ fun BuddyWidget(
                             color = NothingRed,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(3.dp))
                         Text(
                             text = "${xp % 50} / 50 XP to Level ${level + 1}",
                             fontSize = 11.sp,
@@ -1398,15 +1514,20 @@ fun BuddyWidget(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(text = "TOTAL XP", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
-                            Text(text = "$xp", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "$xp", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = "STATUS", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
-                            Text(text = "ACTIVE ⚡", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = NothingRed)
+                            Text(text = "CHARACTER", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            Text(
+                                text = if (displayMode == BuddyDisplayMode.THREE_D) Buddy3DManager.getActiveCharacterLabel() else "CLASSIC 2D",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingRed
+                            )
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(text = "MOOD", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
-                            Text(text = "HAPPY 😊", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "HAPPY 😊", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

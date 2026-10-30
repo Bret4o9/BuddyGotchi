@@ -281,7 +281,7 @@ fun LeftDashboardPage(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .verticalScroll(scrollState, enabled = draggedIndex == null)
+                            .verticalScroll(scrollState, enabled = draggedIndex == null && !Buddy3DManager.isInteractingWith3DState.value)
                             .padding(
                                 start = DashboardGridDefaults.HORIZONTAL_PADDING,
                                 end = DashboardGridDefaults.HORIZONTAL_PADDING,
