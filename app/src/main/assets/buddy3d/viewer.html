@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>BuddyGotchi 3D Companion</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      overflow: hidden;
+      font-family: monospace;
+    }
+    #canvas-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 50% 60%, rgba(215, 25, 33, 0.08) 0%, rgba(18, 18, 18, 0.0) 72%);
+    }
+    canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+      outline: none;
+    }
+    #status-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      color: #9e9e9e;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: opacity 0.25s ease;
+    }
+    #status-overlay.hidden {
+      opacity: 0;
+    }
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      border-top-color: #D71921;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      margin-bottom: 6px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+  <script src="lib/three.min.js"></script>
+  <script src="lib/fflate.min.js"></script>
+  <script src="lib/FBXLoader.js"></script>
+  <script src="lib/GLTFLoader.js"></script>
+  <script src="lib/MTLLoader.js"></script>
+  <script src="lib/OBJLoader.js"></script>
+  <script src="lib/SkeletonUtils.js"></script>
+</head>
+<body>
+  <div id="canvas-container">
+    <div id="status-overlay">
+      <div class="spinner"></div>
+      <div id="status-text">LOADING 3D BUDDY...</div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const container = document.getElementById('canvas-container');
+      const statusOverlay = document.getElementById('status-overlay');
+      const statusText = document.getElementById('status-text');
+
+      let scene, camera, renderer, clock;
+      let currentRoot = null;
+      let mixers = [];
+      let characterGroups = []; // [{ name, object, center, size }]
+      let activeCharIndex = 0;  // -1 = ALL (Trio), 0..N-1 = individual character
+      let activeTexBaseUrl = '';
+
+      // Camera & interaction state
+      let cameraTarget = new THREE.Vector3(0, 15, 0);
+      let desiredCameraTarget = new THREE.Vector3(0, 15, 0);
+      let baseDistance = 68;
+      let desiredDistance = 68;
+
+      let userYaw = 0;
+      let userPitch = 0.08;
+      let yawVelocity = 0;
+      let isUserDragging = false;
+      let lookYawOffset = 0;
+      let lookPitchOffset = 0;
+
+      // Tap / Pet bounce state
+      let bounceTime = -1;
+      let hasProceduralFallback = false;
+
+      function setStatus(msg, visible) {
+        if (statusText) statusText.textContent = msg || '';
+        if (statusOverlay) {
+          if (visible) statusOverlay.classList.remove('hidden');
+          else statusOverlay.classList.add('hidden');
+        }
+      }
+
+      function initEngine() {
+        clock = new THREE.Clock();
+        scene = new THREE.Scene();
+
+        const w = Math.max(container.clientWidth, 64);
+        const h = Math.max(container.clientHeight, 64);
+
+        camera = new THREE.PerspectiveCamera(36, w / h, 0.5, 2000);
+        camera.position.set(0, 20, 75);
+
+        renderer = new THREE.WebGLRenderer({
+          antialias: true,
+          alpha: true,
+          powerPreference: 'high-performance'
+        });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setSize(w, h);
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.setClearColor(0x000000, 0);
+        container.appendChild(renderer.domElement);
+
+        // Bright, anime/toon-friendly studio lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.92);
+        scene.add(ambientLight);
+
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x303038, 0.35);
+        hemiLight.position.set(0, 100, 0);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.48);
+        dirLight.position.set(35, 75, 65);
+        scene.add(dirLight);
+
+        // Subtle shadow floor disc for grounding
+        const shadowGeo = new THREE.CircleGeometry(16, 32);
+        shadowGeo.rotateX(-Math.PI / 2);
+        const shadowMat = new THREE.MeshBasicMaterial({
+          color: 0x000000,
+          transparent: true,
+          opacity: 0.22,
+          depthWrite: false
+        });
+        const shadowDisc = new THREE.Mesh(shadowGeo, shadowMat);
+        shadowDisc.position.y = -0.05;
+        shadowDisc.name = '__ground_shadow';
+        scene.add(shadowDisc);
+
+        setupPointerControls(renderer.domElement);
+        window.addEventListener('resize', onResize);
+        requestAnimationFrame(animate);
+      }
+
+      function onResize() {
+        if (!renderer || !camera) return;
+        const w = Math.max(container.clientWidth, 32);
+        const h = Math.max(container.clientHeight, 32);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      }
+
+      function setupPointerControls(domElement) {
+        let isDragging = false;
+        let startX = 0, startY = 0;
+        let lastX = 0, lastY = 0;
+        let downTime = 0;
+
+        domElement.addEventListener('pointerdown', function (e) {
+          isDragging = true;
+          isUserDragging = true;
+          yawVelocity = 0;
+          lookYawOffset = 0;
+          lookPitchOffset = 0;
+          startX = lastX = e.clientX;
+          startY = lastY = e.clientY;
+          downTime = performance.now();
+          domElement.setPointerCapture(e.pointerId);
+        });
+
+        domElement.addEventListener('pointermove', function (e) {
+          if (!isDragging) return;
+          const dx = e.clientX - lastX;
+          const dy = e.clientY - lastY;
+          lastX = e.clientX;
+          lastY = e.clientY;
+          userYaw -= dx * 0.014;
+          userPitch = Math.max(-0.45, Math.min(0.75, userPitch + dy * 0.01));
+          yawVelocity = -dx * 0.007;
+        });
+
+        domElement.addEventListener('pointerup', function (e) {
+          if (!isDragging) return;
+          isDragging = false;
+          isUserDragging = false;
+          const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
+          const elapsed = performance.now() - downTime;
+          if (dist < 10 && elapsed < 350) {
+            triggerPetBounce();
+            if (window.Buddy3DBridge && window.Buddy3DBridge.onBuddyPetted) {
+              window.Buddy3DBridge.onBuddyPetted();
+            }
+          }
+        });
+      }
+
+      function triggerPetBounce() {
+        bounceTime = 0;
+      }
+
+      function clearCurrentModel() {
+        if (currentRoot) {
+          scene.remove(currentRoot);
+          currentRoot = null;
+        }
+        mixers = [];
+        characterGroups = [];
+        hasProceduralFallback = false;
+      }
+
+      function enhanceMaterials(root) {
+        root.traverse(function (node) {
+          if (node.userData && node.userData.isRigControl) {
+            node.visible = false;
+          }
+          if (node.name && node.name.indexOf('__rig_ctrl_') === 0) {
+            node.visible = false;
+          }
+          if (node.isLine || node.isLineSegments) {
+            node.visible = false;
+            return;
+          }
+          if (!node.isMesh) return;
+
+          node.frustumCulled = false;
+
+          const mats = Array.isArray(node.material) ? node.material : [node.material];
+          const updatedMats = mats.map(function (mat) {
+            if (!mat) return mat;
+            const matName = (mat.name || '').toLowerCase();
+
+            // 1. Inverted-hull black anime outline material (e.g. lambert4 in SSRB)
+            const isBlackOutline =
+              matName === 'lambert4' ||
+              matName.indexOf('outline') !== -1 ||
+              (!mat.map && mat.color && mat.color.r < 0.02 && mat.color.g < 0.02 && mat.color.b < 0.02);
+
+            if (isBlackOutline) {
+              return new THREE.MeshBasicMaterial({
+                name: mat.name,
+                color: 0x0d0d0d,
+                side: THREE.FrontSide
+              });
+            }
+
+            // 2. Floating face decal (e.g. Face_All with Face_UV.png)
+            const isFaceDecal =
+              matName.indexOf('face') !== -1 ||
+              (mat.map && mat.map.name && mat.map.name.toLowerCase().indexOf('face') !== -1);
+
+            if (mat.map) {
+              mat.map.encoding = THREE.sRGBEncoding;
+              mat.map.needsUpdate = true;
+            }
+
+            if (isFaceDecal) {
+              return new THREE.MeshBasicMaterial({
+                name: mat.name,
+                map: mat.map,
+                color: 0xffffff,
+                transparent: true,
+                alphaTest: 0.04,
+                depthWrite: false,
+                polygonOffset: true,
+                polygonOffsetFactor: -2,
+                polygonOffsetUnits: -2,
+                side: THREE.FrontSide
+              });
+            }
+
+            // 3. Standard painted character body material
+            if (mat.map) {
+              mat.color = new THREE.Color(0xffffff);
+              mat.transparent = false;
+              mat.alphaMap = null;
+              mat.opacity = 1.0;
+              mat.side = THREE.FrontSide;
+              mat.shininess = 8;
+              mat.needsUpdate = true;
+            }
+            return mat;
+          });
+
+          node.material = Array.isArray(node.material) ? updatedMats : updatedMats[0];
+        });
+      }
+
+      // Compute the true world-space bounding box of a character node (including SkinnedMesh bone transforms)
+      function computeSkinnedBounds(targetNode) {
+        targetNode.updateMatrixWorld(true);
+        const box = new THREE.Box3();
+        const tempVec = new THREE.Vector3();
+        let foundPoints = false;
+
+        targetNode.traverse(function (child) {
+          if (child.isBone) {
+            child.getWorldPosition(tempVec);
+            box.expandByPoint(tempVec);
+            foundPoints = true;
+          }
+          if (child.isSkinnedMesh && child.skeleton) { child.skeleton.update(); }
+          if (child.isMesh && child.geometry && child.geometry.attributes.position) {
+            const posAttr = child.geometry.attributes.position;
+            const count = posAttr.count;
+            const step = Math.max(1, Math.floor(count / 250));
+            for (let i = 0; i < count; i += step) {
+              if (child.isSkinnedMesh && typeof child.boneTransform === 'function') {
+                tempVec.fromBufferAttribute(posAttr, i);
+                child.boneTransform(i, tempVec);
+                tempVec.applyMatrix4(child.matrixWorld);
+              } else {
+                tempVec.fromBufferAttribute(posAttr, i);
+                tempVec.applyMatrix4(child.matrixWorld);
+              }
+              if (isFinite(tempVec.x) && isFinite(tempVec.y) && isFinite(tempVec.z)) {
+                box.expandByPoint(tempVec);
+                foundPoints = true;
+              }
+            }
+          }
+        });
+
+        if (!foundPoints || box.isEmpty()) {
+          box.min.set(-15, 0, -15);
+          box.max.set(15, 30, 15);
+        }
+        const center = new THREE.Vector3();
+        const size = new THREE.Vector3();
+        box.getCenter(center);
+        box.getSize(size);
+        return { box: box, center: center, size: size };
+      }
+
+      function findPrimaryTrackBone(node) {
+        let preferred = null;
+        let firstBone = null;
+        node.traverse(function (child) {
+          if (child.isBone) {
+            if (!firstBone) firstBone = child;
+            const n = (child.name || '').toLowerCase();
+            if (n.indexOf('backbone') === 0 || n.indexOf('body') === 0 || n.indexOf('hips') !== -1 || n.indexOf('root') !== -1) {
+              if (!preferred) preferred = child;
+            }
+          }
+        });
+        return preferred || firstBone;
+      }
+
+      function detectCharacterGroups(root) {
+        const groups = [];
+        const meshBearingChildren = root.children.filter(function (c) {
+          let hasMesh = false;
+          c.traverse(function (n) {
+            if (n.isMesh) hasMesh = true;
+          });
+          return hasMesh;
+        });
+
+        if (meshBearingChildren.length > 1) {
+          meshBearingChildren.forEach(function (child, idx) {
+            const bounds = computeSkinnedBounds(child);
+            const trackBone = findPrimaryTrackBone(child);
+            const initialBonePos = new THREE.Vector3();
+            if (trackBone) trackBone.getWorldPosition(initialBonePos);
+            groups.push({
+              name: child.name || ('Character ' + (idx + 1)),
+              object: child,
+              trackBone: trackBone,
+              initialBonePos: initialBonePos,
+              box: bounds.box,
+              center: bounds.center,
+              size: bounds.size
+            });
+          });
+        } else {
+          const bounds = computeSkinnedBounds(root);
+          const trackBone = findPrimaryTrackBone(root);
+          const initialBonePos = new THREE.Vector3();
+          if (trackBone) trackBone.getWorldPosition(initialBonePos);
+          groups.push({
+            name: root.name || 'Buddy',
+            object: root,
+            trackBone: trackBone,
+            initialBonePos: initialBonePos,
+            box: bounds.box,
+            center: bounds.center,
+            size: bounds.size
+          });
+        }
+        return groups;
+      }
+
+      function applyCharacterSelection(index) {
+        if (!currentRoot || characterGroups.length === 0) return;
+
+        const shadowDisc = scene.getObjectByName('__ground_shadow');
+
+        if (index < 0 || characterGroups.length === 1) {
+          // Show all characters (Trio mode or single character model)
+          activeCharIndex = characterGroups.length > 1 ? -1 : 0;
+          const totalBox = new THREE.Box3();
+          characterGroups.forEach(function (cg) {
+            cg.object.visible = true;
+            totalBox.union(cg.box);
+          });
+          const center = new THREE.Vector3();
+          const size = new THREE.Vector3();
+          totalBox.getCenter(center);
+          totalBox.getSize(size);
+
+          desiredCameraTarget.copy(center);
+          const maxDim = Math.max(size.x * 0.72, size.y * 1.15, size.z, 10);
+          const fovRad = THREE.MathUtils.degToRad(camera.fov);
+          desiredDistance = (maxDim / 2) / Math.tan(fovRad / 2) * 1.28;
+
+          if (shadowDisc) {
+            shadowDisc.position.set(center.x, totalBox.min.y + 0.05, center.z);
+            shadowDisc.scale.set(characterGroups.length > 1 ? 2.6 : 1.0, 1.0, 1.0);
+          }
+        } else {
+          // Focus on a single character
+          const safeIdx = ((index % characterGroups.length) + characterGroups.length) % characterGroups.length;
+          activeCharIndex = safeIdx;
+          characterGroups.forEach(function (cg, idx) {
+            cg.object.visible = (idx === safeIdx);
+          });
+
+          const chosen = characterGroups[safeIdx];
+          desiredCameraTarget.copy(chosen.center);
+          const maxDim = Math.max(chosen.size.x, chosen.size.y, chosen.size.z, 10);
+          const fovRad = THREE.MathUtils.degToRad(camera.fov);
+          desiredDistance = (maxDim / 2) / Math.tan(fovRad / 2) * 1.35;
+
+          if (shadowDisc) {
+            shadowDisc.position.set(chosen.center.x, chosen.box.min.y + 0.05, chosen.center.z);
+            shadowDisc.scale.set(1.0, 1.0, 1.0);
+          }
+        }
+
+        // Report character roster back to Android UI
+        if (window.Buddy3DBridge && window.Buddy3DBridge.onCharactersDetected) {
+          const names = characterGroups.map(function (c) { return c.name; });
+          window.Buddy3DBridge.onCharactersDetected(JSON.stringify(names), activeCharIndex);
+        }
+      }
+
+      function onModelLoaded(root, animations, initialCharIndex) {
+        clearCurrentModel();
+        currentRoot = root;
+        enhanceMaterials(root);
+        scene.add(root);
+
+        const clips = animations || root.animations || [];
+        if (clips.length > 0) {
+          const mixer = new THREE.AnimationMixer(root);
+          clips.forEach(function (clip) {
+            const action = mixer.clipAction(clip);
+            action.play();
+          });
+          // Advance mixer slightly so initial animated bone transforms (e.g. Camoue X=-32.5, Boitan X=+32) take effect
+          mixer.update(0.033);
+          mixers.push(mixer);
+          hasProceduralFallback = false;
+        } else {
+          hasProceduralFallback = true;
+        }
+
+        root.updateMatrixWorld(true);
+        characterGroups = detectCharacterGroups(root);
+
+        const targetIndex = (typeof initialCharIndex === 'number') ? initialCharIndex : 0;
+        applyCharacterSelection(targetIndex);
+
+        // Snap camera immediately on first load
+        cameraTarget.copy(desiredCameraTarget);
+        baseDistance = desiredDistance;
+        userYaw = 0;
+        userPitch = 0.08;
+        yawVelocity = 0;
+
+        setStatus('', false);
+      }
+
+      function createLoadingManager(texBaseUrl) {
+        activeTexBaseUrl = texBaseUrl || '';
+        const manager = new THREE.LoadingManager();
+        manager.setURLModifier(function (url) {
+          if (!url || url.indexOf('data:') === 0 || url.indexOf('blob:') === 0) {
+            return url;
+          }
+          const clean = url.split('?')[0];
+          const ext = clean.slice(clean.lastIndexOf('.') + 1).toLowerCase();
+          const isImage = ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif', 'tga'].indexOf(ext) !== -1;
+          if (isImage && activeTexBaseUrl) {
+            const basename = clean.split(/[\\/]/).pop();
+            const base = activeTexBaseUrl.endsWith('/') ? activeTexBaseUrl : (activeTexBaseUrl + '/');
+            return base + basename;
+          }
+          return url;
+        });
+        return manager;
+      }
+
+      window.loadBuddyModel = function (modelUrl, formatHint, texBaseUrl, charIndex) {
+        setStatus('LOADING 3D BUDDY...', true);
+        const ext = (formatHint || modelUrl.split('?')[0].split('.').pop() || '').toLowerCase();
+        const manager = createLoadingManager(texBaseUrl);
+
+        const handleError = function (err) {
+          console.error('Buddy3D load error:', err);
+          setStatus('3D LOAD ERROR', true);
+        };
+
+        try {
+          if (ext === 'fbx') {
+            const loader = new THREE.FBXLoader(manager);
+            loader.load(modelUrl, function (object) {
+              onModelLoaded(object, object.animations, charIndex);
+            }, undefined, handleError);
+          } else if (ext === 'glb' || ext === 'gltf') {
+            const loader = new THREE.GLTFLoader(manager);
+            loader.load(modelUrl, function (gltf) {
+              onModelLoaded(gltf.scene, gltf.animations, charIndex);
+            }, undefined, handleError);
+          } else if (ext === 'obj') {
+            const loader = new THREE.OBJLoader(manager);
+            loader.load(modelUrl, function (object) {
+              onModelLoaded(object, [], charIndex);
+            }, undefined, handleError);
+          } else {
+            setStatus('UNSUPPORTED FORMAT: ' + ext, true);
+          }
+        } catch (e) {
+          handleError(e);
+        }
+      };
+
+      window.selectCharacterIndex = function (index) {
+        applyCharacterSelection(index);
+      };
+
+      window.cycleCharacter = function () {
+        if (characterGroups.length <= 1) return;
+        // Cycle: 0 (Greybie) -> 1 (Camoue) -> 2 (Boitan) -> -1 (All 3 Trio) -> 0
+        let next = activeCharIndex + 1;
+        if (next >= characterGroups.length) {
+          next = -1;
+        }
+        applyCharacterSelection(next);
+      };
+
+      // Direct native Compose pointer drag hooks (bypasses parent Scroll/Pager interception)
+      window.onNativeDrag = function (dx, dy) {
+        isUserDragging = true;
+        lookYawOffset = 0;
+        lookPitchOffset = 0;
+        userYaw -= dx * 0.012;
+        userPitch = Math.max(-0.45, Math.min(0.75, userPitch + dy * 0.009));
+        yawVelocity = -dx * 0.006;
+      };
+
+      window.onNativeRelease = function () {
+        isUserDragging = false;
+      };
+
+      window.setLookTarget = function (normX, normY) {
+        if (isUserDragging) return;
+        // normX, normY in [-1, 1] from dashboard touch tracking
+        lookYawOffset = THREE.MathUtils.clamp(normX * 0.42, -0.45, 0.45);
+        lookPitchOffset = THREE.MathUtils.clamp(normY * 0.22, -0.25, 0.25);
+      };
+
+      window.petBuddy = function () {
+        triggerPetBounce();
+      };
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.1);
+        const elapsed = clock.getElapsedTime();
+
+        for (let i = 0; i < mixers.length; i++) {
+          mixers[i].update(dt);
+        }
+
+        // Smooth rotational inertia after user releases drag
+        if (!isUserDragging && Math.abs(yawVelocity) > 0.0001) {
+          userYaw += yawVelocity;
+          yawVelocity *= 0.92;
+        } else if (!isUserDragging) {
+          yawVelocity = 0;
+        }
+
+        if (currentRoot && characterGroups.length > 0) {
+          currentRoot.updateMatrixWorld(true);
+          const tempBonePos = new THREE.Vector3();
+          const shadowDisc = scene.getObjectByName('__ground_shadow');
+
+          if (activeCharIndex >= 0 && activeCharIndex < characterGroups.length) {
+            const chosen = characterGroups[activeCharIndex];
+            if (chosen.trackBone) {
+              chosen.trackBone.getWorldPosition(tempBonePos);
+              const dx = tempBonePos.x - chosen.initialBonePos.x;
+              const dz = tempBonePos.z - chosen.initialBonePos.z;
+              desiredCameraTarget.x = chosen.center.x + dx;
+              desiredCameraTarget.z = chosen.center.z + dz;
+              if (shadowDisc) {
+                shadowDisc.position.x = desiredCameraTarget.x;
+                shadowDisc.position.z = desiredCameraTarget.z;
+              }
+            }
+          } else if (activeCharIndex < 0 && characterGroups.length > 1) {
+            let minX = Infinity, maxX = -Infinity;
+            characterGroups.forEach(function (cg) {
+              let cx = cg.center.x;
+              if (cg.trackBone) {
+                cg.trackBone.getWorldPosition(tempBonePos);
+                cx += (tempBonePos.x - cg.initialBonePos.x);
+              }
+              minX = Math.min(minX, cx - cg.size.x * 0.55);
+              maxX = Math.max(maxX, cx + cg.size.x * 0.55);
+            });
+            if (isFinite(minX) && isFinite(maxX)) {
+              const spanX = Math.max(maxX - minX, 40);
+              desiredCameraTarget.x = (minX + maxX) * 0.5;
+              const fovRad = THREE.MathUtils.degToRad(camera.fov);
+              const aspect = Math.max(camera.aspect || 1, 0.6);
+              const halfHorizFov = Math.atan(Math.tan(fovRad / 2) * aspect);
+              desiredDistance = Math.max(85, (spanX * 0.5) / Math.tan(halfHorizFov) * 1.15);
+              if (shadowDisc) {
+                shadowDisc.position.x = desiredCameraTarget.x;
+              }
+            }
+          }
+        }
+
+        if (currentRoot) {
+          // Procedural gentle breathing for static models (like .obj)
+          let bounceY = 0;
+          if (hasProceduralFallback) {
+            bounceY += Math.sin(elapsed * 2.6) * 0.6;
+            currentRoot.rotation.y = Math.sin(elapsed * 0.9) * 0.15;
+          }
+
+          // Tap-to-pet celebratory hop
+          if (bounceTime >= 0) {
+            bounceTime += dt * 4.2;
+            if (bounceTime >= Math.PI) {
+              bounceTime = -1;
+              currentRoot.position.y = 0;
+            } else {
+              currentRoot.position.y = Math.sin(bounceTime) * (baseDistance * 0.08);
+            }
+          } else {
+            currentRoot.position.y = bounceY;
+          }
+        }
+
+        // Smooth camera target & orbit interpolation
+        cameraTarget.lerp(desiredCameraTarget, Math.min(1, dt * 18));
+        baseDistance += (desiredDistance - baseDistance) * Math.min(1, dt * 8);
+
+        const totalYaw = userYaw + lookYawOffset;
+        const totalPitch = THREE.MathUtils.clamp(userPitch + lookPitchOffset, -0.45, 0.75);
+
+        const horizDist = baseDistance * Math.cos(totalPitch);
+        camera.position.x = cameraTarget.x + Math.sin(totalYaw) * horizDist;
+        camera.position.y = cameraTarget.y + Math.sin(totalPitch) * baseDistance;
+        camera.position.z = cameraTarget.z + Math.cos(totalYaw) * horizDist;
+        camera.lookAt(cameraTarget);
+
+        renderer.render(scene, camera);
+      }
+
+      initEngine();
+    })();
+  </script>
+</body>
+</html>
