@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>BuddyGotchi Location Map</title>
   <link rel="stylesheet" href="leaflet.min.css" />
   <script src="leaflet.min.js"></script>
   <style>
@@ -16,9 +17,19 @@
     }
     .leaflet-container {
       background: #121212 !important;
+      font-family: monospace;
     }
+    /* Required OpenStreetMap ODbL Attribution (styled for dark mode, high contrast) */
     .leaflet-control-attribution {
-      display: none !important;
+      background: rgba(18, 18, 18, 0.85) !important;
+      color: #CCCCCC !important;
+      font-size: 9px !important;
+      padding: 2px 6px !important;
+      border-top-left-radius: 6px;
+    }
+    .leaflet-control-attribution a {
+      color: #FF6B70 !important;
+      text-decoration: none;
     }
     /* Nothing OS Dark Mode Tile Filter */
     .leaflet-tile {
@@ -27,17 +38,18 @@
   </style>
 </head>
 <body>
-  <div id="map"></div>
+  <div id="map" role="application" aria-label="Interactive OpenStreetMap Location Picker"></div>
   <script>
     var map = L.map('map', {
       center: [42.6977, 23.3219],
       zoom: 15,
       zoomControl: false,
-      attributionControl: false
+      attributionControl: true
     });
 
     var tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (ODbL)'
     });
     tileLayer.on('tileload', function() { console.log('OSM Tile loaded successfully'); });
     tileLayer.on('tileerror', function(err) { console.error('OSM Tile error: ' + JSON.stringify(err)); });

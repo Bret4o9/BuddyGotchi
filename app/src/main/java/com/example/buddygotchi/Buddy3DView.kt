@@ -47,6 +47,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -245,6 +247,7 @@ fun Buddy3DView(
         modifier = modifier
             .size(viewportW, viewportH)
             .clip(RoundedCornerShape(12.dp))
+            .semantics { contentDescription = "Interactive 3D Buddy Companion Viewport. Drag to rotate 360 degrees, tap to pet." }
             .onGloballyPositioned { coords ->
                 val pos = coords.positionInRoot()
                 centerInRoot = Offset(

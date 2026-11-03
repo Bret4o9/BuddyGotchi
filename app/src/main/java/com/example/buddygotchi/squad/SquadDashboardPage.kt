@@ -39,6 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.buddygotchi.DashboardGridDefaults
+import com.example.buddygotchi.AccountAndLegalHubDialog
+import com.example.buddygotchi.AccountHubTab
 import com.example.buddygotchi.ui.DashboardGridBackground
 import com.example.buddygotchi.ui.theme.*
 import java.text.SimpleDateFormat
@@ -58,6 +60,20 @@ fun SquadDashboardPage(
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var showAddFriendDialog by remember { mutableStateOf(false) }
+    var showAccountHubDialog by remember { mutableStateOf(false) }
+    var accountHubTab by remember { mutableStateOf(AccountHubTab.ACCOUNT) }
+
+    if (showAccountHubDialog) {
+        AccountAndLegalHubDialog(
+            initialTab = accountHubTab,
+            onDismiss = { showAccountHubDialog = false },
+            onDataChanged = {
+                profile = SquadManager.getProfile(context)
+                friends = SquadManager.getFriends(context)
+                events = SquadManager.getEvents(context)
+            }
+        )
+    }
     var viewingMapEvent by remember { mutableStateOf<GroupEvent?>(null) }
     val scrollState = rememberScrollState()
 
@@ -218,6 +234,40 @@ fun SquadDashboardPage(
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White,
                                     letterSpacing = 0.5.sp
+                                )
+                            }
+                        }
+                    }
+
+                    // Cross-Device Account, Inventory & Legal Action Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(
+                            "CLOUD ACCOUNT" to AccountHubTab.ACCOUNT,
+                            "PETS & ITEMS" to AccountHubTab.INVENTORY,
+                            "PRIVACY & LEGAL" to AccountHubTab.LEGAL
+                        ).forEach { (btnLabel, tabTarget) ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF1E1E1E))
+                                    .border(1.dp, NothingBorder, RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        accountHubTab = tabTarget
+                                        showAccountHubDialog = true
+                                    }
+                                    .padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = btnLabel,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NothingTextSecondary
                                 )
                             }
                         }

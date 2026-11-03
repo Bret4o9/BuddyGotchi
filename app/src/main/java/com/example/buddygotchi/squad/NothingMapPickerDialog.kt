@@ -233,7 +233,7 @@ fun NothingMapPickerDialog(
                                 color = NothingWhite
                             )
                             Text(
-                                text = "CARTO DARK TILES • OPENSTREETMAP",
+                                text = "OPENSTREETMAP TILES • © OSM CONTRIBUTORS (ODbL)",
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 8.sp,
                                 color = NothingTextTertiary,
@@ -512,7 +512,7 @@ fun NothingMapPickerDialog(
                                     cacheMode = WebSettings.LOAD_DEFAULT
                                     loadWithOverviewMode = true
                                     useWideViewPort = true
-                                    userAgentString = "Mozilla/5.0 (Linux; Android 14; Mobile; BuddyGotchi/1.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                    userAgentString = "BuddyGotchiApp/1.0 (Android; OpenStreetMap-Client)"
                                 }
                                 setBackgroundColor(android.graphics.Color.parseColor("#121212"))
                                 webChromeClient = object : android.webkit.WebChromeClient() {

@@ -45,6 +45,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.example.buddygotchi.ui.theme.NothingRed
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -1053,6 +1055,7 @@ fun BuddyEyes(
     Canvas(
         modifier = modifier
             .size(config.canvasWidth, config.canvasHeight)
+            .semantics { contentDescription = "Interactive 2D Buddy Eyes Companion. Tap to blink." }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -1156,9 +1159,16 @@ fun BuddyWidget(
     val activeCharIndex by Buddy3DManager.activeCharacterIndexState
     val detectedChars = Buddy3DManager.detectedCharactersState
     var show3DStudioDialog by remember { mutableStateOf(false) }
+    var showInventoryDialog by remember { mutableStateOf(false) }
 
     if (show3DStudioDialog) {
         Buddy3DStudioDialog(onDismiss = { show3DStudioDialog = false })
+    }
+    if (showInventoryDialog) {
+        AccountAndLegalHubDialog(
+            initialTab = AccountHubTab.INVENTORY,
+            onDismiss = { showInventoryDialog = false }
+        )
     }
 
     WidgetCard(
@@ -1199,8 +1209,26 @@ fun BuddyWidget(
                             .clip(RoundedCornerShape(6.dp))
                             .background(Color(0xFF1F1F1F))
                             .border(0.8.dp, Color(0xFF3A3A3A), RoundedCornerShape(6.dp))
+                            .clickable { showInventoryDialog = true }
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                            .semantics { contentDescription = "Open Companion Pets and Items Inventory" }
+                    ) {
+                        Text(
+                            text = "ITEMS",
+                            fontSize = 8.5.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF1F1F1F))
+                            .border(0.8.dp, Color(0xFF3A3A3A), RoundedCornerShape(6.dp))
                             .clickable { show3DStudioDialog = true }
                             .padding(horizontal = 5.dp, vertical = 2.dp)
+                            .semantics { contentDescription = "Open 3D Companion Studio and Model Selector" }
                     ) {
                         Text(
                             text = "MODELS",

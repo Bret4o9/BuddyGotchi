@@ -105,7 +105,16 @@ object TaskManager {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putInt(KEY_BUDDY_XP, current).apply()
         BuddyTaskWidgetProvider.updateAllWidgets(context)
+        try {
+            AccountAndInventoryManager.syncToCloudIfEnabled(context)
+        } catch (_: Exception) {}
         return current
+    }
+
+    fun setBuddyXp(context: Context, xp: Int) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putInt(KEY_BUDDY_XP, xp.coerceAtLeast(0)).apply()
+        BuddyTaskWidgetProvider.updateAllWidgets(context)
     }
 
     fun clearDoneTasks(context: Context): List<ReminderTask> {

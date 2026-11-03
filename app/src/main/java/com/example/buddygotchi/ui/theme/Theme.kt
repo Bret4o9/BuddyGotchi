@@ -20,7 +20,8 @@ private val NothingColorScheme = darkColorScheme(
     onSurface = NothingWhite,
     surfaceVariant = NothingSurfaceVariant,
     onSurfaceVariant = NothingWhite,
-    outline = NothingBorder
+    outline = NothingTextTertiary, // WCAG AA compliant text/outline contrast (>= 4.5:1)
+    outlineVariant = NothingBorder
 )
 
 @Composable

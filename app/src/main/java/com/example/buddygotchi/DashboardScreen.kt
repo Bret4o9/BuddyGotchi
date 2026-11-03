@@ -47,6 +47,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import com.example.buddygotchi.ui.nothingDotGrid
 import com.example.buddygotchi.ui.DashboardGridBackground
 import com.example.buddygotchi.ui.SlimScrollWheel
@@ -117,6 +120,13 @@ fun DashboardScreen(
         mutableStateOf(DashboardPagesManager.loadAllCustomLayouts(context, pages))
     }
     var showPagesMenu by remember { mutableStateOf(false) }
+    var showAccountLegalDialog by remember { mutableStateOf(false) }
+    var accountHubInitialTab by remember { mutableStateOf(AccountHubTab.ACCOUNT) }
+    LaunchedEffect(Unit) {
+        AccountAndInventoryManager.ensureInitialized(context)
+    }
+    val isAccountLoggedIn by AccountAndInventoryManager.isLoggedInState
+    val accountUsername by AccountAndInventoryManager.accountUsernameState
 
     val initialPageIndex = remember(initialTargetPage) {
         if (initialTargetPage == "SQUAD") {
@@ -382,16 +392,58 @@ fun DashboardScreen(
                         )
                     }
                 } else {
-                    // Drum Roll Page Indicator opposite to "BUDDYGOTCHI"
-                    PageDrumRollIndicator(
-                        pagerState = pagerState,
-                        pages = pages,
-                        isMenuOpen = showPagesMenu,
-                        onClick = {
-                            showPagesMenu = !showPagesMenu
-                            triggerTick()
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = NothingCardSurface,
+                            border = BorderStroke(1.dp, if (isAccountLoggedIn) NothingRed else NothingBorder),
+                            modifier = Modifier
+                                .height(28.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable {
+                                    accountHubInitialTab = AccountHubTab.ACCOUNT
+                                    showAccountLegalDialog = true
+                                    triggerTick()
+                                }
+                                .semantics {
+                                    contentDescription = "Open Account, Pets and Items Inventory, and Legal Settings"
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isAccountLoggedIn) Color(0xFF00E676) else NothingTextSecondary)
+                                )
+                                Text(
+                                    text = if (isAccountLoggedIn) accountUsername.take(8) else "ACCOUNT",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NothingWhite
+                                )
+                            }
                         }
-                    )
+
+                        // Drum Roll Page Indicator opposite to "BUDDYGOTCHI"
+                        PageDrumRollIndicator(
+                            pagerState = pagerState,
+                            pages = pages,
+                            isMenuOpen = showPagesMenu,
+                            onClick = {
+                                showPagesMenu = !showPagesMenu
+                                triggerTick()
+                            }
+                        )
+                    }
                 }
             }
 
@@ -1151,6 +1203,33 @@ fun DashboardScreen(
             showPagesMenu = false
         }
     )
+
+    // Non-intrusive Cookie / Storage & Cloud Sync Consent Banner at bottom
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        StorageAndPrivacyConsentBanner(
+            onOpenLegalDetails = {
+                accountHubInitialTab = AccountHubTab.LEGAL
+                showAccountLegalDialog = true
+            }
+        )
+    }
+
+    if (showAccountLegalDialog) {
+        AccountAndLegalHubDialog(
+            initialTab = accountHubInitialTab,
+            onDismiss = { showAccountLegalDialog = false },
+            onDataChanged = {
+                buddyXp = TaskManager.getBuddyXp(context)
+                notes = NotesManager.getNotes(context)
+                passwords = PasswordsManager.getPasswords(context)
+                groceryLists = GroceryManager.getLists(context)
+                tasks = TaskManager.getTasks(context)
+            }
+        )
+    }
 }
 }
 

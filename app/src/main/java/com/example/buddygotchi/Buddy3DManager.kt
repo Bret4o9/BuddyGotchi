@@ -37,11 +37,23 @@ object Buddy3DManager {
     private const val KEY_CUSTOM_MODELS = "custom_models_json"
 
     const val BUILTIN_SSRB_ID = "ssrbs_hololive"
+    const val BUILTIN_BUDDYBOT_ID = "buddybot_cc0"
+
+    val builtInBuddyBotModel = Buddy3DModelEntry(
+        id = BUILTIN_BUDDYBOT_ID,
+        title = "BUDDYBOT MK-I (FREE CC0)",
+        subtitle = "GLTF • 100% Original Royalty-Free Asset",
+        modelUrl = "https://buddy3d.local/assets/buddy3d/models/buddybot-cc0/buddybot.gltf",
+        format = "gltf",
+        texturesBaseUrl = "https://buddy3d.local/assets/buddy3d/models/buddybot-cc0/",
+        isBuiltIn = true,
+        characterNames = listOf("BuddyBot")
+    )
 
     val builtInSsrbsModel = Buddy3DModelEntry(
         id = BUILTIN_SSRB_ID,
-        title = "SSRB HOLOLIVE",
-        subtitle = "FBX • Greybie, Camoue & Boitan",
+        title = "SSRB HOLOLIVE (TEST)",
+        subtitle = "FBX • Greybie, Camoue & Boitan (Fan Test)",
         modelUrl = "https://buddy3d.local/assets/buddy3d/models/ssrbs-hololive/SSRB_Poi_PoseUp_01.fbx",
         format = "fbx",
         texturesBaseUrl = "https://buddy3d.local/assets/buddy3d/models/ssrbs-hololive/textures/",
@@ -59,7 +71,8 @@ object Buddy3DManager {
      * 4. Add a new Buddy3DModelEntry(...) to [builtInModels] below.
      */
     val builtInModels: List<Buddy3DModelEntry> = listOf(
-        builtInSsrbsModel
+        builtInSsrbsModel,
+        builtInBuddyBotModel
     )
 
     private var isInitialized = false

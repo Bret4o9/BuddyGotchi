@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Squad user profiles (keyed by buddyCode, e.g. "BUD-XXXX")
+    match /users/{buddyCode} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['buddyCode', 'displayName', 'updatedAt'])
+                            && request.resource.data.buddyCode == buddyCode;
+      allow delete: if false;
+    }
+
+    // Squad group events (keyed by event UUID)
+    match /events/{eventId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['id', 'title', 'eventTime', 'hostBuddyCode'])
+                            && request.resource.data.id == eventId;
+      allow delete: if true;
+    }
+  }
+}
