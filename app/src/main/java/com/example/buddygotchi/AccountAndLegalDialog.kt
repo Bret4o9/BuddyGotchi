@@ -462,6 +462,13 @@ private fun AccountTabContent(
                         fontSize = 10.sp,
                         color = NothingTextSecondary
                     )
+                    Text(
+                        text = "✓ AUTO-SYNC ACTIVE (SYNCS AUTOMATICALLY ON LOGIN & CHANGES)",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF00E676)
+                    )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),

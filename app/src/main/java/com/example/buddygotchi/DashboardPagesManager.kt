@@ -60,6 +60,18 @@ object DashboardPageTemplates {
         )
     )
 
+    val INVENTORY = DashboardPageTemplate(
+        id = "inventory",
+        name = "INVENTORY",
+        description = "Pets, Gear Items & Buddy Store",
+        iconEmoji = "🎒",
+        defaultLayout = listOf(
+            DashboardWidgetItem(DashboardWidgetId.PETS, WidgetSize.WIDE),
+            DashboardWidgetItem(DashboardWidgetId.ITEMS, WidgetSize.WIDE),
+            DashboardWidgetItem(DashboardWidgetId.STORE, WidgetSize.MAX)
+        )
+    )
+
     val BLANK = DashboardPageTemplate(
         id = "blank",
         name = "BLANK",
@@ -68,16 +80,23 @@ object DashboardPageTemplates {
         defaultLayout = emptyList()
     )
 
-    val TEMPLATES = listOf(NOTES, WELLNESS, FOCUS, BLANK)
+    val TEMPLATES = listOf(INVENTORY, NOTES, WELLNESS, FOCUS, BLANK)
 }
 
 object DashboardPagesManager {
     private const val PREFS_KEY_PAGES = "dashboard_pages_list_v2"
     private const val PREFS_PAGE_LAYOUT_PREFIX = "dashboard_page_layout_"
 
+    val DEFAULT_INVENTORY_LAYOUT = listOf(
+        DashboardWidgetItem(DashboardWidgetId.PETS, WidgetSize.WIDE),
+        DashboardWidgetItem(DashboardWidgetId.ITEMS, WidgetSize.WIDE),
+        DashboardWidgetItem(DashboardWidgetId.STORE, WidgetSize.MAX)
+    )
+
     val DEFAULT_PAGES = listOf(
         DashboardPageItem(id = "page_left", title = "LEFT", type = DashboardPageType.CUSTOM_GRID, canDelete = false),
         DashboardPageItem(id = "page_main", title = "MAIN", type = DashboardPageType.MAIN, canDelete = false),
+        DashboardPageItem(id = "page_inventory", title = "INVENTORY", type = DashboardPageType.CUSTOM_GRID, canDelete = false),
         DashboardPageItem(id = "page_squad", title = "SQUAD", type = DashboardPageType.SQUAD, canDelete = false)
     )
 
@@ -93,10 +112,29 @@ object DashboardPagesManager {
                 val title = obj.getString("title")
                 val typeStr = obj.optString("type", DashboardPageType.CUSTOM_GRID.name)
                 val type = try { DashboardPageType.valueOf(typeStr) } catch (_: Exception) { DashboardPageType.CUSTOM_GRID }
-                val canDelete = obj.optBoolean("canDelete", type == DashboardPageType.CUSTOM_GRID && id != "page_left")
+                val canDelete = obj.optBoolean("canDelete", type == DashboardPageType.CUSTOM_GRID && id != "page_left" && id != "page_inventory")
                 list.add(DashboardPageItem(id, title, type, canDelete))
             }
-            if (list.isEmpty()) DEFAULT_PAGES else list
+            if (list.isEmpty()) {
+                DEFAULT_PAGES
+            } else {
+                // Auto-migrate existing users to include the default INVENTORY page right after MAIN
+                if (list.none { it.id == "page_inventory" }) {
+                    val mainIdx = list.indexOfFirst { it.id == "page_main" }
+                    val insertIdx = if (mainIdx != -1) mainIdx + 1 else (list.size - 1).coerceAtLeast(0)
+                    list.add(
+                        insertIdx,
+                        DashboardPageItem(
+                            id = "page_inventory",
+                            title = "INVENTORY",
+                            type = DashboardPageType.CUSTOM_GRID,
+                            canDelete = false
+                        )
+                    )
+                    savePages(context, list)
+                }
+                list
+            }
         } catch (_: Exception) {
             DEFAULT_PAGES
         }
@@ -153,7 +191,15 @@ object DashboardPagesManager {
 
     fun loadCustomPageLayout(context: Context, pageId: String): List<DashboardWidgetItem> {
         val prefs = context.getSharedPreferences("buddygotchi_prefs", Context.MODE_PRIVATE)
-        val jsonString = prefs.getString("$PREFS_PAGE_LAYOUT_PREFIX$pageId", null) ?: return emptyList()
+        val jsonString = prefs.getString("$PREFS_PAGE_LAYOUT_PREFIX$pageId", null)
+        if (jsonString == null) {
+            return if (pageId == "page_inventory") {
+                saveCustomPageLayout(context, pageId, DEFAULT_INVENTORY_LAYOUT)
+                DEFAULT_INVENTORY_LAYOUT
+            } else {
+                emptyList()
+            }
+        }
         return try {
             val jsonArray = JSONArray(jsonString)
             val list = mutableListOf<DashboardWidgetItem>()
@@ -169,7 +215,7 @@ object DashboardPagesManager {
             }
             list
         } catch (_: Exception) {
-            emptyList()
+            if (pageId == "page_inventory") DEFAULT_INVENTORY_LAYOUT else emptyList()
         }
     }
 

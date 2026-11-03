@@ -45,7 +45,10 @@ enum class DashboardWidgetId(
     WATER("Water", canRemove = true),
     NOTES("Notes", canRemove = true),
     PASSWORDS("Passwords", canRemove = true),
-    GROCERY("Groceries", canRemove = true)
+    GROCERY("Groceries", canRemove = true),
+    PETS("Pets", canRemove = true),
+    ITEMS("Items", canRemove = true),
+    STORE("Store", canRemove = true)
 }
 
 enum class WidgetSize(val cols: Int, val rows: Int) {
@@ -127,6 +130,9 @@ data class DashboardWidgetItem(
         DashboardWidgetId.NOTES -> WidgetSize.WIDE
         DashboardWidgetId.PASSWORDS -> WidgetSize.WIDE
         DashboardWidgetId.GROCERY -> WidgetSize.WIDE
+        DashboardWidgetId.PETS -> WidgetSize.WIDE
+        DashboardWidgetId.ITEMS -> WidgetSize.WIDE
+        DashboardWidgetId.STORE -> WidgetSize.MAX
     }
 )
 
@@ -231,6 +237,9 @@ object DashboardLayoutManager {
             DashboardWidgetId.NOTES -> WidgetSize.WIDE
             DashboardWidgetId.PASSWORDS -> WidgetSize.WIDE
             DashboardWidgetId.GROCERY -> WidgetSize.WIDE
+            DashboardWidgetId.PETS -> WidgetSize.WIDE
+            DashboardWidgetId.ITEMS -> WidgetSize.WIDE
+            DashboardWidgetId.STORE -> WidgetSize.MAX
         }
         return layout + DashboardWidgetItem(widgetId, defaultSize)
     }
@@ -335,6 +344,9 @@ object LeftDashboardLayoutManager {
             DashboardWidgetId.NEXT -> WidgetSize.HALF
             DashboardWidgetId.BUDDY -> WidgetSize.HALF
             DashboardWidgetId.CLOCK -> WidgetSize.MAX
+            DashboardWidgetId.PETS -> WidgetSize.WIDE
+            DashboardWidgetId.ITEMS -> WidgetSize.WIDE
+            DashboardWidgetId.STORE -> WidgetSize.MAX
         }
         return layout + DashboardWidgetItem(widgetId, size)
     }

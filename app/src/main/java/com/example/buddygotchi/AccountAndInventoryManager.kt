@@ -31,6 +31,25 @@ data class CompanionGearItemEntry(
     val requiredLevel: Int
 )
 
+enum class StoreCategory(val label: String) {
+    BUDDIES("BUDDIES"),
+    ITEMS("ITEMS"),
+    GOODIES("GOODIES")
+}
+
+data class StoreCatalogEntry(
+    val id: String,
+    val title: String,
+    val category: StoreCategory,
+    val subtitle: String,
+    val description: String,
+    val priceLabel: String,
+    val requiredXp: Int = 0,
+    val isAvailableNow: Boolean = true,
+    val unlocksPetId: String? = null,
+    val unlocksItemId: String? = null
+)
+
 object AccountAndInventoryManager {
     private const val PREFS_NAME = "buddy_account_legal_prefs"
     private const val KEY_IS_LOGGED_IN = "is_logged_in"
@@ -41,6 +60,7 @@ object AccountAndInventoryManager {
     private const val KEY_UNLOCKED_PETS = "unlocked_pets_json"
     private const val KEY_UNLOCKED_ITEMS = "unlocked_items_json"
     private const val KEY_EQUIPPED_ITEMS = "equipped_items_json"
+    private const val KEY_CLAIMED_GOODIES = "claimed_goodies_json"
 
     // Legal & Consent keys
     private const val KEY_CONSENT_BANNER_ANSWERED = "consent_banner_answered"
@@ -146,6 +166,85 @@ object AccountAndInventoryManager {
             slot = "BACK",
             description = "Orbital stabilizer module unlocked at Level 5",
             requiredLevel = 5
+        ),
+        CompanionGearItemEntry(
+            id = "item_holo_crown",
+            name = "HOLO-GLYPH CROWN",
+            slot = "HEAD",
+            description = "Store Special: Floating red-matrix holographic crown",
+            requiredLevel = 1
+        ),
+        CompanionGearItemEntry(
+            id = "item_plasma_wings",
+            name = "NEON MATRIX WINGS",
+            slot = "BACK",
+            description = "Store Special: Lightweight dot-matrix glider wings",
+            requiredLevel = 1
+        )
+    )
+
+    val storeCatalog: List<StoreCatalogEntry> = listOf(
+        StoreCatalogEntry(
+            id = "store_item_holo_crown",
+            title = "HOLO-GLYPH CROWN",
+            category = StoreCategory.ITEMS,
+            subtitle = "HEAD GEAR • STARTER STORE DROP",
+            description = "Equippable floating red-matrix holographic crown for your companion. Free starter store drop!",
+            priceLabel = "FREE DROP",
+            requiredXp = 0,
+            isAvailableNow = true,
+            unlocksItemId = "item_holo_crown"
+        ),
+        StoreCatalogEntry(
+            id = "store_item_plasma_wings",
+            title = "NEON MATRIX WINGS",
+            category = StoreCategory.ITEMS,
+            subtitle = "BACK MODULE • XP REWARD",
+            description = "Equippable dot-matrix glider wings unlocked via Store XP milestone.",
+            priceLabel = "50 XP UNLOCK",
+            requiredXp = 50,
+            isAvailableNow = true,
+            unlocksItemId = "item_plasma_wings"
+        ),
+        StoreCatalogEntry(
+            id = "store_goodie_founder_badge",
+            title = "FOUNDER OPERATOR BADGE",
+            category = StoreCategory.GOODIES,
+            subtitle = "ACCOUNT GOODIE • EARLY ADOPTER",
+            description = "Commemorative Season 01 Founder badge stored in your cross-device account profile.",
+            priceLabel = "FREE CLAIM",
+            requiredXp = 0,
+            isAvailableNow = true
+        ),
+        StoreCatalogEntry(
+            id = "store_goodie_glyph_pack",
+            title = "GLYPH AUDIO & HAPTIC PACK",
+            category = StoreCategory.GOODIES,
+            subtitle = "SYSTEM GOODIE • TACTILE PRESETS",
+            description = "Extra mechanical drum-roll & companion chime presets for Nothing OS enthusiasts.",
+            priceLabel = "100 XP UNLOCK",
+            requiredXp = 100,
+            isAvailableNow = true
+        ),
+        StoreCatalogEntry(
+            id = "store_buddy_cyber_kitsune",
+            title = "CYBER KITSUNE (3D)",
+            category = StoreCategory.BUDDIES,
+            subtitle = "ANIMATED 3D COMPANION • WAVE 2",
+            description = "Dual-tail monochrome cybernetic fox companion with custom idle & celebration animations.",
+            priceLabel = "COMING SOON",
+            requiredXp = 0,
+            isAvailableNow = false
+        ),
+        StoreCatalogEntry(
+            id = "store_buddy_mecha_owl",
+            title = "CHRONO OWL MK-II (3D)",
+            category = StoreCategory.BUDDIES,
+            subtitle = "ANIMATED 3D COMPANION • WAVE 2",
+            description = "Precision mechanical owl with rotating DSEG-7 ocular lenses and wing-flap alerts.",
+            priceLabel = "COMING SOON",
+            requiredXp = 0,
+            isAvailableNow = false
         )
     )
 
@@ -168,6 +267,7 @@ object AccountAndInventoryManager {
     )
     val unlockedItemIdsState = mutableStateListOf("item_dot_collar", "item_red_core")
     val equippedItemIdsState = mutableStateListOf("item_dot_collar")
+    val claimedGoodieIdsState = mutableStateListOf<String>()
 
     // Legal & Consent observable state
     val hasAnsweredConsentBannerState = mutableStateOf(false)
@@ -222,6 +322,17 @@ object AccountAndInventoryManager {
             } catch (_: Exception) {}
         }
 
+        val goodiesJson = prefs.getString(KEY_CLAIMED_GOODIES, null)
+        if (!goodiesJson.isNullOrBlank()) {
+            try {
+                val arr = JSONArray(goodiesJson)
+                claimedGoodieIdsState.clear()
+                for (i in 0 until arr.length()) {
+                    claimedGoodieIdsState.add(arr.getString(i))
+                }
+            } catch (_: Exception) {}
+        }
+
         hasAnsweredConsentBannerState.value = prefs.getBoolean(KEY_CONSENT_BANNER_ANSWERED, false)
         cloudSyncConsentState.value = prefs.getBoolean(KEY_CLOUD_SYNC_CONSENT, false)
         ageConsentVerifiedState.value = prefs.getBoolean(KEY_AGE_CONSENT_VERIFIED, false)
@@ -230,6 +341,68 @@ object AccountAndInventoryManager {
 
         autoUnlockForCurrentLevel(context)
         isInitialized = true
+
+        // Automatic background sync on startup when logged in
+        if (isLoggedInState.value && cloudSyncConsentState.value && accountEmailState.value.isNotBlank()) {
+            autoSyncWithCloud(context)
+        }
+    }
+
+    /**
+     * Automatically pulls and merges cloud inventory/progress with local state, then pushes merged state back to cloud.
+     */
+    fun autoSyncWithCloud(context: Context) {
+        if (!isLoggedInState.value || !cloudSyncConsentState.value || accountEmailState.value.isBlank()) return
+        val cleanEmail = accountEmailState.value.trim().lowercase()
+        val accountDocId = accountDocKeyForEmail(cleanEmail)
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(accountDocId)
+            .get()
+            .addOnSuccessListener { doc ->
+                if (doc != null && doc.exists()) {
+                    @Suppress("UNCHECKED_CAST")
+                    val cloudPets = doc.get("unlockedPetIds") as? List<String> ?: emptyList()
+                    @Suppress("UNCHECKED_CAST")
+                    val cloudItems = doc.get("unlockedItemIds") as? List<String> ?: emptyList()
+                    @Suppress("UNCHECKED_CAST")
+                    val cloudGoodies = doc.get("claimedGoodieIds") as? List<String> ?: emptyList()
+
+                    var mergedChanged = false
+                    for (petId in cloudPets) {
+                        if (petId !in unlockedPetIdsState) {
+                            unlockedPetIdsState.add(petId)
+                            mergedChanged = true
+                        }
+                    }
+                    for (itemId in cloudItems) {
+                        if (itemId !in unlockedItemIdsState) {
+                            unlockedItemIdsState.add(itemId)
+                            mergedChanged = true
+                        }
+                    }
+                    for (goodieId in cloudGoodies) {
+                        if (goodieId !in claimedGoodieIdsState) {
+                            claimedGoodieIdsState.add(goodieId)
+                            mergedChanged = true
+                        }
+                    }
+                    val cloudXp = doc.getLong("buddyXp")?.toInt() ?: 0
+                    val localXp = TaskManager.getBuddyXp(context)
+                    if (cloudXp > localXp) {
+                        TaskManager.setBuddyXp(context, cloudXp)
+                        mergedChanged = true
+                    }
+                    if (mergedChanged) {
+                        saveInventoryToPrefs(context)
+                    }
+                }
+                syncAccountToCloud(context)
+                com.example.buddygotchi.squad.FirebaseSquadSync.syncProfile(context)
+            }
+            .addOnFailureListener {
+                syncAccountToCloud(context)
+            }
     }
 
     fun autoUnlockForCurrentLevel(context: Context) {
@@ -250,6 +423,9 @@ object AccountAndInventoryManager {
         }
         if (changed) {
             saveInventoryToPrefs(context)
+            if (isInitialized) {
+                syncToCloudIfEnabled(context)
+            }
         }
     }
 
@@ -258,12 +434,43 @@ object AccountAndInventoryManager {
         val petsArr = JSONArray().apply { unlockedPetIdsState.forEach { put(it) } }
         val itemsArr = JSONArray().apply { unlockedItemIdsState.forEach { put(it) } }
         val eqArr = JSONArray().apply { equippedItemIdsState.forEach { put(it) } }
+        val goodiesArr = JSONArray().apply { claimedGoodieIdsState.forEach { put(it) } }
         prefs.edit()
             .putString(KEY_EQUIPPED_PET_ID, equippedPetIdState.value)
             .putString(KEY_UNLOCKED_PETS, petsArr.toString())
             .putString(KEY_UNLOCKED_ITEMS, itemsArr.toString())
             .putString(KEY_EQUIPPED_ITEMS, eqArr.toString())
+            .putString(KEY_CLAIMED_GOODIES, goodiesArr.toString())
             .apply()
+    }
+
+    fun isStoreEntryUnlocked(entry: StoreCatalogEntry): Boolean {
+        if (entry.unlocksPetId != null && entry.unlocksPetId in unlockedPetIdsState) return true
+        if (entry.unlocksItemId != null && entry.unlocksItemId in unlockedItemIdsState) return true
+        return entry.id in claimedGoodieIdsState
+    }
+
+    fun claimStoreEntry(context: Context, entry: StoreCatalogEntry): Result<String> {
+        ensureInitialized(context)
+        if (!entry.isAvailableNow) {
+            return Result.failure(IllegalArgumentException("${entry.title} will arrive in a future Store wave."))
+        }
+        val currentXp = TaskManager.getBuddyXp(context)
+        if (currentXp < entry.requiredXp) {
+            return Result.failure(IllegalArgumentException("Requires ${entry.requiredXp} XP (Current XP: $currentXp). Complete tasks to earn XP!"))
+        }
+        if (entry.unlocksPetId != null && entry.unlocksPetId !in unlockedPetIdsState) {
+            unlockedPetIdsState.add(entry.unlocksPetId)
+        }
+        if (entry.unlocksItemId != null && entry.unlocksItemId !in unlockedItemIdsState) {
+            unlockedItemIdsState.add(entry.unlocksItemId)
+        }
+        if (entry.id !in claimedGoodieIdsState) {
+            claimedGoodieIdsState.add(entry.id)
+        }
+        saveInventoryToPrefs(context)
+        syncToCloudIfEnabled(context)
+        return Result.success("UNLOCKED: ${entry.title} ADDED TO INVENTORY")
     }
 
     fun equipPet(context: Context, petId: String) {
@@ -397,9 +604,10 @@ object AccountAndInventoryManager {
         // Try native Firebase Email/Password auth first; gracefully fall back to Firestore cloud account record
         auth.createUserWithEmailAndPassword(cleanEmail, password)
             .addOnCompleteListener {
+                com.example.buddygotchi.squad.FirebaseSquadSync.syncProfile(context)
                 syncAccountToCloud(context, passwordHash = passwordHash) { syncOk ->
                     val msg = if (syncOk) {
-                        "ACCOUNT CREATED & SYNCED TO CLOUD ($cleanName)"
+                        "ACCOUNT CREATED & AUTO-SYNCED TO CLOUD ($cleanName)"
                     } else {
                         "ACCOUNT CREATED LOCALLY ($cleanName)"
                     }
@@ -410,7 +618,7 @@ object AccountAndInventoryManager {
     }
 
     /**
-     * Sign in to an existing account and restore Pets, Items, XP, and Buddy Code across devices.
+     * Sign in to an existing account and automatically sync Pets, Items, Goodies, XP, and Buddy Code across devices.
      */
     fun signInAndRestoreFromCloud(
         context: Context,
@@ -440,34 +648,43 @@ object AccountAndInventoryManager {
 
                     val restoredName = doc.getString("displayName") ?: "OPERATOR"
                     val restoredCode = doc.getString("linkedBuddyCode") ?: SquadManager.getProfile(context).buddyCode
-                    val restoredXp = doc.getLong("buddyXp")?.toInt() ?: TaskManager.getBuddyXp(context)
+                    val localXp = TaskManager.getBuddyXp(context)
+                    val cloudXp = doc.getLong("buddyXp")?.toInt() ?: localXp
+                    val mergedXp = maxOf(localXp, cloudXp)
                     val restoredMode = doc.getString("displayMode") ?: BuddyDisplayMode.THREE_D.name
                     val restoredModelId = doc.getString("activeModelId") ?: Buddy3DManager.BUILTIN_SSRB_ID
                     val restoredCharIdx = doc.getLong("activeCharIndex")?.toInt() ?: 0
                     val restoredEquippedPet = doc.getString("equippedPetId") ?: "pet_ssrb_greybie"
 
                     @Suppress("UNCHECKED_CAST")
-                    val cloudPets = doc.get("unlockedPetIds") as? List<String>
+                    val cloudPets = doc.get("unlockedPetIds") as? List<String> ?: emptyList()
                     @Suppress("UNCHECKED_CAST")
-                    val cloudItems = doc.get("unlockedItemIds") as? List<String>
+                    val cloudItems = doc.get("unlockedItemIds") as? List<String> ?: emptyList()
                     @Suppress("UNCHECKED_CAST")
                     val cloudEqItems = doc.get("equippedItemIds") as? List<String>
+                    @Suppress("UNCHECKED_CAST")
+                    val cloudGoodies = doc.get("claimedGoodieIds") as? List<String> ?: emptyList()
 
-                    if (!cloudPets.isNullOrEmpty()) {
-                        unlockedPetIdsState.clear()
-                        unlockedPetIdsState.addAll(cloudPets.distinct())
-                    }
-                    if (!cloudItems.isNullOrEmpty()) {
-                        unlockedItemIdsState.clear()
-                        unlockedItemIdsState.addAll(cloudItems.distinct())
-                    }
+                    val mergedPets = (unlockedPetIdsState + cloudPets).distinct()
+                    unlockedPetIdsState.clear()
+                    unlockedPetIdsState.addAll(mergedPets)
+
+                    val mergedItems = (unlockedItemIdsState + cloudItems).distinct()
+                    unlockedItemIdsState.clear()
+                    unlockedItemIdsState.addAll(mergedItems)
+
                     if (cloudEqItems != null) {
+                        val mergedEq = (equippedItemIdsState + cloudEqItems).distinct()
                         equippedItemIdsState.clear()
-                        equippedItemIdsState.addAll(cloudEqItems.distinct())
+                        equippedItemIdsState.addAll(mergedEq)
                     }
+
+                    val mergedGoodies = (claimedGoodieIdsState + cloudGoodies).distinct()
+                    claimedGoodieIdsState.clear()
+                    claimedGoodieIdsState.addAll(mergedGoodies)
 
                     equippedPetIdState.value = restoredEquippedPet
-                    TaskManager.setBuddyXp(context, restoredXp)
+                    TaskManager.setBuddyXp(context, mergedXp)
 
                     val modeEnum = try {
                         BuddyDisplayMode.valueOf(restoredMode)
@@ -483,7 +700,7 @@ object AccountAndInventoryManager {
                         currentProfile.copy(
                             buddyCode = restoredCode,
                             displayName = restoredName,
-                            level = (restoredXp / 50) + 1
+                            level = (mergedXp / 50) + 1
                         )
                     )
 
@@ -507,9 +724,14 @@ object AccountAndInventoryManager {
                         .apply()
 
                     saveInventoryToPrefs(context)
-                    val msg = "RESTORED ACCOUNT: $restoredName (${unlockedPetIdsState.size} PETS, ${unlockedItemIdsState.size} ITEMS)"
-                    syncStatusMessageState.value = msg
-                    onResult(Result.success(msg))
+
+                    // Automatically sync merged state back to Cloud and Squad immediately on login
+                    com.example.buddygotchi.squad.FirebaseSquadSync.syncProfile(context)
+                    syncAccountToCloud(context) {
+                        val msg = "AUTO-SYNCED: $restoredName (${unlockedPetIdsState.size} PETS, ${unlockedItemIdsState.size} ITEMS)"
+                        syncStatusMessageState.value = msg
+                        onResult(Result.success(msg))
+                    }
                 } else {
                     onResult(Result.failure(IllegalArgumentException("No cloud account found for $cleanEmail. Use CREATE ACCOUNT first.")))
                 }
@@ -561,6 +783,7 @@ object AccountAndInventoryManager {
             "unlockedPetIds" to unlockedPetIdsState.toList(),
             "unlockedItemIds" to unlockedItemIdsState.toList(),
             "equippedItemIds" to equippedItemIdsState.toList(),
+            "claimedGoodieIds" to claimedGoodieIdsState.toList(),
             "updatesSubscribed" to updatesSubscribedState.value,
             "ageConsentVerified" to ageConsentVerifiedState.value,
             "updatedAt" to now

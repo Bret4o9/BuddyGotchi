@@ -627,6 +627,25 @@ private fun ShelfRackItem(
                 DashboardWidgetId.CLOCK -> {
                     ClockWidget(size = WidgetSize.MAX)
                 }
+                DashboardWidgetId.PETS -> {
+                    PetsWidget(
+                        size = WidgetSize.WIDE,
+                        buddyLevel = buddyLevel
+                    )
+                }
+                DashboardWidgetId.ITEMS -> {
+                    ItemsWidget(
+                        size = WidgetSize.WIDE,
+                        buddyLevel = buddyLevel
+                    )
+                }
+                DashboardWidgetId.STORE -> {
+                    StoreWidget(
+                        size = WidgetSize.MAX,
+                        buddyXp = buddyXp,
+                        buddyLevel = buddyLevel
+                    )
+                }
             }
         }
 

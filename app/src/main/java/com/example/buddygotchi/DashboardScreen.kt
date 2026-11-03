@@ -340,15 +340,15 @@ fun DashboardScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Dashboard Header (shows "EDITING LAYOUT" + "[✓ DONE]" when in edit mode, drum roll opposite BUDDYGOTCHI)
+            // Dashboard Header (Left: BUDDYGOTCHI, Center: ACCOUNT pill, Right: Page Drum Roll; generous spacing above SHELF)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(
                         start = 20.dp,
                         end = 20.dp,
-                        top = 54.dp,
-                        bottom = 10.dp
+                        top = 56.dp,
+                        bottom = 16.dp
                     ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -392,58 +392,55 @@ fun DashboardScreen(
                         )
                     }
                 } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = NothingCardSurface,
-                            border = BorderStroke(1.dp, if (isAccountLoggedIn) NothingRed else NothingBorder),
-                            modifier = Modifier
-                                .height(28.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .clickable {
-                                    accountHubInitialTab = AccountHubTab.ACCOUNT
-                                    showAccountLegalDialog = true
-                                    triggerTick()
-                                }
-                                .semantics {
-                                    contentDescription = "Open Account, Pets and Items Inventory, and Legal Settings"
-                                }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isAccountLoggedIn) Color(0xFF00E676) else NothingTextSecondary)
-                                )
-                                Text(
-                                    text = if (isAccountLoggedIn) accountUsername.take(8) else "ACCOUNT",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = NothingWhite
-                                )
-                            }
-                        }
-
-                        // Drum Roll Page Indicator opposite to "BUDDYGOTCHI"
-                        PageDrumRollIndicator(
-                            pagerState = pagerState,
-                            pages = pages,
-                            isMenuOpen = showPagesMenu,
-                            onClick = {
-                                showPagesMenu = !showPagesMenu
+                    // Centered Account Pill with generous spacing between BUDDYGOTCHI and Page Drum Roll
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = NothingCardSurface,
+                        border = BorderStroke(1.dp, if (isAccountLoggedIn) NothingRed else NothingBorder),
+                        modifier = Modifier
+                            .height(28.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable {
+                                accountHubInitialTab = AccountHubTab.ACCOUNT
+                                showAccountLegalDialog = true
                                 triggerTick()
                             }
-                        )
+                            .semantics {
+                                contentDescription = "Open Account, Pets and Items Inventory, and Legal Settings"
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isAccountLoggedIn) Color(0xFF00E676) else NothingTextSecondary)
+                            )
+                            Text(
+                                text = if (isAccountLoggedIn) accountUsername.take(10) else "ACCOUNT",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp,
+                                color = NothingWhite
+                            )
+                        }
                     }
+
+                    // Drum Roll Page Indicator on the right
+                    PageDrumRollIndicator(
+                        pagerState = pagerState,
+                        pages = pages,
+                        isMenuOpen = showPagesMenu,
+                        onClick = {
+                            showPagesMenu = !showPagesMenu
+                            triggerTick()
+                        }
+                    )
                 }
             }
 
@@ -460,7 +457,7 @@ fun DashboardScreen(
                     modifier = Modifier.padding(
                         start = DashboardGridDefaults.HORIZONTAL_PADDING,
                         end = DashboardGridDefaults.HORIZONTAL_PADDING,
-                        bottom = 4.dp
+                        bottom = 10.dp
                     )
                 )
             }
@@ -1396,6 +1393,25 @@ fun RenderDashboardWidgetContent(
                 onExpand = onExpandGrocery,
                 onQuickCreate = onQuickCreateGrocery,
                 onFinishTaskReward = onFinishGroceryTaskReward
+            )
+        }
+        DashboardWidgetId.PETS -> {
+            PetsWidget(
+                size = liveSize,
+                buddyLevel = buddyLevel
+            )
+        }
+        DashboardWidgetId.ITEMS -> {
+            ItemsWidget(
+                size = liveSize,
+                buddyLevel = buddyLevel
+            )
+        }
+        DashboardWidgetId.STORE -> {
+            StoreWidget(
+                size = liveSize,
+                buddyXp = buddyXp,
+                buddyLevel = buddyLevel
             )
         }
     }
