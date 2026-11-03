@@ -107,6 +107,7 @@
       // Tap / Pet bounce state
       let bounceTime = -1;
       let hasProceduralFallback = false;
+      let activeClipDuration = 1.25;
 
       function setStatus(msg, visible) {
         if (statusText) statusText.textContent = msg || '';
@@ -234,6 +235,7 @@
         mixers = [];
         characterGroups = [];
         hasProceduralFallback = false;
+        activeClipDuration = 1.25;
       }
 
       function enhanceMaterials(root) {
@@ -315,40 +317,54 @@
 
       // Compute the true world-space bounding box of a character node (including SkinnedMesh bone transforms)
       function computeSkinnedBounds(targetNode) {
-        targetNode.updateMatrixWorld(true);
+        if (currentRoot) {
+          currentRoot.updateMatrixWorld(true);
+        } else {
+          targetNode.updateMatrixWorld(true);
+        }
         const box = new THREE.Box3();
         const tempVec = new THREE.Vector3();
-        let foundPoints = false;
+        let foundMeshPoints = false;
 
         targetNode.traverse(function (child) {
-          if (child.isBone) {
-            child.getWorldPosition(tempVec);
-            box.expandByPoint(tempVec);
-            foundPoints = true;
+          if (!child.visible) return;
+          if (child.userData && child.userData.isRigControl) return;
+          if (child.name && child.name.indexOf('__rig_ctrl_') === 0) return;
+          if (child.isLine || child.isLineSegments) return;
+
+          if (child.isSkinnedMesh && child.skeleton) {
+            child.skeleton.update();
           }
-          if (child.isSkinnedMesh && child.skeleton) { child.skeleton.update(); }
-          if (child.isMesh && child.geometry && child.geometry.attributes.position) {
+          if (child.isMesh && child.geometry && child.geometry.attributes && child.geometry.attributes.position) {
             const posAttr = child.geometry.attributes.position;
             const count = posAttr.count;
-            const step = Math.max(1, Math.floor(count / 250));
+            const step = Math.max(1, Math.floor(count / 200));
             for (let i = 0; i < count; i += step) {
+              tempVec.fromBufferAttribute(posAttr, i);
               if (child.isSkinnedMesh && typeof child.boneTransform === 'function') {
-                tempVec.fromBufferAttribute(posAttr, i);
                 child.boneTransform(i, tempVec);
-                tempVec.applyMatrix4(child.matrixWorld);
-              } else {
-                tempVec.fromBufferAttribute(posAttr, i);
-                tempVec.applyMatrix4(child.matrixWorld);
               }
+              tempVec.applyMatrix4(child.matrixWorld);
               if (isFinite(tempVec.x) && isFinite(tempVec.y) && isFinite(tempVec.z)) {
                 box.expandByPoint(tempVec);
-                foundPoints = true;
+                foundMeshPoints = true;
               }
             }
           }
         });
 
-        if (!foundPoints || box.isEmpty()) {
+        if (!foundMeshPoints || box.isEmpty()) {
+          targetNode.traverse(function (child) {
+            if (child.isBone) {
+              child.getWorldPosition(tempVec);
+              if (isFinite(tempVec.x) && isFinite(tempVec.y) && isFinite(tempVec.z)) {
+                box.expandByPoint(tempVec);
+              }
+            }
+          });
+        }
+
+        if (box.isEmpty()) {
           box.min.set(-15, 0, -15);
           box.max.set(15, 30, 15);
         }
@@ -359,19 +375,56 @@
         return { box: box, center: center, size: size };
       }
 
-      function findPrimaryTrackBone(node) {
-        let preferred = null;
-        let firstBone = null;
-        node.traverse(function (child) {
-          if (child.isBone) {
-            if (!firstBone) firstBone = child;
-            const n = (child.name || '').toLowerCase();
-            if (n.indexOf('backbone') === 0 || n.indexOf('body') === 0 || n.indexOf('hips') !== -1 || n.indexOf('root') !== -1) {
-              if (!preferred) preferred = child;
+      // Compute the live world-space bounding box and required camera distance for the currently visible character(s)
+      function computeLiveActiveBounds(overrideAspect) {
+        if (!currentRoot || characterGroups.length === 0) return null;
+        currentRoot.updateMatrixWorld(true);
+
+        const totalBox = new THREE.Box3();
+        if (activeCharIndex >= 0 && activeCharIndex < characterGroups.length) {
+          const chosen = characterGroups[activeCharIndex];
+          const b = computeSkinnedBounds(chosen.object);
+          totalBox.copy(b.box);
+        } else {
+          characterGroups.forEach(function (cg) {
+            if (cg.object.visible) {
+              const b = computeSkinnedBounds(cg.object);
+              totalBox.union(b.box);
             }
-          }
-        });
-        return preferred || firstBone;
+          });
+        }
+
+        if (totalBox.isEmpty()) {
+          totalBox.min.set(-15, 0, -15);
+          totalBox.max.set(15, 30, 15);
+        }
+
+        const center = new THREE.Vector3();
+        const size = new THREE.Vector3();
+        totalBox.getCenter(center);
+        totalBox.getSize(size);
+
+        const aspect = Math.max(0.45, overrideAspect || (camera && camera.aspect) || 1.0);
+        const fovRad = THREE.MathUtils.degToRad((camera && camera.fov) || 36);
+        const halfVertFov = fovRad * 0.5;
+        const halfHorizFov = Math.atan(Math.tan(halfVertFov) * aspect);
+
+        const isTrio = (activeCharIndex < 0 && characterGroups.length > 1);
+        const margin = isTrio ? 1.26 : 1.38;
+        const horizSpan = Math.max(size.x, size.z * 0.85, 12);
+        const vertSpan = Math.max(size.y, 12);
+        const depthOffset = size.z * 0.55;
+
+        const distForHeight = (vertSpan * 0.5) / Math.tan(halfVertFov) * margin + depthOffset;
+        const distForWidth = (horizSpan * 0.5) / Math.tan(halfHorizFov) * margin + depthOffset;
+        const requiredDist = Math.max(distForHeight, distForWidth, 24);
+
+        return {
+          box: totalBox,
+          center: center,
+          size: size,
+          requiredDist: requiredDist
+        };
       }
 
       function detectCharacterGroups(root) {
@@ -387,14 +440,9 @@
         if (meshBearingChildren.length > 1) {
           meshBearingChildren.forEach(function (child, idx) {
             const bounds = computeSkinnedBounds(child);
-            const trackBone = findPrimaryTrackBone(child);
-            const initialBonePos = new THREE.Vector3();
-            if (trackBone) trackBone.getWorldPosition(initialBonePos);
             groups.push({
               name: child.name || ('Character ' + (idx + 1)),
               object: child,
-              trackBone: trackBone,
-              initialBonePos: initialBonePos,
               box: bounds.box,
               center: bounds.center,
               size: bounds.size
@@ -402,14 +450,9 @@
           });
         } else {
           const bounds = computeSkinnedBounds(root);
-          const trackBone = findPrimaryTrackBone(root);
-          const initialBonePos = new THREE.Vector3();
-          if (trackBone) trackBone.getWorldPosition(initialBonePos);
           groups.push({
             name: root.name || 'Buddy',
             object: root,
-            trackBone: trackBone,
-            initialBonePos: initialBonePos,
             box: bounds.box,
             center: bounds.center,
             size: bounds.size
@@ -426,23 +469,10 @@
         if (index < 0 || characterGroups.length === 1) {
           // Show all characters (Trio mode or single character model)
           activeCharIndex = characterGroups.length > 1 ? -1 : 0;
-          const totalBox = new THREE.Box3();
           characterGroups.forEach(function (cg) {
             cg.object.visible = true;
-            totalBox.union(cg.box);
           });
-          const center = new THREE.Vector3();
-          const size = new THREE.Vector3();
-          totalBox.getCenter(center);
-          totalBox.getSize(size);
-
-          desiredCameraTarget.copy(center);
-          const maxDim = Math.max(size.x * 0.72, size.y * 1.15, size.z, 10);
-          const fovRad = THREE.MathUtils.degToRad(camera.fov);
-          desiredDistance = (maxDim / 2) / Math.tan(fovRad / 2) * 1.28;
-
           if (shadowDisc) {
-            shadowDisc.position.set(center.x, totalBox.min.y + 0.05, center.z);
             shadowDisc.scale.set(characterGroups.length > 1 ? 2.6 : 1.0, 1.0, 1.0);
           }
         } else {
@@ -452,16 +482,19 @@
           characterGroups.forEach(function (cg, idx) {
             cg.object.visible = (idx === safeIdx);
           });
-
-          const chosen = characterGroups[safeIdx];
-          desiredCameraTarget.copy(chosen.center);
-          const maxDim = Math.max(chosen.size.x, chosen.size.y, chosen.size.z, 10);
-          const fovRad = THREE.MathUtils.degToRad(camera.fov);
-          desiredDistance = (maxDim / 2) / Math.tan(fovRad / 2) * 1.35;
-
           if (shadowDisc) {
-            shadowDisc.position.set(chosen.center.x, chosen.box.min.y + 0.05, chosen.center.z);
             shadowDisc.scale.set(1.0, 1.0, 1.0);
+          }
+        }
+
+        const liveBounds = computeLiveActiveBounds(camera ? camera.aspect : 1.0);
+        if (liveBounds) {
+          desiredCameraTarget.copy(liveBounds.center);
+          cameraTarget.copy(liveBounds.center);
+          desiredDistance = liveBounds.requiredDist;
+          baseDistance = liveBounds.requiredDist;
+          if (shadowDisc) {
+            shadowDisc.position.set(liveBounds.center.x, liveBounds.box.min.y + 0.05, liveBounds.center.z);
           }
         }
 
@@ -483,12 +516,19 @@
       }
 
       function captureIdleSequenceForWidget() {
-        if (!renderer || !scene || !camera || !currentRoot) return;
+        if (!renderer || !scene || !camera || !currentRoot || characterGroups.length === 0) return;
         if (!window.Buddy3DBridge || !window.Buddy3DBridge.onIdleSequenceCaptured) return;
         try {
-          const frameCount = 8;
-          const outW = 160;
-          const outH = 112;
+          const outW = 128;
+          const outH = 84;
+          const dstAspect = outW / outH;
+
+          const clipDur = (activeClipDuration && isFinite(activeClipDuration) && activeClipDuration > 0.1)
+            ? activeClipDuration
+            : 1.25;
+          // Adjust frame count dynamically for 24 FPS playback to cover the entire animation cycle
+          const frameCount = Math.max(24, Math.min(40, Math.round(clipDur * 24)));
+
           const capCanvas = document.createElement('canvas');
           capCanvas.width = outW;
           capCanvas.height = outH;
@@ -498,28 +538,103 @@
           const savedPitch = userPitch;
           const savedLookYaw = lookYawOffset;
           const savedLookPitch = lookPitchOffset;
+          const savedTarget = cameraTarget.clone();
+          const savedDesiredTarget = desiredCameraTarget.clone();
+          const savedBaseDist = baseDistance;
+          const savedDesiredDist = desiredDistance;
           const savedRootY = currentRoot.position.y;
           const savedRootRotY = currentRoot.rotation.y;
+          const savedAspect = camera.aspect;
+          const savedSize = new THREE.Vector2();
+          renderer.getSize(savedSize);
+          const savedPixelRatio = renderer.getPixelRatio();
+
+          // Render directly at target widget aspect ratio so there is zero edge cropping
+          renderer.setPixelRatio(1);
+          renderer.setSize(outW, outH, false);
+          camera.aspect = dstAspect;
+          camera.updateProjectionMatrix();
 
           userYaw = 0;
           userPitch = 0.08;
           lookYawOffset = 0;
           lookPitchOffset = 0;
-          cameraTarget.copy(desiredCameraTarget);
-          baseDistance = desiredDistance;
 
+          const shadowDisc = scene.getObjectByName('__ground_shadow');
+
+          // PASS 1: Scan the entire animation (t = 0 .. clipDur) to compute live 3D bounds & trajectory per frame
+          const rawCenters = [];
+          const rawMinY = [];
+          const rawDists = [];
+
+          for (let f = 0; f < frameCount; f++) {
+            const t = (f / frameCount) * clipDur;
+            const phase = (f / frameCount) * Math.PI * 2;
+
+            for (let m = 0; m < mixers.length; m++) {
+              mixers[m].setTime(t);
+            }
+
+            if (hasProceduralFallback) {
+              currentRoot.position.y = Math.sin(phase) * 0.6;
+              currentRoot.rotation.y = Math.sin(phase) * 0.12;
+            } else {
+              currentRoot.position.y = 0;
+              currentRoot.rotation.y = 0;
+            }
+
+            const b = computeLiveActiveBounds(dstAspect);
+            if (b) {
+              rawCenters.push(b.center.clone());
+              rawMinY.push(b.box.min.y);
+              rawDists.push(b.requiredDist);
+            } else {
+              rawCenters.push(desiredCameraTarget.clone());
+              rawMinY.push(0);
+              rawDists.push(desiredDistance);
+            }
+          }
+
+          // Circularly smooth camera distance across loop while guaranteeing smoothDists[f] >= rawDists[f]
+          const smoothDists = rawDists.slice();
+          for (let pass = 0; pass < 3; pass++) {
+            const next = smoothDists.slice();
+            for (let f = 0; f < frameCount; f++) {
+              const prevF = (f - 1 + frameCount) % frameCount;
+              const nextF = (f + 1) % frameCount;
+              const avg = smoothDists[prevF] * 0.25 + smoothDists[f] * 0.5 + smoothDists[nextF] * 0.25;
+              next[f] = Math.max(rawDists[f], avg);
+            }
+            for (let f = 0; f < frameCount; f++) smoothDists[f] = next[f];
+          }
+
+          // PASS 2: Render all frames of the complete animation with live camera tracking
           const frames = [];
           const srcCanvas = renderer.domElement;
 
           for (let f = 0; f < frameCount; f++) {
+            const t = (f / frameCount) * clipDur;
             const phase = (f / frameCount) * Math.PI * 2;
+
             for (let m = 0; m < mixers.length; m++) {
-              mixers[m].update(0.14);
+              mixers[m].setTime(t);
             }
-            // Add subtle idle breathing & sway so every character has a smooth looping 8-frame idle animation
-            currentRoot.position.y = Math.sin(phase) * (baseDistance * 0.028);
-            currentRoot.rotation.y = Math.sin(phase) * 0.10;
+
+            if (hasProceduralFallback) {
+              currentRoot.position.y = Math.sin(phase) * 0.6;
+              currentRoot.rotation.y = Math.sin(phase) * 0.12;
+            } else {
+              currentRoot.position.y = 0;
+              currentRoot.rotation.y = 0;
+            }
             currentRoot.updateMatrixWorld(true);
+
+            cameraTarget.copy(rawCenters[f]);
+            baseDistance = smoothDists[f];
+
+            if (shadowDisc) {
+              shadowDisc.position.set(rawCenters[f].x, rawMinY[f] + 0.05, rawCenters[f].z);
+            }
 
             const horizDist = baseDistance * Math.cos(userPitch);
             camera.position.x = cameraTarget.x + Math.sin(userYaw) * horizDist;
@@ -530,30 +645,30 @@
             renderer.render(scene, camera);
 
             ctx.clearRect(0, 0, outW, outH);
-            const srcAspect = srcCanvas.width / Math.max(1, srcCanvas.height);
-            const dstAspect = outW / outH;
-            let drawW = outW, drawH = outH, drawX = 0, drawY = 0;
-            if (srcAspect > dstAspect) {
-              drawH = outH;
-              drawW = outH * srcAspect;
-              drawX = (outW - drawW) * 0.5;
-            } else {
-              drawW = outW;
-              drawH = outW / srcAspect;
-              drawY = (outH - drawH) * 0.5;
-            }
-            ctx.drawImage(srcCanvas, drawX, drawY, drawW, drawH);
+            ctx.drawImage(srcCanvas, 0, 0, outW, outH);
             frames.push(capCanvas.toDataURL('image/png'));
           }
+
+          // Restore interactive viewer state
+          renderer.setPixelRatio(savedPixelRatio);
+          renderer.setSize(savedSize.x, savedSize.y, false);
+          camera.aspect = savedAspect;
+          camera.updateProjectionMatrix();
 
           userYaw = savedYaw;
           userPitch = savedPitch;
           lookYawOffset = savedLookYaw;
           lookPitchOffset = savedLookPitch;
+          cameraTarget.copy(savedTarget);
+          desiredCameraTarget.copy(savedDesiredTarget);
+          baseDistance = savedBaseDist;
+          desiredDistance = savedDesiredDist;
           currentRoot.position.y = savedRootY;
           currentRoot.rotation.y = savedRootRotY;
+          currentRoot.updateMatrixWorld(true);
           renderer.render(scene, camera);
 
+          console.log('Captured ' + frames.length + ' widget idle frames for clipDur=' + clipDur.toFixed(2) + 's');
           window.Buddy3DBridge.onIdleSequenceCaptured(String(activeCharIndex), JSON.stringify(frames));
         } catch (e) {
           console.warn('Widget idle capture error:', e);
@@ -569,15 +684,21 @@
         const clips = animations || root.animations || [];
         if (clips.length > 0) {
           const mixer = new THREE.AnimationMixer(root);
+          let maxDur = 0;
           clips.forEach(function (clip) {
+            if (clip && isFinite(clip.duration) && clip.duration > maxDur) {
+              maxDur = clip.duration;
+            }
             const action = mixer.clipAction(clip);
             action.play();
           });
+          activeClipDuration = maxDur > 0.05 ? maxDur : 1.25;
           // Advance mixer slightly so initial animated bone transforms (e.g. Camoue X=-32.5, Boitan X=+32) take effect
           mixer.update(0.033);
           mixers.push(mixer);
           hasProceduralFallback = false;
         } else {
+          activeClipDuration = 1.25;
           hasProceduralFallback = true;
         }
 
@@ -708,44 +829,21 @@
         }
 
         if (currentRoot && characterGroups.length > 0) {
-          currentRoot.updateMatrixWorld(true);
-          const tempBonePos = new THREE.Vector3();
-          const shadowDisc = scene.getObjectByName('__ground_shadow');
+          const savedRootY = currentRoot.position.y;
+          currentRoot.position.y = 0;
+          const liveBounds = computeLiveActiveBounds(camera.aspect);
+          currentRoot.position.y = savedRootY;
 
-          if (activeCharIndex >= 0 && activeCharIndex < characterGroups.length) {
-            const chosen = characterGroups[activeCharIndex];
-            if (chosen.trackBone) {
-              chosen.trackBone.getWorldPosition(tempBonePos);
-              const dx = tempBonePos.x - chosen.initialBonePos.x;
-              const dz = tempBonePos.z - chosen.initialBonePos.z;
-              desiredCameraTarget.x = chosen.center.x + dx;
-              desiredCameraTarget.z = chosen.center.z + dz;
-              if (shadowDisc) {
-                shadowDisc.position.x = desiredCameraTarget.x;
-                shadowDisc.position.z = desiredCameraTarget.z;
-              }
-            }
-          } else if (activeCharIndex < 0 && characterGroups.length > 1) {
-            let minX = Infinity, maxX = -Infinity;
-            characterGroups.forEach(function (cg) {
-              let cx = cg.center.x;
-              if (cg.trackBone) {
-                cg.trackBone.getWorldPosition(tempBonePos);
-                cx += (tempBonePos.x - cg.initialBonePos.x);
-              }
-              minX = Math.min(minX, cx - cg.size.x * 0.55);
-              maxX = Math.max(maxX, cx + cg.size.x * 0.55);
-            });
-            if (isFinite(minX) && isFinite(maxX)) {
-              const spanX = Math.max(maxX - minX, 40);
-              desiredCameraTarget.x = (minX + maxX) * 0.5;
-              const fovRad = THREE.MathUtils.degToRad(camera.fov);
-              const aspect = Math.max(camera.aspect || 1, 0.6);
-              const halfHorizFov = Math.atan(Math.tan(fovRad / 2) * aspect);
-              desiredDistance = Math.max(85, (spanX * 0.5) / Math.tan(halfHorizFov) * 1.15);
-              if (shadowDisc) {
-                shadowDisc.position.x = desiredCameraTarget.x;
-              }
+          if (liveBounds) {
+            desiredCameraTarget.copy(liveBounds.center);
+            desiredDistance = liveBounds.requiredDist;
+            const shadowDisc = scene.getObjectByName('__ground_shadow');
+            if (shadowDisc) {
+              shadowDisc.position.set(
+                liveBounds.center.x,
+                liveBounds.box.min.y + 0.05,
+                liveBounds.center.z
+              );
             }
           }
         }
@@ -773,8 +871,8 @@
         }
 
         // Smooth camera target & orbit interpolation
-        cameraTarget.lerp(desiredCameraTarget, Math.min(1, dt * 18));
-        baseDistance += (desiredDistance - baseDistance) * Math.min(1, dt * 8);
+        cameraTarget.lerp(desiredCameraTarget, Math.min(1, dt * 28));
+        baseDistance += (desiredDistance - baseDistance) * Math.min(1, dt * 14);
 
         const totalYaw = userYaw + lookYawOffset;
         const totalPitch = THREE.MathUtils.clamp(userPitch + lookPitchOffset, -0.45, 0.75);

@@ -61,17 +61,6 @@ class BuddyTaskWidgetProvider : AppWidgetProvider() {
     companion object {
         const val ACTION_PET_BUDDY = "com.example.buddygotchi.ACTION_PET_BUDDY"
 
-        private val FRAME_VIEW_IDS = intArrayOf(
-            R.id.widget_buddy_frame_0,
-            R.id.widget_buddy_frame_1,
-            R.id.widget_buddy_frame_2,
-            R.id.widget_buddy_frame_3,
-            R.id.widget_buddy_frame_4,
-            R.id.widget_buddy_frame_5,
-            R.id.widget_buddy_frame_6,
-            R.id.widget_buddy_frame_7
-        )
-
         fun updateAppWidget(
             context: Context,
             appWidgetManager: AppWidgetManager,
@@ -93,10 +82,11 @@ class BuddyTaskWidgetProvider : AppWidgetProvider() {
                 views.setViewVisibility(R.id.widget_buddy_eyes_flipper, android.view.View.GONE)
                 views.setViewVisibility(R.id.widget_buddy_3d_flipper, android.view.View.VISIBLE)
                 val frames = BuddyWidgetFrameSequenceManager.getOrGenerateIdleFrames(context)
-                for (i in FRAME_VIEW_IDS.indices) {
-                    if (i < frames.size) {
-                        views.setImageViewBitmap(FRAME_VIEW_IDS[i], frames[i])
-                    }
+                views.removeAllViews(R.id.widget_buddy_3d_flipper)
+                for (bmp in frames) {
+                    val frameView = RemoteViews(context.packageName, R.layout.widget_buddy_frame_item)
+                    frameView.setImageViewBitmap(R.id.widget_buddy_single_frame, bmp)
+                    views.addView(R.id.widget_buddy_3d_flipper, frameView)
                 }
             }
 
