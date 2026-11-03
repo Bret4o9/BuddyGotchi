@@ -129,6 +129,7 @@
         renderer = new THREE.WebGLRenderer({
           antialias: true,
           alpha: true,
+          preserveDrawingBuffer: true,
           powerPreference: 'high-performance'
         });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -468,6 +469,94 @@
         if (window.Buddy3DBridge && window.Buddy3DBridge.onCharactersDetected) {
           const names = characterGroups.map(function (c) { return c.name; });
           window.Buddy3DBridge.onCharactersDetected(JSON.stringify(names), activeCharIndex);
+        }
+
+        scheduleWidgetIdleCapture();
+      }
+
+      let captureTimer = null;
+      function scheduleWidgetIdleCapture() {
+        if (captureTimer) clearTimeout(captureTimer);
+        captureTimer = setTimeout(function () {
+          captureIdleSequenceForWidget();
+        }, 280);
+      }
+
+      function captureIdleSequenceForWidget() {
+        if (!renderer || !scene || !camera || !currentRoot) return;
+        if (!window.Buddy3DBridge || !window.Buddy3DBridge.onIdleSequenceCaptured) return;
+        try {
+          const frameCount = 8;
+          const outW = 160;
+          const outH = 112;
+          const capCanvas = document.createElement('canvas');
+          capCanvas.width = outW;
+          capCanvas.height = outH;
+          const ctx = capCanvas.getContext('2d');
+
+          const savedYaw = userYaw;
+          const savedPitch = userPitch;
+          const savedLookYaw = lookYawOffset;
+          const savedLookPitch = lookPitchOffset;
+          const savedRootY = currentRoot.position.y;
+          const savedRootRotY = currentRoot.rotation.y;
+
+          userYaw = 0;
+          userPitch = 0.08;
+          lookYawOffset = 0;
+          lookPitchOffset = 0;
+          cameraTarget.copy(desiredCameraTarget);
+          baseDistance = desiredDistance;
+
+          const frames = [];
+          const srcCanvas = renderer.domElement;
+
+          for (let f = 0; f < frameCount; f++) {
+            const phase = (f / frameCount) * Math.PI * 2;
+            for (let m = 0; m < mixers.length; m++) {
+              mixers[m].update(0.14);
+            }
+            // Add subtle idle breathing & sway so every character has a smooth looping 8-frame idle animation
+            currentRoot.position.y = Math.sin(phase) * (baseDistance * 0.028);
+            currentRoot.rotation.y = Math.sin(phase) * 0.10;
+            currentRoot.updateMatrixWorld(true);
+
+            const horizDist = baseDistance * Math.cos(userPitch);
+            camera.position.x = cameraTarget.x + Math.sin(userYaw) * horizDist;
+            camera.position.y = cameraTarget.y + Math.sin(userPitch) * baseDistance;
+            camera.position.z = cameraTarget.z + Math.cos(userYaw) * horizDist;
+            camera.lookAt(cameraTarget);
+
+            renderer.render(scene, camera);
+
+            ctx.clearRect(0, 0, outW, outH);
+            const srcAspect = srcCanvas.width / Math.max(1, srcCanvas.height);
+            const dstAspect = outW / outH;
+            let drawW = outW, drawH = outH, drawX = 0, drawY = 0;
+            if (srcAspect > dstAspect) {
+              drawH = outH;
+              drawW = outH * srcAspect;
+              drawX = (outW - drawW) * 0.5;
+            } else {
+              drawW = outW;
+              drawH = outW / srcAspect;
+              drawY = (outH - drawH) * 0.5;
+            }
+            ctx.drawImage(srcCanvas, drawX, drawY, drawW, drawH);
+            frames.push(capCanvas.toDataURL('image/png'));
+          }
+
+          userYaw = savedYaw;
+          userPitch = savedPitch;
+          lookYawOffset = savedLookYaw;
+          lookPitchOffset = savedLookPitch;
+          currentRoot.position.y = savedRootY;
+          currentRoot.rotation.y = savedRootRotY;
+          renderer.render(scene, camera);
+
+          window.Buddy3DBridge.onIdleSequenceCaptured(String(activeCharIndex), JSON.stringify(frames));
+        } catch (e) {
+          console.warn('Widget idle capture error:', e);
         }
       }
 

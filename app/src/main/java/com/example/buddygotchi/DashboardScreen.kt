@@ -172,6 +172,12 @@ fun DashboardScreen(
     var buddyXp by remember {
         mutableIntStateOf(TaskManager.getBuddyXp(context))
     }
+    val liveBuddyXp by TaskManager.buddyXpState
+    LaunchedEffect(liveBuddyXp) {
+        if (buddyXp != liveBuddyXp) {
+            buddyXp = liveBuddyXp
+        }
+    }
     val buddyLevel = remember(buddyXp) { (buddyXp / 50) + 1 }
 
     val nextTask = remember(tasks) {

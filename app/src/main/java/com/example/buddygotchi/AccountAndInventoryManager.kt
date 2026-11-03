@@ -483,6 +483,7 @@ object AccountAndInventoryManager {
             Buddy3DManager.selectModel(context, entry.modelId, entry.characterIndex)
         }
         saveInventoryToPrefs(context)
+        BuddyWidgetFrameSequenceManager.onEquippedBuddyChanged(context)
         syncToCloudIfEnabled(context)
     }
 
@@ -495,6 +496,7 @@ object AccountAndInventoryManager {
             equippedItemIdsState.add(itemId)
         }
         saveInventoryToPrefs(context)
+        BuddyWidgetFrameSequenceManager.onEquippedBuddyChanged(context)
         syncToCloudIfEnabled(context)
     }
 

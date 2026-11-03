@@ -912,6 +912,7 @@ fun BuddyEyes(
     getTouchPosition: () -> Offset? = { null },
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val config = remember(size) { getEyeConfig(size) }
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
@@ -1060,6 +1061,7 @@ fun BuddyEyes(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) {
+                TaskManager.petBuddy(context)
                 coroutineScope.launch {
                     isBlinking = true
                     delay(130)

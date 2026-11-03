@@ -1,15 +1,34 @@
 package com.example.buddygotchi
 
 import android.content.Context
+import androidx.compose.runtime.mutableIntStateOf
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 object TaskManager {
 
     private const val PREFS_NAME = "buddygotchi_prefs"
     private const val KEY_TASKS = "saved_tasks"
     private const val KEY_BUDDY_XP = "buddy_xp"
+
+    // Configurable Petting XP settings (Default: 1 XP per pet, max 5 XP per day)
+    const val DEFAULT_XP_PER_PET = 1
+    const val DEFAULT_MAX_DAILY_PET_XP = 5
+    private const val KEY_XP_PER_PET = "xp_per_pet_config"
+    private const val KEY_MAX_DAILY_PET_XP = "max_daily_pet_xp_config"
+    private const val KEY_DAILY_PET_DATE = "daily_pet_date_str"
+    private const val KEY_DAILY_PET_XP_EARNED = "daily_pet_xp_earned"
+
+    val buddyXpState = mutableIntStateOf(0)
+    val dailyPetXpEarnedState = mutableIntStateOf(0)
+    val maxDailyPetXpState = mutableIntStateOf(DEFAULT_MAX_DAILY_PET_XP)
+
+    private fun todayDateKey(): String {
+        return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+    }
 
     fun getTasks(context: Context): List<ReminderTask> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -97,13 +116,92 @@ object TaskManager {
 
     fun getBuddyXp(context: Context): Int {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getInt(KEY_BUDDY_XP, 0)
+        val xp = prefs.getInt(KEY_BUDDY_XP, 0)
+        buddyXpState.intValue = xp
+        dailyPetXpEarnedState.intValue = getDailyPetXpEarned(context)
+        maxDailyPetXpState.intValue = getMaxDailyPetXp(context)
+        return xp
+    }
+
+    fun getXpPerPet(context: Context): Int {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getInt(KEY_XP_PER_PET, DEFAULT_XP_PER_PET).coerceAtLeast(1)
+    }
+
+    fun setXpPerPet(context: Context, xpPerPet: Int) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putInt(KEY_XP_PER_PET, xpPerPet.coerceAtLeast(1)).apply()
+    }
+
+    fun getMaxDailyPetXp(context: Context): Int {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val cap = prefs.getInt(KEY_MAX_DAILY_PET_XP, DEFAULT_MAX_DAILY_PET_XP).coerceAtLeast(0)
+        maxDailyPetXpState.intValue = cap
+        return cap
+    }
+
+    fun setMaxDailyPetXp(context: Context, maxDailyXp: Int) {
+        val safeCap = maxDailyXp.coerceAtLeast(0)
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putInt(KEY_MAX_DAILY_PET_XP, safeCap).apply()
+        maxDailyPetXpState.intValue = safeCap
+        BuddyTaskWidgetProvider.updateAllWidgets(context)
+    }
+
+    fun getDailyPetXpEarned(context: Context): Int {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val today = todayDateKey()
+        val savedDate = prefs.getString(KEY_DAILY_PET_DATE, null)
+        return if (savedDate != today) {
+            prefs.edit()
+                .putString(KEY_DAILY_PET_DATE, today)
+                .putInt(KEY_DAILY_PET_XP_EARNED, 0)
+                .apply()
+            dailyPetXpEarnedState.intValue = 0
+            0
+        } else {
+            val earned = prefs.getInt(KEY_DAILY_PET_XP_EARNED, 0).coerceAtLeast(0)
+            dailyPetXpEarnedState.intValue = earned
+            earned
+        }
+    }
+
+    /**
+     * Pets the Buddy and grants up to [getXpPerPet] (default 1 XP) per pet,
+     * capped at [getMaxDailyPetXp] (default 5 XP) per calendar day.
+     * Returns the actual XP granted (0 if daily cap reached).
+     */
+    fun petBuddy(context: Context): Int {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val today = todayDateKey()
+        val earnedToday = getDailyPetXpEarned(context)
+        val maxDaily = getMaxDailyPetXp(context)
+        val xpPerPet = getXpPerPet(context)
+
+        val remaining = (maxDaily - earnedToday).coerceAtLeast(0)
+        if (remaining <= 0) {
+            dailyPetXpEarnedState.intValue = earnedToday
+            BuddyTaskWidgetProvider.updateAllWidgets(context)
+            return 0
+        }
+
+        val granted = minOf(xpPerPet, remaining)
+        val newDailyTotal = earnedToday + granted
+        prefs.edit()
+            .putString(KEY_DAILY_PET_DATE, today)
+            .putInt(KEY_DAILY_PET_XP_EARNED, newDailyTotal)
+            .apply()
+        dailyPetXpEarnedState.intValue = newDailyTotal
+
+        addBuddyXp(context, granted)
+        return granted
     }
 
     fun addBuddyXp(context: Context, xpAmount: Int): Int {
-        val current = getBuddyXp(context) + xpAmount
+        val current = (getBuddyXp(context) + xpAmount).coerceAtLeast(0)
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putInt(KEY_BUDDY_XP, current).apply()
+        buddyXpState.intValue = current
         BuddyTaskWidgetProvider.updateAllWidgets(context)
         try {
             AccountAndInventoryManager.syncToCloudIfEnabled(context)
@@ -112,8 +210,10 @@ object TaskManager {
     }
 
     fun setBuddyXp(context: Context, xp: Int) {
+        val safeXp = xp.coerceAtLeast(0)
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putInt(KEY_BUDDY_XP, xp.coerceAtLeast(0)).apply()
+        prefs.edit().putInt(KEY_BUDDY_XP, safeXp).apply()
+        buddyXpState.intValue = safeXp
         BuddyTaskWidgetProvider.updateAllWidgets(context)
     }
 

@@ -37,8 +37,8 @@ class BuddyTaskWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == ACTION_PET_BUDDY) {
-            // Give 5 XP to Buddy when petted from home screen
-            TaskManager.addBuddyXp(context, 5)
+            // Give 1 XP per pet, capped at TaskManager.getMaxDailyPetXp(context) (default 5 XP/day)
+            TaskManager.petBuddy(context)
 
             // Optional light haptic buzz
             try {
@@ -61,6 +61,17 @@ class BuddyTaskWidgetProvider : AppWidgetProvider() {
     companion object {
         const val ACTION_PET_BUDDY = "com.example.buddygotchi.ACTION_PET_BUDDY"
 
+        private val FRAME_VIEW_IDS = intArrayOf(
+            R.id.widget_buddy_frame_0,
+            R.id.widget_buddy_frame_1,
+            R.id.widget_buddy_frame_2,
+            R.id.widget_buddy_frame_3,
+            R.id.widget_buddy_frame_4,
+            R.id.widget_buddy_frame_5,
+            R.id.widget_buddy_frame_6,
+            R.id.widget_buddy_frame_7
+        )
+
         fun updateAppWidget(
             context: Context,
             appWidgetManager: AppWidgetManager,
@@ -68,14 +79,36 @@ class BuddyTaskWidgetProvider : AppWidgetProvider() {
         ) {
             val views = RemoteViews(context.packageName, R.layout.widget_buddy_task)
 
-            // --- 1. BUDDY STATS (Left Column) ---
+            // --- 1. EQUIPPED BUDDY IDLE SEQUENCE & STATS (Left Column) ---
+            Buddy3DManager.ensureInitialized(context)
+            AccountAndInventoryManager.ensureInitialized(context)
+
+            val displayMode = Buddy3DManager.displayModeState.value
+            val buddyShortName = BuddyWidgetFrameSequenceManager.getEquippedBuddyShortName(context)
+
+            if (displayMode == BuddyDisplayMode.CLASSIC_2D) {
+                views.setViewVisibility(R.id.widget_buddy_eyes_flipper, android.view.View.VISIBLE)
+                views.setViewVisibility(R.id.widget_buddy_3d_flipper, android.view.View.GONE)
+            } else {
+                views.setViewVisibility(R.id.widget_buddy_eyes_flipper, android.view.View.GONE)
+                views.setViewVisibility(R.id.widget_buddy_3d_flipper, android.view.View.VISIBLE)
+                val frames = BuddyWidgetFrameSequenceManager.getOrGenerateIdleFrames(context)
+                for (i in FRAME_VIEW_IDS.indices) {
+                    if (i < frames.size) {
+                        views.setImageViewBitmap(FRAME_VIEW_IDS[i], frames[i])
+                    }
+                }
+            }
+
             val xp = TaskManager.getBuddyXp(context)
             val level = (xp / 50) + 1
             val progressInLevel = xp % 50
+            val dailyPetEarned = TaskManager.getDailyPetXpEarned(context)
+            val maxDailyPet = TaskManager.getMaxDailyPetXp(context)
 
-            views.setTextViewText(R.id.widget_buddy_level, "LVL $level BUDDY")
+            views.setTextViewText(R.id.widget_buddy_level, "LVL $level • $buddyShortName")
             views.setProgressBar(R.id.widget_buddy_xp_progress, 50, progressInLevel, false)
-            views.setTextViewText(R.id.widget_buddy_xp_text, "$progressInLevel / 50 XP")
+            views.setTextViewText(R.id.widget_buddy_xp_text, "$progressInLevel/50 XP • PET $dailyPetEarned/$maxDailyPet")
 
             // --- 2. NEXT AGENDA ITEM: TASK OR SQUAD EVENT (Right Column) ---
             val now = System.currentTimeMillis()

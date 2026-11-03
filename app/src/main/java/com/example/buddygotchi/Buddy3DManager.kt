@@ -151,6 +151,7 @@ object Buddy3DManager {
             .edit()
             .putString(KEY_DISPLAY_MODE, mode.name)
             .apply()
+        BuddyWidgetFrameSequenceManager.onEquippedBuddyChanged(context)
     }
 
     fun toggleDisplayMode(context: Context) {
@@ -177,6 +178,7 @@ object Buddy3DManager {
             .putString(KEY_ACTIVE_MODEL_ID, modelId)
             .putInt(KEY_ACTIVE_CHAR_INDEX, characterIndex)
             .apply()
+        BuddyWidgetFrameSequenceManager.onEquippedBuddyChanged(context)
     }
 
     fun selectCharacterIndex(context: Context, index: Int) {
@@ -186,6 +188,7 @@ object Buddy3DManager {
             .edit()
             .putInt(KEY_ACTIVE_CHAR_INDEX, index)
             .apply()
+        BuddyWidgetFrameSequenceManager.onEquippedBuddyChanged(context)
     }
 
     fun cycleCharacter(context: Context) {

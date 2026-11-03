@@ -76,7 +76,14 @@ private class Buddy3DJsBridge(
     @JavascriptInterface
     fun onBuddyPetted() {
         mainHandler.post {
-            TaskManager.addBuddyXp(context, 5)
+            TaskManager.petBuddy(context)
+        }
+    }
+
+    @JavascriptInterface
+    fun onIdleSequenceCaptured(modelKey: String, framesJson: String) {
+        mainHandler.post {
+            BuddyWidgetFrameSequenceManager.saveCapturedWebGLFrames(context, modelKey, framesJson)
         }
     }
 
@@ -303,7 +310,7 @@ fun Buddy3DView(
                         val elapsed = SystemClock.uptimeMillis() - downTime
                         if (totalDist < tapSlopPx && elapsed < 350L) {
                             webViewRef?.evaluateJavascript("if(window.petBuddy) window.petBuddy();", null)
-                            TaskManager.addBuddyXp(context, 5)
+                            TaskManager.petBuddy(context)
                         }
                     }
                 }
@@ -712,6 +719,72 @@ fun Buddy3DStudioDialog(
                                 }
                                 HorizontalDivider(color = Color(0xFF232323), thickness = 0.5.dp)
                             }
+                        }
+                    }
+                }
+
+                // Daily Petting XP Cap Info & Configurable Controls
+                val dailyPetEarned by TaskManager.dailyPetXpEarnedState
+                val maxDailyPet by TaskManager.maxDailyPetXpState
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF1A1A1A))
+                        .border(1.dp, Color(0xFF2C2C2C), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "DAILY PETTING XP CAP (+1 XP / PET)",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "TODAY: $dailyPetEarned / $maxDailyPet XP EARNED",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.5.sp,
+                            color = if (dailyPetEarned >= maxDailyPet) NothingRed else Color(0xFF00E676)
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF2A2A2A))
+                                .clickable {
+                                    TaskManager.setMaxDailyPetXp(context, (maxDailyPet - 1).coerceAtLeast(1))
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("-", fontFamily = FontFamily.Monospace, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                        Text(
+                            text = "$maxDailyPet XP",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF2A2A2A))
+                                .clickable {
+                                    TaskManager.setMaxDailyPetXp(context, (maxDailyPet + 1).coerceAtMost(50))
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("+", fontFamily = FontFamily.Monospace, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
                 }

@@ -130,6 +130,66 @@
 
         </ViewFlipper>
 
+        <!-- Looping 8-Frame Temporary Idle Image Sequence Flipper for Equipped 3D Buddy (Zero Battery Drain) -->
+        <ViewFlipper
+            android:id="@+id/widget_buddy_3d_flipper"
+            android:layout_width="104dp"
+            android:layout_height="62dp"
+            android:autoStart="true"
+            android:flipInterval="135"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/widget_buddy_frame_0"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:contentDescription="Equipped Buddy Idle Frame 1" />
+            <ImageView
+                android:id="@+id/widget_buddy_frame_1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:contentDescription="Equipped Buddy Idle Frame 2" />
+            <ImageView
+                android:id="@+id/widget_buddy_frame_2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:contentDescription="Equipped Buddy Idle Frame 3" />
+            <ImageView
+                android:id="@+id/widget_buddy_frame_3"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:contentDescription="Equipped Buddy Idle Frame 4" />
+            <ImageView
+                android:id="@+id/widget_buddy_frame_4"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:contentDescription="Equipped Buddy Idle Frame 5" />
+            <ImageView
+                android:id="@+id/widget_buddy_frame_5"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:contentDescription="Equipped Buddy Idle Frame 6" />
+            <ImageView
+                android:id="@+id/widget_buddy_frame_6"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:contentDescription="Equipped Buddy Idle Frame 7" />
+            <ImageView
+                android:id="@+id/widget_buddy_frame_7"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:contentDescription="Equipped Buddy Idle Frame 8" />
+
+        </ViewFlipper>
+
 
         <!-- Level Text -->
         <TextView
