@@ -129,7 +129,7 @@ private fun interceptBuddy3DRequest(context: Context, request: WebResourceReques
     val headers = mapOf(
         "Access-Control-Allow-Origin" to "*",
         "Access-Control-Allow-Methods" to "GET, OPTIONS",
-        "Cache-Control" to "no-cache"
+        "Cache-Control" to "public, max-age=604800"
     )
 
     try {
@@ -201,9 +201,32 @@ fun Buddy3DView(
         Buddy3DManager.ensureInitialized(context)
     }
 
-    DisposableEffect(Unit) {
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var isPageReady by remember { mutableStateOf(false) }
+    var loadedModelUrl by remember { mutableStateOf<String?>(null) }
+
+    val isRenderingActive by Buddy3DManager.isRenderingActiveState
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner, webViewRef, isPageReady) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                    if (isRenderingActive) {
+                        webViewRef?.evaluateJavascript("if(window.setRenderingActive) window.setRenderingActive(true);", null)
+                    }
+                }
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE, androidx.lifecycle.Lifecycle.Event.ON_STOP -> {
+                    webViewRef?.evaluateJavascript("if(window.setRenderingActive) window.setRenderingActive(false);", null)
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
             Buddy3DManager.isInteractingWith3DState.value = false
+            webViewRef?.evaluateJavascript("if(window.setRenderingActive) window.setRenderingActive(false);", null)
         }
     }
 
@@ -215,9 +238,15 @@ fun Buddy3DView(
     }
 
     val (viewportW, viewportH) = getBuddy3DViewportSize(size)
-    var webViewRef by remember { mutableStateOf<WebView?>(null) }
-    var isPageReady by remember { mutableStateOf(false) }
-    var loadedModelUrl by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(isPageReady, isRenderingActive) {
+        val wv = webViewRef ?: return@LaunchedEffect
+        if (!isPageReady) return@LaunchedEffect
+        wv.evaluateJavascript(
+            "if(window.setRenderingActive) window.setRenderingActive($isRenderingActive);",
+            null
+        )
+    }
 
     var centerInRoot by remember { mutableStateOf<Offset?>(null) }
     val activeTouch = getTouchPosition()
@@ -335,7 +364,7 @@ fun Buddy3DView(
                         domStorageEnabled = true
                         allowFileAccess = true
                         allowContentAccess = true
-                        cacheMode = WebSettings.LOAD_NO_CACHE
+                        cacheMode = WebSettings.LOAD_DEFAULT
                         mediaPlaybackRequiresUserGesture = false
                     }
 

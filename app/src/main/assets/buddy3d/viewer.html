@@ -675,7 +675,16 @@
         }
       }
 
-      function onModelLoaded(root, animations, initialCharIndex) {
+      // In-memory 3D model cache: modelUrl -> { root, animations }
+      const modelCache = new Map();
+
+      function onModelLoaded(root, animations, initialCharIndex, modelUrl) {
+        if (modelUrl && !modelCache.has(modelUrl)) {
+          modelCache.set(modelUrl, {
+            root: root,
+            animations: animations || root.animations || []
+          });
+        }
         clearCurrentModel();
         currentRoot = root;
         enhanceMaterials(root);
@@ -739,6 +748,17 @@
       }
 
       window.loadBuddyModel = function (modelUrl, formatHint, texBaseUrl, charIndex) {
+        if (modelCache.has(modelUrl)) {
+          const cached = modelCache.get(modelUrl);
+          if (currentRoot === cached.root) {
+            applyCharacterSelection(charIndex);
+            setStatus('', false);
+            return;
+          }
+          onModelLoaded(cached.root, cached.animations, charIndex, modelUrl);
+          return;
+        }
+
         setStatus('LOADING 3D BUDDY...', true);
         const ext = (formatHint || modelUrl.split('?')[0].split('.').pop() || '').toLowerCase();
         const manager = createLoadingManager(texBaseUrl);
@@ -752,17 +772,17 @@
           if (ext === 'fbx') {
             const loader = new THREE.FBXLoader(manager);
             loader.load(modelUrl, function (object) {
-              onModelLoaded(object, object.animations, charIndex);
+              onModelLoaded(object, object.animations, charIndex, modelUrl);
             }, undefined, handleError);
           } else if (ext === 'glb' || ext === 'gltf') {
             const loader = new THREE.GLTFLoader(manager);
             loader.load(modelUrl, function (gltf) {
-              onModelLoaded(gltf.scene, gltf.animations, charIndex);
+              onModelLoaded(gltf.scene, gltf.animations, charIndex, modelUrl);
             }, undefined, handleError);
           } else if (ext === 'obj') {
             const loader = new THREE.OBJLoader(manager);
             loader.load(modelUrl, function (object) {
-              onModelLoaded(object, [], charIndex);
+              onModelLoaded(object, [], charIndex, modelUrl);
             }, undefined, handleError);
           } else {
             setStatus('UNSUPPORTED FORMAT: ' + ext, true);
@@ -811,8 +831,32 @@
         triggerPetBounce();
       };
 
+      let isRenderingActive = true;
+      let animFrameId = null;
+
+      window.setRenderingActive = function (active) {
+        const willBeActive = !!active;
+        if (isRenderingActive === willBeActive) return;
+        isRenderingActive = willBeActive;
+        if (isRenderingActive) {
+          if (clock) clock.getDelta(); // Clear delta so no sudden animation jump
+          if (!animFrameId) {
+            animFrameId = requestAnimationFrame(animate);
+          }
+        } else {
+          if (animFrameId) {
+            cancelAnimationFrame(animFrameId);
+            animFrameId = null;
+          }
+        }
+      };
+
       function animate() {
-        requestAnimationFrame(animate);
+        if (!isRenderingActive) {
+          animFrameId = null;
+          return;
+        }
+        animFrameId = requestAnimationFrame(animate);
         const dt = Math.min(clock.getDelta(), 0.1);
         const elapsed = clock.getElapsedTime();
 
@@ -887,6 +931,7 @@
       }
 
       initEngine();
+      animFrameId = requestAnimationFrame(animate);
     })();
   </script>
 </body>

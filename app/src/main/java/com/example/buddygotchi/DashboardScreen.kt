@@ -150,6 +150,11 @@ fun DashboardScreen(
     val livePageFloat = pagerState.currentPage + pagerState.currentPageOffsetFraction
     val currentSnappedPage = livePageFloat.roundToInt().coerceIn(0, (pages.size - 1).coerceAtLeast(0))
     val isCurrentPageSquad = pages.getOrNull(currentSnappedPage)?.type == DashboardPageType.SQUAD
+    val isMainPageActive = pages.getOrNull(currentSnappedPage)?.type == DashboardPageType.MAIN
+
+    LaunchedEffect(isMainPageActive) {
+        Buddy3DManager.isRenderingActiveState.value = isMainPageActive
+    }
     var lastTickedPage by remember { mutableIntStateOf(initialPageIndex) }
     var hasInitializedSettled by remember { mutableStateOf(false) }
     LaunchedEffect(currentSnappedPage) {
@@ -471,6 +476,7 @@ fun DashboardScreen(
             // HorizontalPager holding Left Page, Main Dashboard, Right Page
             HorizontalPager(
                 state = pagerState,
+                beyondViewportPageCount = 2,
                 userScrollEnabled = !isEditMode && draggedIndex == null && !isChildPageDraggingWidget && !Buddy3DManager.isInteractingWith3DState.value,
                 modifier = Modifier
                     .weight(1f)

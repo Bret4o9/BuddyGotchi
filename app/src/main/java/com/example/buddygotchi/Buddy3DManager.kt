@@ -86,6 +86,9 @@ object Buddy3DManager {
     // True while the user is actively touching/dragging on the 3D Buddy viewport
     val isInteractingWith3DState = mutableStateOf(false)
 
+    // Controlled by DashboardScreen & Lifecycle to freeze WebGL rendering when off-screen or minimized
+    val isRenderingActiveState = mutableStateOf(true)
+
     fun ensureInitialized(context: Context) {
         if (isInitialized) return
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
