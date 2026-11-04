@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -1105,7 +1106,14 @@ fun ClockWidget(
                         if (isInputFocused) {
                             delay(100)
                             categoryScrollState.animateScrollTo(categoryScrollState.maxValue)
-                            bringIntoViewRequester.bringIntoView()
+                            bringIntoViewRequester.bringIntoView(
+                                Rect(
+                                    left = 0f,
+                                    top = -120f,
+                                    right = 1000f,
+                                    bottom = 500f
+                                )
+                            )
                         }
                     }
 
@@ -1297,7 +1305,14 @@ fun ClockWidget(
                                             coroutineScope.launch {
                                                 delay(120)
                                                 categoryScrollState.animateScrollTo(categoryScrollState.maxValue)
-                                                bringIntoViewRequester.bringIntoView()
+                                                bringIntoViewRequester.bringIntoView(
+                                                    Rect(
+                                                        left = 0f,
+                                                        top = -120f,
+                                                        right = 1000f,
+                                                        bottom = 500f
+                                                    )
+                                                )
                                             }
                                         }
                                     }
@@ -1397,6 +1412,10 @@ fun ClockWidget(
                                     color = MaterialTheme.colorScheme.onPrimary
                                 )
                             }
+                        }
+
+                        if (isInputFocused) {
+                            Spacer(modifier = Modifier.height(130.dp))
                         }
                     }
                 }

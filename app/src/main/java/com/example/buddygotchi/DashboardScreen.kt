@@ -337,7 +337,6 @@ fun DashboardScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .navigationBarsPadding()
-            .imePadding()
             .padding(bottom = 16.dp)
             .pointerInput(Unit) {
                 try {
