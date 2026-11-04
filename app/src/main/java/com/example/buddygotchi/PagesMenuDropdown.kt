@@ -126,50 +126,45 @@ fun PagesMenuDropdown(
     var newPageButtonTopInRoot by remember { mutableFloatStateOf(0f) }
     var newPageButtonBottomInRoot by remember { mutableFloatStateOf(0f) }
 
-    val activeDragY = if (isDropping) dropAnimOffsetY.value else dragOffsetY
     val itemHeight = 54.dp
     val itemGap = 6.dp
     val itemSlotPx = with(density) { (itemHeight + itemGap).toPx() }
 
-    val isHoveringOverDelete by remember {
+    val isHoveringOverDelete by remember(pages) {
         derivedStateOf {
-            val d = draggedIndex
-            if (d == null) {
-                false
-            } else {
-                val page = pages.getOrNull(d)
-                if (page == null || !page.canDelete) {
-                    false
-                } else {
-                    // Check relative slot offset (always reliable)
-                    val distanceToLastSlot = (pages.size - 1 - d) * itemSlotPx
-                    val isPastLastSlot = dragOffsetY >= distanceToLastSlot + with(density) { 15.dp.toPx() }
+            val d = draggedIndex ?: return@derivedStateOf false
+            val page = pages.getOrNull(d) ?: return@derivedStateOf false
+            if (!page.canDelete) return@derivedStateOf false
 
-                    // Also verify root coordinates when measured
-                    val rootCheck = if (newPageButtonBottomInRoot > 0f) {
-                        val touchY = dragStartItemTopInRoot + dragStartTouchOffsetY + dragOffsetY
-                        val itemCenterY = dragStartItemTopInRoot + (draggedItemHeightPx / 2f) + dragOffsetY
-                        (touchY >= newPageButtonTopInRoot - with(density) { 16.dp.toPx() } &&
-                         touchY <= newPageButtonBottomInRoot + with(density) { 40.dp.toPx() }) ||
-                        (itemCenterY >= newPageButtonTopInRoot - with(density) { 12.dp.toPx() } &&
-                         itemCenterY <= newPageButtonBottomInRoot + with(density) { 30.dp.toPx() })
-                    } else false
+            val currentY = if (isDropping) dropAnimOffsetY.value else dragOffsetY
 
-                    isPastLastSlot || rootCheck
-                }
-            }
+            // Relative slot offset check
+            val distanceToLastSlot = (pages.size - 1 - d) * itemSlotPx
+            val isPastLastSlot = currentY >= distanceToLastSlot + with(density) { 35.dp.toPx() }
+
+            // Root coordinates check when button is measured
+            val rootCheck = if (newPageButtonBottomInRoot > 0f) {
+                val touchY = dragStartItemTopInRoot + dragStartTouchOffsetY + currentY
+                val itemCenterY = dragStartItemTopInRoot + (draggedItemHeightPx / 2f) + currentY
+                (touchY >= newPageButtonTopInRoot - with(density) { 16.dp.toPx() } &&
+                 touchY <= newPageButtonBottomInRoot + with(density) { 40.dp.toPx() }) ||
+                (itemCenterY >= newPageButtonTopInRoot - with(density) { 12.dp.toPx() } &&
+                 itemCenterY <= newPageButtonBottomInRoot + with(density) { 30.dp.toPx() })
+            } else false
+
+            isPastLastSlot || rootCheck
         }
     }
 
-    val currentTargetIndex by remember {
+    val currentTargetIndex by remember(pages) {
         derivedStateOf {
             if (isHoveringOverDelete) {
                 null
             } else {
-                draggedIndex?.let { d ->
-                    val offsetSlots = (activeDragY / itemSlotPx).roundToInt()
-                    (d + offsetSlots).coerceIn(0, pages.size - 1)
-                }
+                val d = draggedIndex ?: return@derivedStateOf null
+                val currentY = if (isDropping) dropAnimOffsetY.value else dragOffsetY
+                val offsetSlots = (currentY / itemSlotPx).roundToInt()
+                (d + offsetSlots).coerceIn(0, pages.size - 1)
             }
         }
     }
@@ -363,8 +358,6 @@ fun PagesMenuDropdown(
                                         label = "disp_${page.id}"
                                     )
 
-                                    val effectiveOffsetY = if (isThisItemDragged) activeDragY else animatedDisplacement
-
                                     val itemScale by animateFloatAsState(
                                         targetValue = if (isThisItemDragged) 1.03f else 1f,
                                         animationSpec = spring(
@@ -413,7 +406,14 @@ fun PagesMenuDropdown(
                                                 }
                                             }
                                             .zIndex(if (isThisItemDragged) 100f else 1f)
-                                            .offset { IntOffset(0, effectiveOffsetY.roundToInt()) }
+                                            .offset {
+                                                val y = if (isThisItemDragged) {
+                                                    if (isDropping) dropAnimOffsetY.value else dragOffsetY
+                                                } else {
+                                                    animatedDisplacement
+                                                }
+                                                IntOffset(0, y.roundToInt())
+                                            }
                                             .graphicsLayer {
                                                 scaleX = itemScale
                                                 scaleY = itemScale
@@ -449,9 +449,15 @@ fun PagesMenuDropdown(
                                                         onDrag = { change, dragAmount ->
                                                             change.consume()
                                                             // Constrain dragging strictly within the pages container:
-                                                            // Cannot drag above slot 0, and cannot drag below the delete button
+                                                            // - Default pages can only move within the page slots (0 to pages.size - 1)
+                                                            // - Non-default pages can also drag down over the delete button (+95dp)
+                                                            val isDeletable = page.canDelete
                                                             val minDragY = -(index * itemSlotPx)
-                                                            val maxDragY = (pages.size - 1 - index) * itemSlotPx + with(density) { 56.dp.toPx() }
+                                                            val maxDragY = if (isDeletable) {
+                                                                (pages.size - 1 - index) * itemSlotPx + with(density) { 95.dp.toPx() }
+                                                            } else {
+                                                                (pages.size - 1 - index) * itemSlotPx
+                                                            }
                                                             dragOffsetY = (dragOffsetY + dragAmount.y).coerceIn(minDragY, maxDragY)
                                                         },
                                                         onDragEnd = {
