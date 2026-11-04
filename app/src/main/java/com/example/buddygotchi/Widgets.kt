@@ -1160,19 +1160,10 @@ fun BuddyWidget(
         Buddy3DManager.ensureInitialized(context)
     }
     val displayMode by Buddy3DManager.displayModeState
-    val activeCharIndex by Buddy3DManager.activeCharacterIndexState
-    val detectedChars = Buddy3DManager.detectedCharactersState
     var show3DStudioDialog by remember { mutableStateOf(false) }
-    var showInventoryDialog by remember { mutableStateOf(false) }
 
     if (show3DStudioDialog) {
         Buddy3DStudioDialog(onDismiss = { show3DStudioDialog = false })
-    }
-    if (showInventoryDialog) {
-        AccountAndLegalHubDialog(
-            initialTab = AccountHubTab.INVENTORY,
-            onDismiss = { showInventoryDialog = false }
-        )
     }
 
     WidgetCard(
@@ -1181,92 +1172,22 @@ fun BuddyWidget(
         size = size,
         modifier = modifier,
         headerAction = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFF1F1F1F))
+                    .border(0.8.dp, Color(0xFF3A3A3A), RoundedCornerShape(6.dp))
+                    .clickable { show3DStudioDialog = true }
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .semantics { contentDescription = "Open Buddy Studio" }
             ) {
-                if (size.cols >= 2 && displayMode == BuddyDisplayMode.THREE_D && detectedChars.size > 1) {
-                    val charLabel = remember(activeCharIndex, detectedChars.size) {
-                        Buddy3DManager.getActiveCharacterLabel()
-                    }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF1F1F1F))
-                            .border(0.8.dp, Color(0xFF3A3A3A), RoundedCornerShape(6.dp))
-                            .clickable { Buddy3DManager.cycleCharacter(context) }
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "$charLabel ↻",
-                            fontSize = 8.5.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                }
-
-                if (size.cols >= 2) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF1F1F1F))
-                            .border(0.8.dp, Color(0xFF3A3A3A), RoundedCornerShape(6.dp))
-                            .clickable { showInventoryDialog = true }
-                            .padding(horizontal = 5.dp, vertical = 2.dp)
-                            .semantics { contentDescription = "Open Companion Pets and Items Inventory" }
-                    ) {
-                        Text(
-                            text = "ITEMS",
-                            fontSize = 8.5.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF1F1F1F))
-                            .border(0.8.dp, Color(0xFF3A3A3A), RoundedCornerShape(6.dp))
-                            .clickable { show3DStudioDialog = true }
-                            .padding(horizontal = 5.dp, vertical = 2.dp)
-                            .semantics { contentDescription = "Open 3D Companion Studio and Model Selector" }
-                    ) {
-                        Text(
-                            text = "MODELS",
-                            fontSize = 8.5.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-                }
-
-                // 2D / 3D Mode Switcher Pill
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(
-                            if (displayMode == BuddyDisplayMode.THREE_D) NothingRed else Color(0xFF222222)
-                        )
-                        .border(
-                            0.8.dp,
-                            if (displayMode == BuddyDisplayMode.THREE_D) NothingRed else Color(0xFF444444),
-                            RoundedCornerShape(6.dp)
-                        )
-                        .clickable { Buddy3DManager.toggleDisplayMode(context) }
-                        .padding(horizontal = if (size.cols == 1) 4.dp else 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = if (displayMode == BuddyDisplayMode.THREE_D) "3D" else "2D",
-                        fontSize = if (size.cols == 1) 8.sp else 8.5.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                Text(
+                    text = "Buddy Studio",
+                    fontSize = 8.5.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.secondary
+                )
             }
         }
     ) {

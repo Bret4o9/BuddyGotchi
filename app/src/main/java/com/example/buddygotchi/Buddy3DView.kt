@@ -1,4 +1,4 @@
-package com.example.buddygotchi
+﻿package com.example.buddygotchi
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -17,6 +17,7 @@ import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,6 +26,9 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
@@ -36,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -43,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -423,29 +429,15 @@ fun Buddy3DStudioDialog(
     val context = LocalContext.current
     LaunchedEffect(Unit) {
         Buddy3DManager.ensureInitialized(context)
+        AccountAndInventoryManager.ensureInitialized(context)
     }
 
     val displayMode by Buddy3DManager.displayModeState
     val activeModelId by Buddy3DManager.activeModelIdState
     val activeCharIndex by Buddy3DManager.activeCharacterIndexState
-    val detectedChars = Buddy3DManager.detectedCharactersState
-    val allModels = remember(Buddy3DManager.customModelsState.size) {
-        Buddy3DManager.getAllModels(context)
-    }
+    val equippedPetId by AccountAndInventoryManager.equippedPetIdState
 
-    var importStatusMsg by remember { mutableStateOf<String?>(null) }
-
-    val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            val res = Buddy3DManager.importModelFile(context, uri)
-            importStatusMsg = res.fold(
-                onSuccess = { "IMPORTED: ${it.title} (${it.format.uppercase()})" },
-                onFailure = { "ERROR: ${it.message}" }
-            )
-        }
-    }
+    val pets = remember { AccountAndInventoryManager.petCatalog }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -473,7 +465,7 @@ fun Buddy3DStudioDialog(
                 ) {
                     Column {
                         Text(
-                            text = "BUDDY 3D STUDIO",
+                            text = "BUDDY STUDIO",
                             fontFamily = FontFamily.Monospace,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
@@ -481,7 +473,7 @@ fun Buddy3DStudioDialog(
                             color = Color.White
                         )
                         Text(
-                            text = "SELECT 2D / 3D COMPANION & CHARACTER",
+                            text = "SELECT 2D / 3D COMPANION",
                             fontFamily = FontFamily.Monospace,
                             fontSize = 9.sp,
                             color = Color(0xFF8E8E8E)
@@ -515,14 +507,17 @@ fun Buddy3DStudioDialog(
                             .weight(1f)
                             .clip(RoundedCornerShape(9.dp))
                             .background(if (is2D) NothingRed else Color.Transparent)
-                            .clickable { Buddy3DManager.setDisplayMode(context, BuddyDisplayMode.CLASSIC_2D) }
+                            .clickable {
+                                Buddy3DManager.setDisplayMode(context, BuddyDisplayMode.CLASSIC_2D)
+                                AccountAndInventoryManager.equipPet(context, "pet_2d_classic")
+                            }
                             .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "2D CLASSIC EYES",
+                            text = " 2D Buddy ",
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
+                            fontSize = 10.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (is2D) Color.White else Color(0xFF9E9E9E)
                         )
@@ -532,14 +527,19 @@ fun Buddy3DStudioDialog(
                             .weight(1f)
                             .clip(RoundedCornerShape(9.dp))
                             .background(if (!is2D) NothingRed else Color.Transparent)
-                            .clickable { Buddy3DManager.setDisplayMode(context, BuddyDisplayMode.THREE_D) }
+                            .clickable {
+                                Buddy3DManager.setDisplayMode(context, BuddyDisplayMode.THREE_D)
+                                if (equippedPetId == "pet_2d_classic") {
+                                    AccountAndInventoryManager.equipPet(context, "pet_ssrb_greybie")
+                                }
+                            }
                             .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "3D ANIMATED BUDDY",
+                            text = "3D Buddy",
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
+                            fontSize = 10.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (!is2D) Color.White else Color(0xFF9E9E9E)
                         )
@@ -550,7 +550,7 @@ fun Buddy3DStudioDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(170.dp)
+                        .height(150.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFF181818))
                         .border(1.dp, Color(0xFF2A2A2A), RoundedCornerShape(16.dp)),
@@ -575,253 +575,88 @@ fun Buddy3DStudioDialog(
                     )
                 }
 
-                // 3. Multi-Character Scene Selector (e.g. Greybie, Camoue, Boitan, Trio)
-                if (displayMode == BuddyDisplayMode.THREE_D && detectedChars.size > 1) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "SCENE CHARACTERS (${detectedChars.size} IN FILE)",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 9.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFAAAAAA)
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            detectedChars.forEachIndexed { idx, charName ->
-                                val selected = activeCharIndex == idx
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (selected) NothingRed else Color(0xFF1E1E1E))
-                                        .border(
-                                            1.dp,
-                                            if (selected) NothingRed else Color(0xFF333333),
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .clickable { Buddy3DManager.selectCharacterIndex(context, idx) }
-                                        .padding(vertical = 7.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = charName.uppercase(),
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 9.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                // 3. Buddy Selection Grid (3x3 visible, scrollable up and down)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "BUDDY CATALOG",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFAAAAAA)
+                    )
+
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(pets) { pet ->
+                            val isSelected = when (pet.displayMode) {
+                                BuddyDisplayMode.CLASSIC_2D -> displayMode == BuddyDisplayMode.CLASSIC_2D
+                                BuddyDisplayMode.THREE_D -> {
+                                    displayMode == BuddyDisplayMode.THREE_D &&
+                                        activeModelId == pet.modelId &&
+                                        activeCharIndex == pet.characterIndex
                                 }
                             }
-                            val allSelected = activeCharIndex == -1
-                            Box(
+
+                            val thumbnail = remember(pet.id) {
+                                BuddyWidgetFrameSequenceManager.getBaseBuddyThumbnail(pet.id)
+                            }
+
+                            val buddyDisplayName = remember(pet.id) {
+                                when (pet.id) {
+                                    "pet_2d_classic" -> "2D Classic"
+                                    "pet_buddybot_cc0" -> "BuddyBot"
+                                    "pet_ssrb_greybie" -> "Greybie"
+                                    "pet_ssrb_camoue" -> "Camoue"
+                                    "pet_ssrb_boitan" -> "Boitan"
+                                    "pet_ssrb_trio" -> "Trio"
+                                    else -> pet.name.replace(" (3D)", "").trim()
+                                }
+                            }
+
+                            Column(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (allSelected) NothingRed else Color(0xFF1E1E1E))
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isSelected) NothingRed.copy(alpha = 0.16f) else Color(0xFF191919))
                                     .border(
-                                        1.dp,
-                                        if (allSelected) NothingRed else Color(0xFF333333),
-                                        RoundedCornerShape(8.dp)
+                                        width = if (isSelected) 1.5.dp else 0.8.dp,
+                                        color = if (isSelected) NothingRed else Color(0xFF2C2C2C),
+                                        shape = RoundedCornerShape(12.dp)
                                     )
-                                    .clickable { Buddy3DManager.selectCharacterIndex(context, -1) }
-                                    .padding(vertical = 7.dp),
-                                contentAlignment = Alignment.Center
+                                    .clickable {
+                                        AccountAndInventoryManager.equipPet(context, pet.id)
+                                    }
+                                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
                             ) {
+                                Image(
+                                    bitmap = thumbnail.asImageBitmap(),
+                                    contentDescription = buddyDisplayName,
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                )
+                                Spacer(modifier = Modifier.height(5.dp))
                                 Text(
-                                    text = "ALL ${detectedChars.size}",
+                                    text = buddyDisplayName,
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 9.5.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = if (isSelected) Color.White else Color(0xFFCCCCCC),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center
                                 )
                             }
-                        }
-                    }
-                }
-
-                // 4. Model Library (Local file importer hidden while SHOW_LOCAL_IMPORT_UI == false)
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "3D CHARACTER MODELS",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 9.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFAAAAAA)
-                        )
-                        if (SHOW_LOCAL_IMPORT_UI) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(NothingRed.copy(alpha = 0.16f))
-                                    .border(1.dp, NothingRed, RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        filePickerLauncher.launch(arrayOf("*/*"))
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = "+ IMPORT 3D / ZIP",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = NothingRed
-                                )
-                            }
-                        }
-                    }
-
-                    if (SHOW_LOCAL_IMPORT_UI && importStatusMsg != null) {
-                        Text(
-                            text = importStatusMsg!!,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 9.sp,
-                            color = NothingRed
-                        )
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFF181818),
-                        border = BorderStroke(1.dp, Color(0xFF2B2B2B)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 130.dp)
-                    ) {
-                        LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                            items(allModels) { model ->
-                                val isSelected = model.id == activeModelId
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            Buddy3DManager.selectModel(context, model.id, 0)
-                                            Buddy3DManager.setDisplayMode(context, BuddyDisplayMode.THREE_D)
-                                        }
-                                        .padding(horizontal = 12.dp, vertical = 9.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(7.dp)
-                                                .clip(CircleShape)
-                                                .background(if (isSelected) NothingRed else Color(0xFF555555))
-                                        )
-                                        Column {
-                                            Text(
-                                                text = model.title,
-                                                fontFamily = FontFamily.Monospace,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isSelected) Color.White else Color(0xFFCCCCCC)
-                                            )
-                                            Text(
-                                                text = model.subtitle,
-                                                fontFamily = FontFamily.Monospace,
-                                                fontSize = 8.5.sp,
-                                                color = Color(0xFF888888)
-                                            )
-                                        }
-                                    }
-
-                                    if (!model.isBuiltIn && SHOW_LOCAL_IMPORT_UI) {
-                                        Text(
-                                            text = "DEL",
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = NothingRed,
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .clickable {
-                                                    Buddy3DManager.deleteCustomModel(context, model.id)
-                                                }
-                                                .padding(horizontal = 6.dp, vertical = 3.dp)
-                                        )
-                                    }
-                                }
-                                HorizontalDivider(color = Color(0xFF232323), thickness = 0.5.dp)
-                            }
-                        }
-                    }
-                }
-
-                // Daily Petting XP Cap Info & Configurable Controls
-                val dailyPetEarned by TaskManager.dailyPetXpEarnedState
-                val maxDailyPet by TaskManager.maxDailyPetXpState
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF1A1A1A))
-                        .border(1.dp, Color(0xFF2C2C2C), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 12.dp, vertical = 9.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "DAILY PETTING XP CAP (+1 XP / PET)",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 9.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "TODAY: $dailyPetEarned / $maxDailyPet XP EARNED",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 8.5.sp,
-                            color = if (dailyPetEarned >= maxDailyPet) NothingRed else Color(0xFF00E676)
-                        )
-                    }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF2A2A2A))
-                                .clickable {
-                                    TaskManager.setMaxDailyPetXp(context, (maxDailyPet - 1).coerceAtLeast(1))
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("-", fontFamily = FontFamily.Monospace, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                        Text(
-                            text = "$maxDailyPet XP",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF2A2A2A))
-                                .clickable {
-                                    TaskManager.setMaxDailyPetXp(context, (maxDailyPet + 1).coerceAtMost(50))
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("+", fontFamily = FontFamily.Monospace, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
                 }
