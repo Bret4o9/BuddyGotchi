@@ -1,4 +1,4 @@
-﻿package com.example.buddygotchi
+package com.example.buddygotchi
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -437,7 +437,10 @@ fun Buddy3DStudioDialog(
     val activeCharIndex by Buddy3DManager.activeCharacterIndexState
     val equippedPetId by AccountAndInventoryManager.equippedPetIdState
 
-    val pets = remember { AccountAndInventoryManager.petCatalog }
+    // Filter pets based on active mode (2D Buddy shows 2D pets only; 3D Buddy shows 3D pets only)
+    val filteredPets = remember(displayMode) {
+        AccountAndInventoryManager.petCatalog.filter { it.displayMode == displayMode }
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -596,7 +599,7 @@ fun Buddy3DStudioDialog(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(pets) { pet ->
+                        items(filteredPets) { pet ->
                             val isSelected = when (pet.displayMode) {
                                 BuddyDisplayMode.CLASSIC_2D -> displayMode == BuddyDisplayMode.CLASSIC_2D
                                 BuddyDisplayMode.THREE_D -> {
@@ -606,8 +609,8 @@ fun Buddy3DStudioDialog(
                                 }
                             }
 
-                            val thumbnail = remember(pet.id) {
-                                BuddyWidgetFrameSequenceManager.getBaseBuddyThumbnail(pet.id)
+                            val screenshot = remember(pet.id) {
+                                Buddy3DManager.getBuddyScreenshotBitmap(context, pet.id)
                             }
 
                             val buddyDisplayName = remember(pet.id) {
@@ -638,13 +641,31 @@ fun Buddy3DStudioDialog(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
                             ) {
-                                Image(
-                                    bitmap = thumbnail.asImageBitmap(),
-                                    contentDescription = buddyDisplayName,
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                )
+                                if (screenshot != null) {
+                                    Image(
+                                        bitmap = screenshot.asImageBitmap(),
+                                        contentDescription = buddyDisplayName,
+                                        modifier = Modifier
+                                            .size(52.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(52.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0xFF222222)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = buddyDisplayName.take(2).uppercase(),
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
                                 Spacer(modifier = Modifier.height(5.dp))
                                 Text(
                                     text = buddyDisplayName,

@@ -1,6 +1,7 @@
 package com.example.buddygotchi
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -778,16 +780,25 @@ private fun InventoryTabContent(
             }
         }
 
+        val displayMode by Buddy3DManager.displayModeState
+        val filteredPets = remember(displayMode) {
+            AccountAndInventoryManager.petCatalog.filter { it.displayMode == displayMode }
+        }
+
         // 1. Companion Pets Section
         Text(
-            text = "COMPANION PETS (${unlockedPets.size}/${AccountAndInventoryManager.petCatalog.size} UNLOCKED)",
+            text = if (displayMode == BuddyDisplayMode.CLASSIC_2D) {
+                "2D COMPANION PETS (${filteredPets.count { it.id in unlockedPets || level >= it.requiredLevel }}/${filteredPets.size} UNLOCKED)"
+            } else {
+                "3D COMPANION PETS (${filteredPets.count { it.id in unlockedPets || level >= it.requiredLevel }}/${filteredPets.size} UNLOCKED)"
+            },
             fontFamily = FontFamily.Monospace,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             color = NothingTextSecondary
         )
 
-        AccountAndInventoryManager.petCatalog.forEach { pet ->
+        filteredPets.forEach { pet ->
             val isUnlocked = pet.id in unlockedPets || level >= pet.requiredLevel
             val isEquipped = equippedPetId == pet.id
 
@@ -804,6 +815,20 @@ private fun InventoryTabContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val screenshot = remember(pet.id) {
+                        Buddy3DManager.getBuddyScreenshotBitmap(context, pet.id)
+                    }
+                    if (screenshot != null) {
+                        Image(
+                            bitmap = screenshot.asImageBitmap(),
+                            contentDescription = pet.name,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                    }
+
                     Column(modifier = Modifier.weight(1f)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,

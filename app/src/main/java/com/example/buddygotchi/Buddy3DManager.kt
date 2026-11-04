@@ -1,6 +1,8 @@
 package com.example.buddygotchi
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.compose.runtime.mutableIntStateOf
@@ -361,5 +363,31 @@ object Buddy3DManager {
             name = uri.path?.substringAfterLast('/')
         }
         return name
+    }
+
+    /**
+     * Loads the static screenshot icon for the given companion pet from the app's assets/buddies/ folder.
+     * This provides direct asset-backed icons created from character screenshots without runtime generation.
+     * Also checks filesDir/buddies/ for future user-generated content (UGC).
+     */
+    fun getBuddyScreenshotBitmap(context: Context, petId: String): Bitmap? {
+        // 1. Check bundled assets in buddies/ folder (program assets)
+        try {
+            context.assets.open("buddies/$petId.png").use { stream ->
+                val bmp = BitmapFactory.decodeStream(stream)
+                if (bmp != null) return bmp
+            }
+        } catch (_: Exception) {}
+
+        // 2. Check local user-generated storage in buddies/ folder for future UGC
+        try {
+            val ugcFile = File(context.filesDir, "buddies/$petId.png")
+            if (ugcFile.exists()) {
+                val bmp = BitmapFactory.decodeFile(ugcFile.absolutePath)
+                if (bmp != null) return bmp
+            }
+        } catch (_: Exception) {}
+
+        return null
     }
 }
