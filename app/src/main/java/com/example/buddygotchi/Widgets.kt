@@ -324,24 +324,26 @@ fun TodayWidget(
                         }
                     }
                 } else {
+                    val todayCal = remember(tasks) { Calendar.getInstance().apply { time = Date() } }
+                    val todayYear = todayCal.get(Calendar.YEAR)
+                    val todayDayOfYear = todayCal.get(Calendar.DAY_OF_YEAR)
+
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(tasks, key = { it.id }) { task ->
-                            val todayCal = Calendar.getInstance().apply { time = Date() }
-                            val taskCal = Calendar.getInstance().apply { time = task.taskTime }
-
-                            val isToday = todayCal.get(Calendar.YEAR) == taskCal.get(Calendar.YEAR) &&
-                                    todayCal.get(Calendar.DAY_OF_YEAR) == taskCal.get(Calendar.DAY_OF_YEAR)
-
-                            val isTomorrow = todayCal.get(Calendar.YEAR) == taskCal.get(Calendar.YEAR) &&
-                                    todayCal.get(Calendar.DAY_OF_YEAR) + 1 == taskCal.get(Calendar.DAY_OF_YEAR)
-
-                            val dayLabel = when {
-                                isToday -> ""
-                                isTomorrow -> "Tomorrow "
-                                else -> "${dateFormat.format(task.taskTime)} "
+                            val dayLabel = remember(task.taskTime, todayYear, todayDayOfYear) {
+                                val taskCal = Calendar.getInstance().apply { time = task.taskTime }
+                                val taskYear = taskCal.get(Calendar.YEAR)
+                                val taskDay = taskCal.get(Calendar.DAY_OF_YEAR)
+                                val isToday = todayYear == taskYear && todayDayOfYear == taskDay
+                                val isTomorrow = todayYear == taskYear && todayDayOfYear + 1 == taskDay
+                                when {
+                                    isToday -> ""
+                                    isTomorrow -> "Tomorrow "
+                                    else -> "${dateFormat.format(task.taskTime)} "
+                                }
                             }
 
                             Row(

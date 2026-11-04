@@ -844,9 +844,12 @@ fun InteractiveWaterGlass(
     var liquidAngularVel by remember { mutableFloatStateOf(0f) }
     var waveAmplitude by remember { mutableFloatStateOf(0f) }
     var wavePhase by remember { mutableFloatStateOf(0f) }
+    var physicsWakeToken by remember { mutableIntStateOf(0) }
 
-    // Register Accelerometer Listener
-    DisposableEffect(Unit) {
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+
+    // Register Accelerometer Listener only while Lifecycle is RESUMED
+    DisposableEffect(lifecycleOwner) {
         val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         val accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
@@ -857,30 +860,49 @@ fun InteractiveWaterGlass(
                 val ay = event.values[1] // tilt pitch up/down
 
                 val angleRad = atan2(ax, ay).coerceIn(-0.85f, 0.85f)
-                targetSensorAngle = angleRad
+                // Ignore micro-jitter sensor noise when resting on a flat surface
+                if (abs(angleRad - targetSensorAngle) > 0.015f) {
+                    targetSensorAngle = angleRad
+                    physicsWakeToken++
+                }
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
         }
 
-        if (sensorManager != null && accelerometer != null) {
-            sensorManager.registerListener(listener, accelerometer, SensorManager.SENSOR_DELAY_GAME)
+        val lifecycleObserver = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                    if (sensorManager != null && accelerometer != null) {
+                        sensorManager.registerListener(listener, accelerometer, SensorManager.SENSOR_DELAY_UI)
+                    }
+                }
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE,
+                androidx.lifecycle.Lifecycle.Event.ON_STOP -> {
+                    sensorManager?.unregisterListener(listener)
+                }
+                else -> {}
+            }
         }
 
+        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
+
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
             sensorManager?.unregisterListener(listener)
         }
     }
 
-    // Main 60FPS Physics Simulation Loop (Harmonic Spring-Damper for realistic fluid sloshing)
-    LaunchedEffect(isPouring) {
+    // Harmonic Spring-Damper Physics Loop — automatically sleeps when liquid settles
+    LaunchedEffect(isPouring, physicsWakeToken) {
         var lastTimeNanos = 0L
         if (isPouring) {
             waveAmplitude = 12f
             liquidAngularVel += (Random.nextFloat() - 0.5f) * 1.5f
         }
 
-        while (isActive) {
+        var keepSimulating = true
+        while (isActive && keepSimulating) {
             withFrameNanos { nowNanos ->
                 if (lastTimeNanos == 0L) {
                     lastTimeNanos = nowNanos
@@ -903,18 +925,36 @@ fun InteractiveWaterGlass(
                 val disturbance = abs(angularAccel) * 0.04f + abs(liquidAngularVel) * 1.2f
                 waveAmplitude = (waveAmplitude * (1f - dt * 2.5f) + disturbance * 0.15f).coerceIn(0f, 15f)
                 wavePhase += dt * 9f
+
+                if (!isPouring &&
+                    abs(liquidAngle - effectiveTargetAngle) < 0.004f &&
+                    abs(liquidAngularVel) < 0.008f &&
+                    waveAmplitude < 0.05f
+                ) {
+                    liquidAngle = effectiveTargetAngle
+                    liquidAngularVel = 0f
+                    waveAmplitude = 0f
+                    keepSimulating = false
+                }
             }
         }
     }
 
     val dragModifier = Modifier.pointerInput(Unit) {
         detectDragGestures(
-            onDragEnd = { touchTiltOffset = 0f },
-            onDragCancel = { touchTiltOffset = 0f },
+            onDragEnd = {
+                touchTiltOffset = 0f
+                physicsWakeToken++
+            },
+            onDragCancel = {
+                touchTiltOffset = 0f
+                physicsWakeToken++
+            },
             onDrag = { change, dragAmount ->
                 change.consume()
                 touchTiltOffset = (touchTiltOffset + dragAmount.x * 0.004f).coerceIn(-0.6f, 0.6f)
                 waveAmplitude = (waveAmplitude + abs(dragAmount.x) * 0.15f).coerceIn(0f, 15f)
+                physicsWakeToken++
             }
         )
     }
@@ -928,6 +968,26 @@ fun InteractiveWaterGlass(
                 wobblePhase = index * 1.3f
             )
         }
+    }
+
+    val outerPath = remember { Path() }
+    val innerGlassPath = remember { Path() }
+    val waterPath = remember { Path() }
+    val meniscusLine = remember { Path() }
+    val etchedTicks = remember { floatArrayOf(0.25f, 0.50f, 0.75f, 1.00f) }
+    val waterGradientColors = remember {
+        listOf(
+            Color(0xD900E5FF),
+            Color(0xB30091EA),
+            Color(0x99003366)
+        )
+    }
+    val streamGradientColors = remember {
+        listOf(
+            Color(0x0000E5FF),
+            Color(0xFF00E5FF),
+            Color(0xFFE0F7FA)
+        )
     }
 
     val infiniteTransition = rememberInfiniteTransition(label = "glassAnimation")
@@ -986,7 +1046,8 @@ fun InteractiveWaterGlass(
         val baseThickness = 6.dp.toPx() * scaleFactor
         val cornerRadius = 12.dp.toPx() * scaleFactor
 
-        val outerPath = Path().apply {
+        outerPath.reset()
+        outerPath.apply {
             moveTo(topLeftX, glassTopY)
             lineTo(topRightX, glassTopY)
             lineTo(bottomRightX, glassBottomY - cornerRadius)
@@ -1004,7 +1065,8 @@ fun InteractiveWaterGlass(
         val innerBottomRightX = bottomRightX - wallThickness
         val innerCornerRadius = (cornerRadius - wallThickness).coerceAtLeast(2.dp.toPx())
 
-        val innerGlassPath = Path().apply {
+        innerGlassPath.reset()
+        innerGlassPath.apply {
             moveTo(innerTopLeftX, innerTopY)
             lineTo(innerTopRightX, innerTopY)
             lineTo(innerBottomRightX, innerBottomY - innerCornerRadius)
@@ -1021,8 +1083,7 @@ fun InteractiveWaterGlass(
 
         // Etched ticks
         if (actualCupHeight > 55.dp.toPx()) {
-            val ticks = listOf(0.25f, 0.50f, 0.75f, 1.00f)
-            ticks.forEach { t ->
+            for (t in etchedTicks) {
                 val tickY = innerBottomY - (innerBottomY - innerTopY) * t
                 val tickWidth = 6.dp.toPx() * scaleFactor
                 val rightWallX = innerTopRightX + (innerBottomRightX - innerTopRightX) * (1f - t)
@@ -1052,7 +1113,8 @@ fun InteractiveWaterGlass(
                 val surfaceYRight = waterCenterY + extendedW * slope
                 val waveOffset = sin(wavePhase) * waveAmplitude * scaleFactor
 
-                val waterPath = Path().apply {
+                waterPath.reset()
+                waterPath.apply {
                     moveTo(leftX, surfaceYLeft)
                     quadraticTo(
                         topCenterX,
@@ -1066,17 +1128,14 @@ fun InteractiveWaterGlass(
                 }
 
                 val waterBrush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xD900E5FF),
-                        Color(0xB30091EA),
-                        Color(0x99003366)
-                    ),
+                    colors = waterGradientColors,
                     startY = waterCenterY - 20f,
                     endY = innerBottomY
                 )
                 drawPath(path = waterPath, brush = waterBrush)
 
-                val meniscusLine = Path().apply {
+                meniscusLine.reset()
+                meniscusLine.apply {
                     moveTo(leftX, surfaceYLeft)
                     quadraticTo(
                         topCenterX,
@@ -1119,11 +1178,7 @@ fun InteractiveWaterGlass(
 
             drawRect(
                 brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0x0000E5FF),
-                        Color(0xFF00E5FF),
-                        Color(0xFFE0F7FA)
-                    ),
+                    colors = streamGradientColors,
                     startY = 0f,
                     endY = waterCenterY
                 ),

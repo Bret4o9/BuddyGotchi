@@ -98,7 +98,7 @@ fun SquadDashboardPage(
             packedRows = emptyList(),
             activeResizeWidgetId = null,
             activeResizePreviewSize = null,
-            scrollY = scrollState.value.toFloat(),
+            scrollYProvider = { scrollState.value.toFloat() },
             modifier = Modifier.fillMaxSize()
         )
 

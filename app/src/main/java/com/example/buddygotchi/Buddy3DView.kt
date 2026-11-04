@@ -249,19 +249,27 @@ fun Buddy3DView(
     }
 
     var centerInRoot by remember { mutableStateOf<Offset?>(null) }
-    val activeTouch = getTouchPosition()
+    val currentTouchGetter by rememberUpdatedState(getTouchPosition)
 
-    // Forward dashboard touch tracking to 3D Buddy gaze ONLY when not manually rotating the 3D Buddy
-    LaunchedEffect(activeTouch, isPageReady, isInteractingWith3D) {
+    // Forward dashboard touch tracking to 3D Buddy gaze via snapshotFlow without recomposing Buddy3DView
+    LaunchedEffect(isPageReady, isInteractingWith3D, isRenderingActive) {
         val wv = webViewRef ?: return@LaunchedEffect
-        if (!isPageReady || isInteractingWith3D) return@LaunchedEffect
-        val center = centerInRoot
-        if (activeTouch != null && center != null) {
-            val normX = ((activeTouch.x - center.x) / 350f).coerceIn(-1f, 1f)
-            val normY = ((activeTouch.y - center.y) / 350f).coerceIn(-1f, 1f)
-            wv.evaluateJavascript("if(window.setLookTarget) window.setLookTarget($normX, $normY);", null)
-        } else {
-            wv.evaluateJavascript("if(window.setLookTarget) window.setLookTarget(0, 0);", null)
+        if (!isPageReady || isInteractingWith3D || !isRenderingActive) return@LaunchedEffect
+        var lastEvalTime = 0L
+        snapshotFlow { currentTouchGetter() }.collect { activeTouch ->
+            val center = centerInRoot
+            if (activeTouch != null && center != null) {
+                val now = SystemClock.uptimeMillis()
+                if (now - lastEvalTime >= 32L) {
+                    lastEvalTime = now
+                    val normX = ((activeTouch.x - center.x) / 350f).coerceIn(-1f, 1f)
+                    val normY = ((activeTouch.y - center.y) / 350f).coerceIn(-1f, 1f)
+                    wv.evaluateJavascript("if(window.setLookTarget) window.setLookTarget($normX, $normY);", null)
+                }
+            } else {
+                lastEvalTime = 0L
+                wv.evaluateJavascript("if(window.setLookTarget) window.setLookTarget(0, 0);", null)
+            }
         }
     }
 

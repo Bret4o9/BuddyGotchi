@@ -147,8 +147,12 @@ fun DashboardScreen(
         }
     }
 
-    val livePageFloat = pagerState.currentPage + pagerState.currentPageOffsetFraction
-    val currentSnappedPage = livePageFloat.roundToInt().coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+    val currentSnappedPage by remember(pages) {
+        derivedStateOf {
+            val livePageFloat = pagerState.currentPage + pagerState.currentPageOffsetFraction
+            livePageFloat.roundToInt().coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+        }
+    }
     val isCurrentPageSquad = pages.getOrNull(currentSnappedPage)?.type == DashboardPageType.SQUAD
     val isMainPageActive = pages.getOrNull(currentSnappedPage)?.type == DashboardPageType.MAIN
 
@@ -482,13 +486,12 @@ fun DashboardScreen(
                     .weight(1f)
                     .fillMaxWidth()
             ) { pageIndex ->
-                val pageOffset = ((pageIndex - pagerState.currentPage) - pagerState.currentPageOffsetFraction)
-                val absOffset = abs(pageOffset).coerceIn(0f, 1f)
-
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
+                            val pageOffset = ((pageIndex - pagerState.currentPage) - pagerState.currentPageOffsetFraction)
+                            val absOffset = abs(pageOffset).coerceIn(0f, 1f)
                             val clampedOffset = pageOffset.coerceIn(-1f, 1f)
                             val isLeft = clampedOffset < 0f
 
@@ -617,7 +620,7 @@ fun DashboardScreen(
                                 packedRows = packedRows,
                                 activeResizeWidgetId = activeResizeWidgetId,
                                 activeResizePreviewSize = activeResizePreviewSize,
-                                scrollY = scrollState.value.toFloat(),
+                                scrollYProvider = { scrollState.value.toFloat() },
                                 modifier = Modifier.fillMaxSize()
                             )
 

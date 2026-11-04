@@ -67,7 +67,8 @@ fun DashboardGridBackground(
     packedRows: List<List<DashboardWidgetItem>>,
     activeResizeWidgetId: DashboardWidgetId?,
     activeResizePreviewSize: WidgetSize?,
-    scrollY: Float,
+    scrollY: Float = 0f,
+    scrollYProvider: (() -> Float)? = null,
     modifier: Modifier = Modifier
 ) {
     val editModeProgress by animateFloatAsState(
@@ -92,7 +93,11 @@ fun DashboardGridBackground(
         }
     }
 
+    val xCoordsBuffer = remember { FloatArray(DashboardGridDefaults.COLUMNS * 4) }
+    val yCoordsBuffer = remember { FloatArray(4) }
+
     Canvas(modifier = modifier) {
+        val currentScrollY = scrollYProvider?.invoke() ?: scrollY
         val canvasWidth = size.width
         val canvasHeight = size.height
 
@@ -106,7 +111,7 @@ fun DashboardGridBackground(
 
         fun getColLeft(col: Int): Float = horizontalPaddingPx + col * (unitWPx + gapPx)
         fun getColRight(col: Int): Float = getColLeft(col) + unitWPx
-        fun getRowTop(row: Int): Float = topPaddingPx + row * (unitHPx + gapPx) - scrollY
+        fun getRowTop(row: Int): Float = topPaddingPx + row * (unitHPx + gapPx) - currentScrollY
         fun getRowBottom(row: Int): Float = getRowTop(row) + unitHPx
 
         // Calculate widget bounds and target illumination rect
@@ -143,6 +148,8 @@ fun DashboardGridBackground(
             val dashEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()), 0f)
             val strokeWidth = 1.dp.toPx()
             val slotCornerRadius = CornerRadius(16.dp.toPx())
+            val slotStroke = Stroke(width = strokeWidth, pathEffect = dashEffect)
+            val slotColor = Color.White.copy(alpha = 0.10f * editModeProgress)
 
             for (r in 0 until totalGridRows) {
                 val rTop = getRowTop(r)
@@ -151,11 +158,11 @@ fun DashboardGridBackground(
                 for (c in 0 until DashboardGridDefaults.COLUMNS) {
                     val cLeft = getColLeft(c)
                     drawRoundRect(
-                        color = Color.White.copy(alpha = 0.10f * editModeProgress),
+                        color = slotColor,
                         topLeft = Offset(cLeft, rTop),
                         size = Size(unitWPx, unitHPx),
                         cornerRadius = slotCornerRadius,
-                        style = Stroke(width = strokeWidth, pathEffect = dashEffect)
+                        style = slotStroke
                     )
                 }
             }
@@ -183,73 +190,62 @@ fun DashboardGridBackground(
                 style = Stroke(width = 2.dp.toPx())
             )
 
-            // Glowing corner vertices
+            // Glowing corner vertices (zero-allocation helper)
             val glowRadiusPx = 3.5.dp.toPx()
-            val corners = listOf(
-                Offset(rect.left, rect.top),
-                Offset(rect.right, rect.top),
-                Offset(rect.left, rect.bottom),
-                Offset(rect.right, rect.bottom)
-            )
-            for (pt in corners) {
-                drawCircle(
-                    color = NothingRed.copy(alpha = 0.35f),
-                    radius = glowRadiusPx * 2.2f,
-                    center = pt
-                )
-                drawCircle(
-                    color = NothingRed,
-                    radius = glowRadiusPx,
-                    center = pt
-                )
+            val outerGlowColor = NothingRed.copy(alpha = 0.35f)
+            fun drawCornerGlow(cx: Float, cy: Float) {
+                val pt = Offset(cx, cy)
+                drawCircle(color = outerGlowColor, radius = glowRadiusPx * 2.2f, center = pt)
+                drawCircle(color = NothingRed, radius = glowRadiusPx, center = pt)
             }
+            drawCornerGlow(rect.left, rect.top)
+            drawCornerGlow(rect.right, rect.top)
+            drawCornerGlow(rect.left, rect.bottom)
+            drawCornerGlow(rect.right, rect.bottom)
         }
 
-        // 3. Draw Background Dots aligned with the modular grid
+        // 3. Draw Background Dots aligned with the modular grid (zero heap allocations)
         val normalDotRadius = 1.2.dp.toPx()
         val illuminatedDotRadius = 2.0.dp.toPx()
         val baseAlpha = 0.08f + 0.12f * editModeProgress
+        val normalDotColor = Color.White.copy(alpha = baseAlpha)
+        val illuminatedDotColor = NothingRed.copy(alpha = 0.95f)
 
-        // Collect X coordinates across the 4 columns (strictly on the grid cells, no gap or margin dots)
-        val xCoords = mutableListOf<Float>()
+        var xIdx = 0
         for (c in 0 until DashboardGridDefaults.COLUMNS) {
             val left = getColLeft(c)
-            xCoords.add(left)
-            xCoords.add(left + unitWPx * (1f / 3f))
-            xCoords.add(left + unitWPx * (2f / 3f))
-            val right = getColRight(c)
-            xCoords.add(right)
+            xCoordsBuffer[xIdx++] = left
+            xCoordsBuffer[xIdx++] = left + unitWPx * (1f / 3f)
+            xCoordsBuffer[xIdx++] = left + unitWPx * (2f / 3f)
+            xCoordsBuffer[xIdx++] = getColRight(c)
         }
 
-        // For each row, collect Y coordinates (strictly on the grid cells, no gap dots)
         for (r in 0 until totalGridRows) {
             val top = getRowTop(r)
             if (top > canvasHeight + 20 || top + unitHPx + gapPx < -20) continue
 
-            val yCoords = listOf(
-                top,
-                top + unitHPx * (1f / 3f),
-                top + unitHPx * (2f / 3f),
-                getRowBottom(r)
-            )
+            yCoordsBuffer[0] = top
+            yCoordsBuffer[1] = top + unitHPx * (1f / 3f)
+            yCoordsBuffer[2] = top + unitHPx * (2f / 3f)
+            yCoordsBuffer[3] = getRowBottom(r)
 
-            for (y in yCoords) {
+            for (y in yCoordsBuffer) {
                 if (y < -10 || y > canvasHeight + 10) continue
 
-                for (x in xCoords) {
+                for (x in xCoordsBuffer) {
                     val isInsideTarget = resizingRect != null &&
                             x >= (resizingRect.left - 2f) && x <= (resizingRect.right + 2f) &&
                             y >= (resizingRect.top - 2f) && y <= (resizingRect.bottom + 2f)
 
                     if (isInsideTarget) {
                         drawCircle(
-                            color = NothingRed.copy(alpha = 0.95f),
+                            color = illuminatedDotColor,
                             radius = illuminatedDotRadius,
                             center = Offset(x, y)
                         )
                     } else {
                         drawCircle(
-                            color = Color.White.copy(alpha = baseAlpha),
+                            color = normalDotColor,
                             radius = normalDotRadius,
                             center = Offset(x, y)
                         )

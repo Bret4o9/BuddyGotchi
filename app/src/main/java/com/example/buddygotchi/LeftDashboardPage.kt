@@ -274,7 +274,7 @@ fun LeftDashboardPage(
                         packedRows = packedRows,
                         activeResizeWidgetId = activeResizeWidgetId,
                         activeResizePreviewSize = activeResizePreviewSize,
-                        scrollY = scrollState.value.toFloat(),
+                        scrollYProvider = { scrollState.value.toFloat() },
                         modifier = Modifier.fillMaxSize()
                     )
 

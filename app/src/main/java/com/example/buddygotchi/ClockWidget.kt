@@ -164,35 +164,43 @@ fun ClockWidget(
     val currentSelectedHour = ((hourFloat.roundToInt() % 24) + 24) % 24
     val currentSelectedMinute = ((minuteFloat.roundToInt() % 60) + 60) % 60
 
-    val effectiveCal = Calendar.getInstance().apply {
-        time = baseDate
-        add(Calendar.DAY_OF_YEAR, selectedDayOffset)
-        set(Calendar.HOUR_OF_DAY, currentSelectedHour)
-        set(Calendar.MINUTE, currentSelectedMinute)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }
+    val dateFormatter = remember { SimpleDateFormat("EEE, MMM d", Locale.getDefault()) }
 
-    // Auto-advance to tomorrow if selected time is earlier today
-    val isAutoTomorrow = remember(effectiveCal.time, selectedDayOffset) {
-        selectedDayOffset == 0 && effectiveCal.time.before(baseDate)
-    }
-
-    val finalCal = Calendar.getInstance().apply {
-        time = effectiveCal.time
-        if (isAutoTomorrow) {
-            add(Calendar.DAY_OF_YEAR, 1)
+    val effectiveCal = remember(baseDate, selectedDayOffset, currentSelectedHour, currentSelectedMinute) {
+        Calendar.getInstance().apply {
+            time = baseDate
+            add(Calendar.DAY_OF_YEAR, selectedDayOffset)
+            set(Calendar.HOUR_OF_DAY, currentSelectedHour)
+            set(Calendar.MINUTE, currentSelectedMinute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
         }
     }
 
-    val displayedTime = String.format(Locale.getDefault(), "%02d:%02d", currentSelectedHour, currentSelectedMinute)
+    // Auto-advance to tomorrow if selected time is earlier today
+    val isAutoTomorrow = remember(effectiveCal, selectedDayOffset, baseDate) {
+        selectedDayOffset == 0 && effectiveCal.time.before(baseDate)
+    }
 
-    val displayedDateLabel = remember(selectedDayOffset, isAutoTomorrow, finalCal.time) {
+    val finalCal = remember(effectiveCal, isAutoTomorrow) {
+        Calendar.getInstance().apply {
+            time = effectiveCal.time
+            if (isAutoTomorrow) {
+                add(Calendar.DAY_OF_YEAR, 1)
+            }
+        }
+    }
+
+    val displayedTime = remember(currentSelectedHour, currentSelectedMinute) {
+        String.format(Locale.getDefault(), "%02d:%02d", currentSelectedHour, currentSelectedMinute)
+    }
+
+    val displayedDateLabel = remember(selectedDayOffset, isAutoTomorrow, finalCal) {
         val effectiveOffset = if (isAutoTomorrow) selectedDayOffset + 1 else selectedDayOffset
         when (effectiveOffset) {
             0 -> "Today"
             1 -> "Tomorrow"
-            else -> SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(finalCal.time)
+            else -> dateFormatter.format(finalCal.time)
         }
     }
 

@@ -32,6 +32,13 @@ object BuddyWidgetFrameSequenceManager {
     private const val CACHE_DIR_NAME = "widget_buddy_idle_seq"
     private const val META_FILE_NAME = "sequence_meta.txt"
 
+    // L1 In-Memory Bitmap Cache so frequent widget updates (e.g., petting, task toggles) do 0 disk I/O
+    @Volatile
+    private var inMemoryFrames: List<Bitmap>? = null
+    @Volatile
+    private var inMemoryKey: String? = null
+    private val ioExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+
     private fun getCacheDir(context: Context): File {
         val dir = File(context.cacheDir, CACHE_DIR_NAME)
         if (!dir.exists()) dir.mkdirs()
@@ -79,59 +86,68 @@ object BuddyWidgetFrameSequenceManager {
     /**
      * Called when the live 3D WebGL viewer (`viewer.html`) finishes capturing a 24 FPS
      * idle animation sequence of the active 3D model. Saves all frames as temporary PNGs
-     * in [Context.getCacheDir] and refreshes all Home Screen widgets.
+     * in [Context.getCacheDir] on a background thread, updates L1 RAM cache, and refreshes widgets.
      */
     fun saveCapturedWebGLFrames(context: Context, modelKey: String, framesJson: String) {
-        try {
-            val arr = JSONArray(framesJson)
-            val count = arr.length().coerceAtMost(MAX_FRAME_COUNT)
-            if (count < 8) return
-            val dir = getCacheDir(context)
+        val appContext = context.applicationContext
+        val currentKey = getCurrentBuddyVisualKey(appContext)
+        ioExecutor.execute {
+            try {
+                val arr = JSONArray(framesJson)
+                val count = arr.length().coerceAtMost(MAX_FRAME_COUNT)
+                if (count < 8) return@execute
+                val dir = getCacheDir(appContext)
 
-            dir.listFiles()?.forEach { file ->
-                if (file.name.startsWith("frame_") && file.name.endsWith(".png")) {
-                    file.delete()
-                }
-            }
-
-            var savedCount = 0
-            for (i in 0 until count) {
-                val dataUrl = arr.getString(i)
-                val base64Part = dataUrl.substringAfter("base64,", "")
-                if (base64Part.isNotBlank()) {
-                    val bytes = Base64.decode(base64Part, Base64.DEFAULT)
-                    val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    if (decoded != null) {
-                        val scaled = if (decoded.width == FRAME_WIDTH && decoded.height == FRAME_HEIGHT) {
-                            decoded
-                        } else {
-                            Bitmap.createScaledBitmap(decoded, FRAME_WIDTH, FRAME_HEIGHT, true)
-                        }
-                        val outFile = File(dir, "frame_$savedCount.png")
-                        FileOutputStream(outFile).use { out ->
-                            scaled.compress(Bitmap.CompressFormat.PNG, 100, out)
-                        }
-                        savedCount++
+                dir.listFiles()?.forEach { file ->
+                    if (file.name.startsWith("frame_") && file.name.endsWith(".png")) {
+                        file.delete()
                     }
                 }
-            }
 
-            if (savedCount >= 8) {
-                val currentKey = getCurrentBuddyVisualKey(context)
-                File(dir, META_FILE_NAME).writeText("webgl::$savedCount::$currentKey")
-                BuddyTaskWidgetProvider.updateAllWidgets(context)
+                val decodedBitmaps = mutableListOf<Bitmap>()
+                var savedCount = 0
+                for (i in 0 until count) {
+                    val dataUrl = arr.getString(i)
+                    val base64Part = dataUrl.substringAfter("base64,", "")
+                    if (base64Part.isNotBlank()) {
+                        val bytes = Base64.decode(base64Part, Base64.DEFAULT)
+                        val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        if (decoded != null) {
+                            val scaled = if (decoded.width == FRAME_WIDTH && decoded.height == FRAME_HEIGHT) {
+                                decoded
+                            } else {
+                                Bitmap.createScaledBitmap(decoded, FRAME_WIDTH, FRAME_HEIGHT, true)
+                            }
+                            decodedBitmaps.add(scaled)
+                            val outFile = File(dir, "frame_$savedCount.png")
+                            FileOutputStream(outFile).use { out ->
+                                scaled.compress(Bitmap.CompressFormat.PNG, 100, out)
+                            }
+                            savedCount++
+                        }
+                    }
+                }
+
+                if (savedCount >= 8) {
+                    inMemoryFrames = decodedBitmaps
+                    inMemoryKey = currentKey
+                    File(dir, META_FILE_NAME).writeText("webgl::$savedCount::$currentKey")
+                    BuddyTaskWidgetProvider.updateAllWidgets(appContext)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("BuddyWidgetSeq", "Failed to save WebGL frames: ${e.message}")
             }
-        } catch (e: Exception) {
-            android.util.Log.w("BuddyWidgetSeq", "Failed to save WebGL frames: ${e.message}")
         }
     }
 
     /**
      * Called whenever the user equips a different Pet, switches 2D/3D mode, or changes characters.
-     * Immediately regenerates the temporary idle frame sequence and updates the Home Screen widget.
+     * Immediately invalidates L1/L2 caches, regenerates the sequence, and updates the Home Screen widget.
      */
     fun onEquippedBuddyChanged(context: Context) {
         try {
+            inMemoryFrames = null
+            inMemoryKey = null
             val dir = getCacheDir(context)
             val metaFile = File(dir, META_FILE_NAME)
             if (metaFile.exists()) {
@@ -143,13 +159,21 @@ object BuddyWidgetFrameSequenceManager {
     }
 
     /**
-     * Loads the temporary 24 FPS idle animation frames from cache, or generates them into temporary
-     * PNG files if the equipped Buddy changed or cache was cleared.
+     * Loads the 24 FPS idle animation frames from L1 In-Memory Cache first (0ms),
+     * falling back to L2 Disk Cache in [Context.getCacheDir], or generating them if needed.
      */
     fun getOrGenerateIdleFrames(context: Context): List<Bitmap> {
+        val expectedKey = getCurrentBuddyVisualKey(context)
+
+        // 1. Check L1 In-Memory Cache (instant, zero disk I/O)
+        val memFrames = inMemoryFrames
+        if (memFrames != null && memFrames.isNotEmpty() && inMemoryKey == expectedKey) {
+            return memFrames
+        }
+
+        // 2. Check L2 Disk Cache
         val dir = getCacheDir(context)
         val metaFile = File(dir, META_FILE_NAME)
-        val expectedKey = getCurrentBuddyVisualKey(context)
 
         val savedMeta = if (metaFile.exists()) metaFile.readText().trim() else ""
         val parts = savedMeta.split("::", limit = 3)
@@ -162,20 +186,28 @@ object BuddyWidgetFrameSequenceManager {
                     if (bmp != null) loaded.add(bmp)
                 }
                 if (loaded.size == cachedCount) {
+                    inMemoryFrames = loaded
+                    inMemoryKey = expectedKey
                     return loaded
                 }
             }
         }
 
-        // Generate the 24 FPS fallback idle animation sequence for the currently equipped Buddy and save to temp cache
+        // 3. Generate fallback studio sequence and populate both L1 and L2 caches
         val generated = generateStudioIdleFrames(context, DEFAULT_FRAME_COUNT)
-        for (i in generated.indices) {
-            val outFile = File(dir, "frame_$i.png")
-            FileOutputStream(outFile).use { out ->
-                generated[i].compress(Bitmap.CompressFormat.PNG, 100, out)
-            }
+        inMemoryFrames = generated
+        inMemoryKey = expectedKey
+        ioExecutor.execute {
+            try {
+                for (i in generated.indices) {
+                    val outFile = File(dir, "frame_$i.png")
+                    FileOutputStream(outFile).use { out ->
+                        generated[i].compress(Bitmap.CompressFormat.PNG, 100, out)
+                    }
+                }
+                metaFile.writeText("studio::${generated.size}::$expectedKey")
+            } catch (_: Exception) {}
         }
-        metaFile.writeText("studio::${generated.size}::$expectedKey")
         return generated
     }
 
