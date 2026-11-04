@@ -224,6 +224,15 @@ object Buddy3DManager {
         }
     }
 
+    fun getBuddyNickname(context: Context, petId: String? = null): String {
+        AccountAndInventoryManager.ensureInitialized(context)
+        return AccountAndInventoryManager.getPetNickname(petId ?: AccountAndInventoryManager.equippedPetIdState.value)
+    }
+
+    fun setBuddyNickname(context: Context, nickname: String, petId: String? = null) {
+        AccountAndInventoryManager.setPetNickname(context, nickname, petId ?: AccountAndInventoryManager.equippedPetIdState.value)
+    }
+
     private fun saveCustomModels(context: Context) {
         val arr = JSONArray()
         for (m in customModelsState) {

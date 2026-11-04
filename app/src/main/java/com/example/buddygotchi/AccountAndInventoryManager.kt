@@ -2,6 +2,7 @@ package com.example.buddygotchi
 
 import android.content.Context
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import com.example.buddygotchi.squad.SquadManager
 import com.google.firebase.auth.FirebaseAuth
@@ -61,6 +62,7 @@ object AccountAndInventoryManager {
     private const val KEY_UNLOCKED_ITEMS = "unlocked_items_json"
     private const val KEY_EQUIPPED_ITEMS = "equipped_items_json"
     private const val KEY_CLAIMED_GOODIES = "claimed_goodies_json"
+    private const val KEY_PET_NICKNAMES = "pet_nicknames_json"
 
     // Legal & Consent keys
     private const val KEY_CONSENT_BANNER_ANSWERED = "consent_banner_answered"
@@ -268,6 +270,7 @@ object AccountAndInventoryManager {
     val unlockedItemIdsState = mutableStateListOf("item_dot_collar", "item_red_core")
     val equippedItemIdsState = mutableStateListOf("item_dot_collar")
     val claimedGoodieIdsState = mutableStateListOf<String>()
+    val petNicknamesState = mutableStateMapOf<String, String>()
 
     // Legal & Consent observable state
     val hasAnsweredConsentBannerState = mutableStateOf(false)
@@ -333,6 +336,22 @@ object AccountAndInventoryManager {
             } catch (_: Exception) {}
         }
 
+        val nicknamesJson = prefs.getString(KEY_PET_NICKNAMES, null)
+        if (!nicknamesJson.isNullOrBlank()) {
+            try {
+                val obj = JSONObject(nicknamesJson)
+                petNicknamesState.clear()
+                val keys = obj.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    val v = obj.optString(k, "")
+                    if (v.isNotBlank()) {
+                        petNicknamesState[k] = v
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
         hasAnsweredConsentBannerState.value = prefs.getBoolean(KEY_CONSENT_BANNER_ANSWERED, false)
         cloudSyncConsentState.value = prefs.getBoolean(KEY_CLOUD_SYNC_CONSENT, false)
         ageConsentVerifiedState.value = prefs.getBoolean(KEY_AGE_CONSENT_VERIFIED, false)
@@ -387,6 +406,16 @@ object AccountAndInventoryManager {
                             mergedChanged = true
                         }
                     }
+                    @Suppress("UNCHECKED_CAST")
+                    val cloudNicknames = doc.get("petNicknames") as? Map<String, String>
+                    if (cloudNicknames != null) {
+                        cloudNicknames.forEach { (k, v) ->
+                            if (v.isNotBlank() && petNicknamesState[k] != v) {
+                                petNicknamesState[k] = v
+                                mergedChanged = true
+                            }
+                        }
+                    }
                     val cloudXp = doc.getLong("buddyXp")?.toInt() ?: 0
                     val localXp = TaskManager.getBuddyXp(context)
                     if (cloudXp > localXp) {
@@ -435,12 +464,18 @@ object AccountAndInventoryManager {
         val itemsArr = JSONArray().apply { unlockedItemIdsState.forEach { put(it) } }
         val eqArr = JSONArray().apply { equippedItemIdsState.forEach { put(it) } }
         val goodiesArr = JSONArray().apply { claimedGoodieIdsState.forEach { put(it) } }
+        val nicknamesObj = JSONObject().apply {
+            petNicknamesState.forEach { (k, v) ->
+                if (v.isNotBlank()) put(k, v)
+            }
+        }
         prefs.edit()
             .putString(KEY_EQUIPPED_PET_ID, equippedPetIdState.value)
             .putString(KEY_UNLOCKED_PETS, petsArr.toString())
             .putString(KEY_UNLOCKED_ITEMS, itemsArr.toString())
             .putString(KEY_EQUIPPED_ITEMS, eqArr.toString())
             .putString(KEY_CLAIMED_GOODIES, goodiesArr.toString())
+            .putString(KEY_PET_NICKNAMES, nicknamesObj.toString())
             .apply()
     }
 
@@ -481,6 +516,23 @@ object AccountAndInventoryManager {
         Buddy3DManager.setDisplayMode(context, entry.displayMode)
         if (entry.displayMode == BuddyDisplayMode.THREE_D) {
             Buddy3DManager.selectModel(context, entry.modelId, entry.characterIndex)
+        }
+        saveInventoryToPrefs(context)
+        BuddyWidgetFrameSequenceManager.onEquippedBuddyChanged(context)
+        syncToCloudIfEnabled(context)
+    }
+
+    fun getPetNickname(petId: String = equippedPetIdState.value): String {
+        return petNicknamesState[petId]?.takeIf { it.isNotBlank() } ?: "Companion"
+    }
+
+    fun setPetNickname(context: Context, nickname: String, petId: String = equippedPetIdState.value) {
+        ensureInitialized(context)
+        val trimmed = nickname.trim()
+        if (trimmed.isEmpty() || trimmed.equals("Companion", ignoreCase = true)) {
+            petNicknamesState.remove(petId)
+        } else {
+            petNicknamesState[petId] = trimmed
         }
         saveInventoryToPrefs(context)
         BuddyWidgetFrameSequenceManager.onEquippedBuddyChanged(context)
@@ -685,6 +737,14 @@ object AccountAndInventoryManager {
                     claimedGoodieIdsState.clear()
                     claimedGoodieIdsState.addAll(mergedGoodies)
 
+                    @Suppress("UNCHECKED_CAST")
+                    val cloudNicknames = doc.get("petNicknames") as? Map<String, String>
+                    if (cloudNicknames != null) {
+                        cloudNicknames.forEach { (k, v) ->
+                            if (v.isNotBlank()) petNicknamesState[k] = v
+                        }
+                    }
+
                     equippedPetIdState.value = restoredEquippedPet
                     TaskManager.setBuddyXp(context, mergedXp)
 
@@ -782,6 +842,7 @@ object AccountAndInventoryManager {
             "activeModelId" to Buddy3DManager.activeModelIdState.value,
             "activeCharIndex" to Buddy3DManager.activeCharacterIndexState.intValue,
             "equippedPetId" to equippedPetIdState.value,
+            "petNicknames" to HashMap(petNicknamesState),
             "unlockedPetIds" to unlockedPetIdsState.toList(),
             "unlockedItemIds" to unlockedItemIdsState.toList(),
             "equippedItemIds" to equippedItemIdsState.toList(),
@@ -901,6 +962,7 @@ object AccountAndInventoryManager {
         equippedItemIdsState.clear()
         equippedItemIdsState.add("item_dot_collar")
         equippedPetIdState.value = "pet_ssrb_greybie"
+        petNicknamesState.clear()
 
         val msg = "ALL CLOUD & LOCAL DATA PERMANENTLY DELETED"
         syncStatusMessageState.value = msg

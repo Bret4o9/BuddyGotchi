@@ -15,6 +15,12 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -243,7 +249,7 @@ fun TodayWidget(
                                         )
                                         if (task.isRecurring) {
                                             Text(
-                                                text = " ↻",
+                                                text = " â†»",
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = if (task.isCompleted) MaterialTheme.colorScheme.outline else NothingRed
@@ -252,7 +258,7 @@ fun TodayWidget(
                                     }
                                 }
                                 Text(
-                                    text = if (task.isCompleted) "✓" else task.category.label,
+                                    text = if (task.isCompleted) "âœ“" else task.category.label,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = if (task.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
@@ -392,7 +398,7 @@ fun TodayWidget(
                                         )
                                         if (task.isRecurring) {
                                             Text(
-                                                text = "  ↻",
+                                                text = "  â†»",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = if (task.isCompleted) MaterialTheme.colorScheme.outline else NothingRed
@@ -410,7 +416,7 @@ fun TodayWidget(
                                 }
 
                                 Text(
-                                    text = if (task.isCompleted) "DONE ✓" else task.category.label,
+                                    text = if (task.isCompleted) "DONE âœ“" else task.category.label,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = if (task.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
@@ -536,7 +542,7 @@ fun NextWidget(
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                         ) {
                             Text(
-                                text = if (nextTask.isRecurring) "↻ ${nextTask.category.label}" else nextTask.category.label.uppercase(Locale.getDefault()),
+                                text = if (nextTask.isRecurring) "â†» ${nextTask.category.label}" else nextTask.category.label.uppercase(Locale.getDefault()),
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
                                 fontSize = 8.5.sp,
                                 fontWeight = FontWeight.Bold,
@@ -600,7 +606,7 @@ fun NextWidget(
                             )
                             if (nextTask.isRecurring) {
                                 Text(
-                                    text = " • ↻",
+                                    text = " â€¢ â†»",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = NothingRed
@@ -672,7 +678,7 @@ fun NextWidget(
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                         ) {
                             Text(
-                                text = if (nextTask.isRecurring) "↻ ${nextTask.category.label}" else nextTask.category.label.uppercase(Locale.getDefault()),
+                                text = if (nextTask.isRecurring) "â†» ${nextTask.category.label}" else nextTask.category.label.uppercase(Locale.getDefault()),
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
@@ -729,7 +735,7 @@ fun NextWidget(
                                 )
                                 if (nextTask.isRecurring) {
                                     Text(
-                                        text = "↻ RECURRING",
+                                        text = "â†» RECURRING",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = NothingRed
@@ -1158,12 +1164,27 @@ fun BuddyWidget(
     val context = LocalContext.current
     LaunchedEffect(Unit) {
         Buddy3DManager.ensureInitialized(context)
+        AccountAndInventoryManager.ensureInitialized(context)
     }
     val displayMode by Buddy3DManager.displayModeState
+    val equippedPetId by AccountAndInventoryManager.equippedPetIdState
+    val petNicknames = AccountAndInventoryManager.petNicknamesState
+    val buddyNickname = petNicknames[equippedPetId]?.takeIf { it.isNotBlank() } ?: "Companion"
     var show3DStudioDialog by remember { mutableStateOf(false) }
+    var showNicknameEditDialog by remember { mutableStateOf(false) }
 
     if (show3DStudioDialog) {
         Buddy3DStudioDialog(onDismiss = { show3DStudioDialog = false })
+    }
+
+    if (showNicknameEditDialog) {
+        BuddyNicknameEditDialog(
+            currentNickname = if (buddyNickname == "Companion") "" else buddyNickname,
+            onDismiss = { showNicknameEditDialog = false },
+            onSave = { newName ->
+                AccountAndInventoryManager.setPetNickname(context, newName, equippedPetId)
+            }
+        )
     }
 
     WidgetCard(
@@ -1291,7 +1312,7 @@ fun BuddyWidget(
                             fontSize = 12.sp
                         )
                         Text(
-                            text = "• $xp XP",
+                            text = "â€¢ $xp XP",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.secondary
                         )
@@ -1319,7 +1340,7 @@ fun BuddyWidget(
                         )
                         Column {
                             Text(
-                                text = "BUDDY • LVL $level",
+                                text = "BUDDY â€¢ LVL $level",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp,
@@ -1382,11 +1403,24 @@ fun BuddyWidget(
                                 letterSpacing = 1.sp,
                                 color = NothingRed
                             )
-                            Text(
-                                text = "Level $level Companion",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .clickable { showNicknameEditDialog = true }
+                                    .semantics { contentDescription = "Edit Buddy Nickname" }
+                            ) {
+                                Text(
+                                    text = "Level $level $buddyNickname",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                PenEditIcon(
+                                    modifier = Modifier.size(13.dp),
+                                    tint = MaterialTheme.colorScheme.secondary
+                                )
+                            }
                             Text(
                                 text = "$xp Total XP",
                                 fontSize = 12.sp,
@@ -1434,11 +1468,25 @@ fun BuddyWidget(
                     )
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Level $level Companion",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable { showNicknameEditDialog = true }
+                                .semantics { contentDescription = "Edit Buddy Nickname" }
+                        ) {
+                            Text(
+                                text = "Level $level $buddyNickname",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            PenEditIcon(
+                                modifier = Modifier.size(15.dp),
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                        }
                         val progress = ((xp % 50) / 50f).coerceIn(0f, 1f)
                         Spacer(modifier = Modifier.height(4.dp))
                         LinearProgressIndicator(
@@ -1480,8 +1528,203 @@ fun BuddyWidget(
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(text = "MOOD", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
-                            Text(text = "HAPPY 😊", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "HAPPY \uD83D\uDE0A", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PenEditIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.secondary
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val scaleX = w / 24f
+        val scaleY = h / 24f
+
+        val bodyPath = Path().apply {
+            moveTo(3f * scaleX, 17.25f * scaleY)
+            lineTo(3f * scaleX, 21f * scaleY)
+            lineTo(6.75f * scaleX, 21f * scaleY)
+            lineTo(17.81f * scaleX, 9.94f * scaleY)
+            lineTo(14.06f * scaleX, 6.19f * scaleY)
+            close()
+        }
+        drawPath(bodyPath, color = tint)
+
+        val capPath = Path().apply {
+            moveTo(20.71f * scaleX, 7.04f * scaleY)
+            lineTo(18.37f * scaleX, 4.7f * scaleY)
+            lineTo(16.03f * scaleX, 7.04f * scaleY)
+            lineTo(18.37f * scaleX, 9.38f * scaleY)
+            close()
+        }
+        drawPath(capPath, color = tint)
+    }
+}
+
+@Composable
+fun BuddyNicknameEditDialog(
+    currentNickname: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var nicknameText by remember { mutableStateOf(currentNickname) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = Color(0xFF141414),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2C2C2C)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "BUDDY NICKNAME",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "SET A CUSTOM NAME FOR YOUR BUDDY",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.sp,
+                            color = Color(0xFF8E8E8E)
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .clickable { onDismiss() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "✕", fontSize = 12.sp, color = Color.White)
+                    }
+                }
+
+                // Input Box
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "NICKNAME",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    BasicTextField(
+                        value = nicknameText,
+                        onValueChange = { if (it.length <= 20) nicknameText = it },
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = FontFamily.Default
+                        ),
+                        cursorBrush = SolidColor(NothingRed),
+                        decorationBox = { innerTextField ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF1F1F1F))
+                                    .border(1.dp, Color(0xFF383838), RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 14.dp, vertical = 12.dp)
+                            ) {
+                                if (nicknameText.isEmpty()) {
+                                    Text(
+                                        text = "Companion (Default)",
+                                        color = Color(0xFF6E6E6E),
+                                        fontSize = 15.sp
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        }
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = if (nicknameText.isBlank()) "Default: Companion" else "Custom nickname",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                        Text(
+                            text = "${nicknameText.length} / 20",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
+
+                // Action Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF222222))
+                            .clickable { nicknameText = "" }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "RESET",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFAAAAAA)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(NothingRed)
+                            .clickable {
+                                onSave(nicknameText)
+                                onDismiss()
+                            }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "SAVE",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                     }
                 }
             }
