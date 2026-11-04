@@ -646,6 +646,11 @@ private fun ShelfRackItem(
                         buddyLevel = buddyLevel
                     )
                 }
+                DashboardWidgetId.TEST_ALERT -> {
+                    TestAlertWidget(
+                        size = WidgetSize.WIDE
+                    )
+                }
             }
         }
 

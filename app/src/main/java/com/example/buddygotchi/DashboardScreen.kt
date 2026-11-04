@@ -1429,6 +1429,11 @@ fun RenderDashboardWidgetContent(
                 buddyLevel = buddyLevel
             )
         }
+        DashboardWidgetId.TEST_ALERT -> {
+            TestAlertWidget(
+                size = liveSize
+            )
+        }
     }
 }
 

@@ -48,7 +48,8 @@ enum class DashboardWidgetId(
     GROCERY("Groceries", canRemove = true),
     PETS("Pets", canRemove = true),
     ITEMS("Items", canRemove = true),
-    STORE("Store", canRemove = true)
+    STORE("Store", canRemove = true),
+    TEST_ALERT("Alert Tester", canRemove = true)
 }
 
 enum class WidgetSize(val cols: Int, val rows: Int) {
@@ -133,6 +134,7 @@ data class DashboardWidgetItem(
         DashboardWidgetId.PETS -> WidgetSize.WIDE
         DashboardWidgetId.ITEMS -> WidgetSize.WIDE
         DashboardWidgetId.STORE -> WidgetSize.MAX
+        DashboardWidgetId.TEST_ALERT -> WidgetSize.WIDE
     }
 )
 
@@ -144,6 +146,7 @@ object DashboardLayoutManager {
 
     fun getDefaultLayout(): List<DashboardWidgetItem> = listOf(
         DashboardWidgetItem(DashboardWidgetId.CLOCK, WidgetSize.MAX),
+        DashboardWidgetItem(DashboardWidgetId.TEST_ALERT, WidgetSize.WIDE),
         DashboardWidgetItem(DashboardWidgetId.TODAY, WidgetSize.WIDE),
         DashboardWidgetItem(DashboardWidgetId.NEXT, WidgetSize.HALF),
         DashboardWidgetItem(DashboardWidgetId.BUDDY, WidgetSize.HALF)
@@ -183,7 +186,20 @@ object DashboardLayoutManager {
                     }
                 }
             }
-            if (list.isEmpty()) getDefaultLayout() else list
+            if (list.isEmpty()) {
+                getDefaultLayout()
+            } else {
+                // Ensure TEST_ALERT widget is present for testing
+                if (list.none { it.widgetId == DashboardWidgetId.TEST_ALERT }) {
+                    val clockIndex = list.indexOfFirst { it.widgetId == DashboardWidgetId.CLOCK }
+                    if (clockIndex != -1) {
+                        list.add(clockIndex + 1, DashboardWidgetItem(DashboardWidgetId.TEST_ALERT, WidgetSize.WIDE))
+                    } else {
+                        list.add(0, DashboardWidgetItem(DashboardWidgetId.TEST_ALERT, WidgetSize.WIDE))
+                    }
+                }
+                list
+            }
         } catch (_: Exception) {
             getDefaultLayout()
         }
@@ -240,6 +256,7 @@ object DashboardLayoutManager {
             DashboardWidgetId.PETS -> WidgetSize.WIDE
             DashboardWidgetId.ITEMS -> WidgetSize.WIDE
             DashboardWidgetId.STORE -> WidgetSize.MAX
+            DashboardWidgetId.TEST_ALERT -> WidgetSize.WIDE
         }
         return layout + DashboardWidgetItem(widgetId, defaultSize)
     }
@@ -347,6 +364,7 @@ object LeftDashboardLayoutManager {
             DashboardWidgetId.PETS -> WidgetSize.WIDE
             DashboardWidgetId.ITEMS -> WidgetSize.WIDE
             DashboardWidgetId.STORE -> WidgetSize.MAX
+            DashboardWidgetId.TEST_ALERT -> WidgetSize.WIDE
         }
         return layout + DashboardWidgetItem(widgetId, size)
     }

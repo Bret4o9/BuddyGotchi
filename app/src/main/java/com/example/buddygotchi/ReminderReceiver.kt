@@ -30,6 +30,7 @@ class ReminderReceiver : BroadcastReceiver() {
             ACTION_DISMISS_ALARM -> {
                 val taskId = intent.getStringExtra(EXTRA_TASK_ID) ?: return
                 AlarmPlayer.stopAlarm()
+                BuddyOverlayManager.dismissActiveOverlay(context)
                 val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 nm.cancel(taskId.hashCode())
 
@@ -67,7 +68,28 @@ class ReminderReceiver : BroadcastReceiver() {
                 val taskDescription = intent.getStringExtra(EXTRA_DESCRIPTION) ?: ""
                 val isRecurring = intent.getBooleanExtra(EXTRA_IS_RECURRING, false)
 
-                // 1. Play looping alarm sound & vibration immediately
+                // 1. High priority notification with vibration
+                AlertNotificationManager.showTaskNotification(
+                    context = context,
+                    taskId = taskId,
+                    taskTitle = if (taskDescription.isNotBlank()) taskDescription else "$categoryLabel Task Due",
+                    taskCategory = categoryLabel,
+                    taskTime = taskTimeMs,
+                    offsetMinutes = offsetMinutes
+                )
+
+                // 2. Floating Buddy popup overlay outside the app (if permitted)
+                if (BuddyOverlayManager.canDrawOverlays(context)) {
+                    BuddyOverlayManager.showPopupAlert(
+                        context = context,
+                        taskId = taskId,
+                        taskTitle = if (taskDescription.isNotBlank()) taskDescription else "$categoryLabel Task Due",
+                        taskCategory = categoryLabel,
+                        taskTime = taskTimeMs
+                    )
+                }
+
+                // 3. Play alarm audio/haptic player
                 AlarmPlayer.startAlarm(context, taskId)
 
                 // 2. Prepare Channel
@@ -136,11 +158,11 @@ class ReminderReceiver : BroadcastReceiver() {
                 val notificationTitle = if (taskDescription.isNotBlank()) {
                     taskDescription
                 } else {
-                    "BuddyGotchi • $categoryLabel"
+                    "BuddyGotchi â€¢ $categoryLabel"
                 }
 
                 val notificationSubtitle = if (taskDescription.isNotBlank()) {
-                    "$categoryLabel • $message"
+                    "$categoryLabel â€¢ $message"
                 } else {
                     message
                 }

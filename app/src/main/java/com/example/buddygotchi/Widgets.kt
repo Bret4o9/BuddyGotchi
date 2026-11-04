@@ -1,5 +1,6 @@
 package com.example.buddygotchi
 
+import android.widget.Toast
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -1722,6 +1723,231 @@ fun BuddyNicknameEditDialog(
                             text = "SAVE",
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TestAlertWidget(
+    size: WidgetSize = WidgetSize.WIDE,
+    height: Dp = getWidgetHeight(size),
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var hasOverlayPermission by remember { mutableStateOf(BuddyOverlayManager.canDrawOverlays(context)) }
+
+    LaunchedEffect(Unit) {
+        hasOverlayPermission = BuddyOverlayManager.canDrawOverlays(context)
+    }
+
+    WidgetCard(
+        title = "ALERT TESTER (DEBUG)",
+        height = height,
+        size = size,
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Permission Status Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (hasOverlayPermission) "OVERLAY: ACTIVE \u2713" else "OVERLAY: DISABLED",
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = if (hasOverlayPermission) Color(0xFF4CAF50) else Color(0xFFFF5252)
+                )
+
+                if (!hasOverlayPermission) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF333333))
+                            .clickable {
+                                BuddyOverlayManager.requestOverlayPermission(context)
+                                hasOverlayPermission = BuddyOverlayManager.canDrawOverlays(context)
+                            }
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = "ENABLE OVERLAY",
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+
+            // Buttons
+            if (size.cols >= 2) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Button 1: Immediate Notification
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1E1E1E))
+                            .border(1.dp, Color(0xFF3A3A3A), RoundedCornerShape(8.dp))
+                            .clickable {
+                                AlertNotificationManager.showTaskNotification(
+                                    context = context,
+                                    taskId = "test_notif_${System.currentTimeMillis()}",
+                                    taskTitle = "Task Alert: Drink water & stretch!",
+                                    taskCategory = "TEST",
+                                    taskTime = System.currentTimeMillis()
+                                )
+                                Toast.makeText(context, "Notification sent with vibration!", Toast.LENGTH_SHORT).show()
+                            }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "NOTIF NOW",
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
+                    // Button 2: Immediate Buddy Overlay
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1E1E1E))
+                            .border(1.dp, Color(0xFF3A3A3A), RoundedCornerShape(8.dp))
+                            .clickable {
+                                if (!BuddyOverlayManager.canDrawOverlays(context)) {
+                                    Toast.makeText(context, "Please enable overlay permission first!", Toast.LENGTH_SHORT).show()
+                                    BuddyOverlayManager.requestOverlayPermission(context)
+                                } else {
+                                    BuddyOverlayManager.showPopupAlert(
+                                        context = context,
+                                        taskId = "test_popup_${System.currentTimeMillis()}",
+                                        taskTitle = "Buddy Alert: Check on your buddy!",
+                                        taskCategory = "DEBUG",
+                                        taskTime = System.currentTimeMillis()
+                                    )
+                                }
+                            }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "POPUP NOW",
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
+                    // Button 3: Schedule 5-second test alarm
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(NothingRed)
+                            .clickable {
+                                val triggerMillis = System.currentTimeMillis() + 5000L
+                                val testTask = ReminderTask(
+                                    id = "test_alarm_${System.currentTimeMillis()}",
+                                    taskTime = Date(triggerMillis),
+                                    offsetMinutes = 0,
+                                    reminderTime = Date(triggerMillis),
+                                    category = TaskCategory.WORK,
+                                    description = "5s Alert: Leave app to see popup!"
+                                )
+                                ReminderScheduler.scheduleReminder(context, testTask)
+                                Toast.makeText(context, "Trigger in 5s! Exit app to see popup & notif!", Toast.LENGTH_LONG).show()
+                            }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "TEST IN 5s",
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF1E1E1E))
+                            .clickable {
+                                AlertNotificationManager.showTaskNotification(
+                                    context = context,
+                                    taskId = "test_notif_${System.currentTimeMillis()}",
+                                    taskTitle = "Task Alert: Drink water & stretch!",
+                                    taskCategory = "TEST",
+                                    taskTime = System.currentTimeMillis()
+                                )
+                            }
+                            .padding(vertical = 5.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "NOTIF NOW",
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(NothingRed)
+                            .clickable {
+                                val triggerMillis = System.currentTimeMillis() + 5000L
+                                val testTask = ReminderTask(
+                                    id = "test_alarm_${System.currentTimeMillis()}",
+                                    taskTime = Date(triggerMillis),
+                                    offsetMinutes = 0,
+                                    reminderTime = Date(triggerMillis),
+                                    category = TaskCategory.WORK,
+                                    description = "5s Alert: Leave app to see popup!"
+                                )
+                                ReminderScheduler.scheduleReminder(context, testTask)
+                                Toast.makeText(context, "Trigger in 5s! Exit app!", Toast.LENGTH_SHORT).show()
+                            }
+                            .padding(vertical = 5.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "TEST IN 5s",
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
