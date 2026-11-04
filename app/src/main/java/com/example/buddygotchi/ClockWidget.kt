@@ -55,6 +55,11 @@ import com.example.buddygotchi.ui.theme.NothingRed
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -135,6 +140,7 @@ fun ClockWidget(
     var stage by remember { mutableStateOf(ClockStage.TIME) }
     var baseDate by remember { mutableStateOf(Date()) }
     var selectedDayOffset by remember { mutableIntStateOf(0) }
+    var isCustomDateSelected by remember { mutableStateOf(false) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
 
     // Start with current live time
@@ -195,45 +201,61 @@ fun ClockWidget(
         String.format(Locale.getDefault(), "%02d:%02d", currentSelectedHour, currentSelectedMinute)
     }
 
-    val displayedDateLabel = remember(selectedDayOffset, isAutoTomorrow, finalCal) {
+    val displayedDateLabel = remember(selectedDayOffset, isAutoTomorrow, isCustomDateSelected, finalCal) {
         val effectiveOffset = if (isAutoTomorrow) selectedDayOffset + 1 else selectedDayOffset
-        when (effectiveOffset) {
-            0 -> "Today"
-            1 -> "Tomorrow"
+        when {
+            effectiveOffset == 0 -> "Today"
+            effectiveOffset == 1 && !isCustomDateSelected -> "Tomorrow"
             else -> dateFormatter.format(finalCal.time)
         }
     }
 
     // Material 3 Date Picker Dialog
     if (showDatePickerDialog) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = finalCal.timeInMillis
-        )
-        DatePickerDialog(
-            onDismissRequest = { showDatePickerDialog = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        datePickerState.selectedDateMillis?.let { millis ->
-                            val chosenCal = Calendar.getInstance().apply { timeInMillis = millis }
-                            val todayCal = Calendar.getInstance().apply { time = baseDate }
-                            val diffDays = ((chosenCal.timeInMillis - todayCal.timeInMillis) / (1000 * 60 * 60 * 24)).toInt()
-                            selectedDayOffset = diffDays.coerceAtLeast(0)
-                            triggerTick()
+        val userZone = remember { ZoneId.systemDefault() }
+        val todayLocalDate = remember(baseDate) {
+            Instant.ofEpochMilli(baseDate.time).atZone(userZone).toLocalDate()
+        }
+        val targetDayOffset = if (isAutoTomorrow) selectedDayOffset + 1 else selectedDayOffset
+        val currentTargetDate = remember(todayLocalDate, targetDayOffset) {
+            todayLocalDate.plusDays(targetDayOffset.toLong())
+        }
+        val initialUtcMillis = remember(currentTargetDate) {
+            currentTargetDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        }
+
+        key(initialUtcMillis) {
+            val datePickerState = rememberDatePickerState(
+                initialSelectedDateMillis = initialUtcMillis
+            )
+            DatePickerDialog(
+                onDismissRequest = { showDatePickerDialog = false },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            datePickerState.selectedDateMillis?.let { millis ->
+                                val selectedLocalDate = Instant.ofEpochMilli(millis)
+                                    .atZone(ZoneOffset.UTC)
+                                    .toLocalDate()
+                                val diffDays = ChronoUnit.DAYS.between(todayLocalDate, selectedLocalDate).toInt()
+                                selectedDayOffset = diffDays.coerceAtLeast(0)
+                                isCustomDateSelected = diffDays > 0
+                                triggerTick()
+                            }
+                            showDatePickerDialog = false
                         }
-                        showDatePickerDialog = false
+                    ) {
+                        Text("OK")
                     }
-                ) {
-                    Text("OK")
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDatePickerDialog = false }) {
+                        Text("Cancel")
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePickerDialog = false }) {
-                    Text("Cancel")
-                }
+            ) {
+                DatePicker(state = datePickerState)
             }
-        ) {
-            DatePicker(state = datePickerState)
         }
     }
 
@@ -440,9 +462,9 @@ fun ClockWidget(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    val isTodaySelected = selectedDayOffset == 0 && !isAutoTomorrow
-                                    val isTomorrowSelected = (selectedDayOffset == 1 && !isAutoTomorrow) || isAutoTomorrow
-                                    val isMoreSelected = selectedDayOffset > 1 && !isAutoTomorrow
+                                    val isMoreSelected = isCustomDateSelected && selectedDayOffset > 0 && !isAutoTomorrow
+                                    val isTomorrowSelected = !isMoreSelected && ((selectedDayOffset == 1 && !isAutoTomorrow) || isAutoTomorrow)
+                                    val isTodaySelected = !isMoreSelected && !isTomorrowSelected && selectedDayOffset == 0
 
                                     // 1. Today
                                     Surface(
@@ -452,6 +474,7 @@ fun ClockWidget(
                                             .clip(RoundedCornerShape(12.dp))
                                             .clickable {
                                                 selectedDayOffset = 0
+                                                isCustomDateSelected = false
                                                 triggerTick()
                                             }
                                     ) {
@@ -472,6 +495,7 @@ fun ClockWidget(
                                             .clip(RoundedCornerShape(12.dp))
                                             .clickable {
                                                 selectedDayOffset = 1
+                                                isCustomDateSelected = false
                                                 triggerTick()
                                             }
                                     ) {
@@ -1094,7 +1118,7 @@ fun ClockWidget(
                                     .padding(vertical = 2.dp, horizontal = 2.dp)
                             )
                             Text(
-                                text = "$displayedTime • -${selectedOffsetMinutes}m",
+                                text = "$displayedDateLabel, $displayedTime • -${selectedOffsetMinutes}m",
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.SemiBold,
@@ -1359,6 +1383,7 @@ fun ClockWidget(
                         wasFastMinuteDrag = false
                         offsetIndex = 3
                         selectedDayOffset = 0
+                        isCustomDateSelected = false
                         baseDate = Date()
                         taskDescription = ""
                         isRecurring = false
