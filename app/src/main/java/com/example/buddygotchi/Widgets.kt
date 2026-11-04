@@ -249,7 +249,7 @@ fun TodayWidget(
                                         )
                                         if (task.isRecurring) {
                                             Text(
-                                                text = " â†»",
+                                                text = " \u21BB",
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = if (task.isCompleted) MaterialTheme.colorScheme.outline else NothingRed
@@ -258,7 +258,7 @@ fun TodayWidget(
                                     }
                                 }
                                 Text(
-                                    text = if (task.isCompleted) "âœ“" else task.category.label,
+                                    text = if (task.isCompleted) "\u2713" else task.category.label,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = if (task.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
@@ -398,7 +398,7 @@ fun TodayWidget(
                                         )
                                         if (task.isRecurring) {
                                             Text(
-                                                text = "  â†»",
+                                                text = "  \u21BB",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = if (task.isCompleted) MaterialTheme.colorScheme.outline else NothingRed
@@ -416,7 +416,7 @@ fun TodayWidget(
                                 }
 
                                 Text(
-                                    text = if (task.isCompleted) "DONE âœ“" else task.category.label,
+                                    text = if (task.isCompleted) "DONE \u2713" else task.category.label,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = if (task.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
@@ -542,7 +542,7 @@ fun NextWidget(
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                         ) {
                             Text(
-                                text = if (nextTask.isRecurring) "â†» ${nextTask.category.label}" else nextTask.category.label.uppercase(Locale.getDefault()),
+                                text = if (nextTask.isRecurring) "\u21BB ${nextTask.category.label}" else nextTask.category.label.uppercase(Locale.getDefault()),
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
                                 fontSize = 8.5.sp,
                                 fontWeight = FontWeight.Bold,
@@ -606,7 +606,7 @@ fun NextWidget(
                             )
                             if (nextTask.isRecurring) {
                                 Text(
-                                    text = " â€¢ â†»",
+                                    text = " \u2022 \u21BB",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = NothingRed
@@ -678,7 +678,7 @@ fun NextWidget(
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                         ) {
                             Text(
-                                text = if (nextTask.isRecurring) "â†» ${nextTask.category.label}" else nextTask.category.label.uppercase(Locale.getDefault()),
+                                text = if (nextTask.isRecurring) "\u21BB ${nextTask.category.label}" else nextTask.category.label.uppercase(Locale.getDefault()),
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
@@ -735,7 +735,7 @@ fun NextWidget(
                                 )
                                 if (nextTask.isRecurring) {
                                     Text(
-                                        text = "â†» RECURRING",
+                                        text = "\u21BB RECURRING",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = NothingRed
@@ -1312,7 +1312,7 @@ fun BuddyWidget(
                             fontSize = 12.sp
                         )
                         Text(
-                            text = "â€¢ $xp XP",
+                            text = "\u2022 $xp XP",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.secondary
                         )
@@ -1340,7 +1340,7 @@ fun BuddyWidget(
                         )
                         Column {
                             Text(
-                                text = "BUDDY â€¢ LVL $level",
+                                text = "BUDDY \u2022 LVL $level",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp,

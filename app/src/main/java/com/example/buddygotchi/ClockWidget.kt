@@ -19,6 +19,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -30,6 +32,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -73,7 +76,7 @@ enum class ClockStage {
     DONE
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ClockWidget(
     size: WidgetSize = WidgetSize.MAX,
@@ -1094,12 +1097,25 @@ fun ClockWidget(
                 }
 
                 ClockStage.CATEGORY -> {
+                    val categoryScrollState = rememberScrollState()
+                    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+                    var isInputFocused by remember { mutableStateOf(false) }
+
+                    LaunchedEffect(isInputFocused, taskDescription) {
+                        if (isInputFocused) {
+                            delay(100)
+                            categoryScrollState.animateScrollTo(categoryScrollState.maxValue)
+                            bringIntoViewRequester.bringIntoView()
+                        }
+                    }
+
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
+                            .verticalScroll(categoryScrollState)
                             .padding(bottom = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         // Top back button & time summary
                         Row(
@@ -1249,7 +1265,11 @@ fun ClockWidget(
                         }
 
                         // 3. Task Description Input Field
-                        Column(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .bringIntoViewRequester(bringIntoViewRequester)
+                        ) {
                             Text(
                                 text = "DESCRIPTION",
                                 fontSize = 9.sp,
@@ -1271,6 +1291,16 @@ fun ClockWidget(
                                                 else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
                                         shape = RoundedCornerShape(10.dp)
                                     )
+                                    .onFocusChanged { focusState ->
+                                        isInputFocused = focusState.isFocused
+                                        if (focusState.isFocused) {
+                                            coroutineScope.launch {
+                                                delay(120)
+                                                categoryScrollState.animateScrollTo(categoryScrollState.maxValue)
+                                                bringIntoViewRequester.bringIntoView()
+                                            }
+                                        }
+                                    }
                                     .padding(horizontal = 10.dp, vertical = 6.dp),
                                 textStyle = TextStyle(
                                     color = MaterialTheme.colorScheme.onSurface,
