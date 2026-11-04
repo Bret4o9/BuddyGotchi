@@ -269,6 +269,8 @@ object Buddy3DManager {
             val texDir = File(destRoot, "textures")
             destRoot.mkdirs()
             texDir.mkdirs()
+            val thumbDir = File(destRoot, "Thumbnail")
+            thumbDir.mkdirs()
 
             val supported3DExts = setOf("fbx", "glb", "gltf", "obj")
             val supportedTexExts = setOf("png", "jpg", "jpeg", "webp", "bmp")
@@ -284,7 +286,18 @@ object Buddy3DManager {
                             if (!entry.isDirectory) {
                                 val entryName = File(entry.name).name
                                 val entryExt = entryName.substringAfterLast('.', "").lowercase()
-                                if (entryExt in supported3DExts) {
+                                val isThumb = entry.name.contains("Thumbnail", ignoreCase = true) ||
+                                    entryName.startsWith("thumb", ignoreCase = true)
+
+                                if (isThumb && entryExt in supportedTexExts) {
+                                    val outThumb = File(thumbDir, entryName)
+                                    FileOutputStream(outThumb).use { out -> zis.copyTo(out) }
+                                    // Also maintain thumbnail.png as default entry if not already set
+                                    val stdThumb = File(thumbDir, "thumbnail.png")
+                                    if (!stdThumb.exists()) {
+                                        FileOutputStream(stdThumb).use { out -> outThumb.inputStream().use { it.copyTo(out) } }
+                                    }
+                                } else if (entryExt in supported3DExts) {
                                     val outFile = File(destRoot, entryName)
                                     FileOutputStream(outFile).use { out -> zis.copyTo(out) }
                                     if (primaryModelFile == null) {
@@ -366,27 +379,79 @@ object Buddy3DManager {
     }
 
     /**
-     * Loads the static screenshot icon for the given companion pet from the app's assets/buddies/ folder.
-     * This provides direct asset-backed icons created from character screenshots without runtime generation.
-     * Also checks filesDir/buddies/ for future user-generated content (UGC).
+     * Loads the static screenshot icon for the given companion pet from standardized Thumbnail/ folders.
+     * Checks:
+     * 1. Model-specific Thumbnail/ folders (e.g. assets/buddy3d/models/<folder>/Thumbnail/)
+     * 2. Program buddies/Thumbnail/ folder (assets/buddies/Thumbnail/)
+     * 3. User-generated content (UGC) storage (filesDir/custom_models/<id>/Thumbnail/)
      */
     fun getBuddyScreenshotBitmap(context: Context, petId: String): Bitmap? {
-        // 1. Check bundled assets in buddies/ folder (program assets)
-        try {
-            context.assets.open("buddies/$petId.png").use { stream ->
-                val bmp = BitmapFactory.decodeStream(stream)
-                if (bmp != null) return bmp
-            }
-        } catch (_: Exception) {}
+        val candidateAssetPaths = when (petId) {
+            "pet_2d_classic" -> listOf(
+                "buddy3d/models/2d-classic/Thumbnail/thumbnail.png",
+                "buddy3d/models/2d-classic/Thumbnail/$petId.png",
+                "buddies/Thumbnail/$petId.png",
+                "buddies/$petId.png"
+            )
+            "pet_buddybot_cc0" -> listOf(
+                "buddy3d/models/buddybot-cc0/Thumbnail/thumbnail.png",
+                "buddy3d/models/buddybot-cc0/Thumbnail/$petId.png",
+                "buddies/Thumbnail/$petId.png",
+                "buddies/$petId.png"
+            )
+            "pet_ssrb_greybie" -> listOf(
+                "buddy3d/models/ssrbs-hololive/Thumbnail/pet_ssrb_greybie.png",
+                "buddy3d/models/ssrbs-hololive/Thumbnail/thumbnail.png",
+                "buddies/Thumbnail/$petId.png",
+                "buddies/$petId.png"
+            )
+            "pet_ssrb_camoue" -> listOf(
+                "buddy3d/models/ssrbs-hololive/Thumbnail/pet_ssrb_camoue.png",
+                "buddies/Thumbnail/$petId.png",
+                "buddies/$petId.png"
+            )
+            "pet_ssrb_boitan" -> listOf(
+                "buddy3d/models/ssrbs-hololive/Thumbnail/pet_ssrb_boitan.png",
+                "buddies/Thumbnail/$petId.png",
+                "buddies/$petId.png"
+            )
+            "pet_ssrb_trio" -> listOf(
+                "buddy3d/models/ssrbs-hololive/Thumbnail/pet_ssrb_trio.png",
+                "buddies/Thumbnail/$petId.png",
+                "buddies/$petId.png"
+            )
+            else -> listOf(
+                "buddies/Thumbnail/$petId.png",
+                "buddies/$petId.png"
+            )
+        }
 
-        // 2. Check local user-generated storage in buddies/ folder for future UGC
-        try {
-            val ugcFile = File(context.filesDir, "buddies/$petId.png")
-            if (ugcFile.exists()) {
-                val bmp = BitmapFactory.decodeFile(ugcFile.absolutePath)
-                if (bmp != null) return bmp
-            }
-        } catch (_: Exception) {}
+        // 1. Check bundled program assets
+        for (path in candidateAssetPaths) {
+            try {
+                context.assets.open(path).use { stream ->
+                    val bmp = BitmapFactory.decodeStream(stream)
+                    if (bmp != null) return bmp
+                }
+            } catch (_: Exception) {}
+        }
+
+        // 2. Check user-generated content (UGC) storage for custom models
+        val ugcCandidates = listOf(
+            File(context.filesDir, "custom_models/$petId/Thumbnail/thumbnail.png"),
+            File(context.filesDir, "custom_models/$petId/Thumbnail/$petId.png"),
+            File(context.filesDir, "custom_models/$petId/Thumbnail/thumb.png"),
+            File(context.filesDir, "buddies/Thumbnail/$petId.png"),
+            File(context.filesDir, "buddies/$petId.png")
+        )
+        for (f in ugcCandidates) {
+            try {
+                if (f.exists()) {
+                    val bmp = BitmapFactory.decodeFile(f.absolutePath)
+                    if (bmp != null) return bmp
+                }
+            } catch (_: Exception) {}
+        }
 
         return null
     }
