@@ -131,28 +131,37 @@ fun PagesMenuDropdown(
     val itemGap = 6.dp
     val itemSlotPx = with(density) { (itemHeight + itemGap).toPx() }
 
-    val isHoveringOverDelete by remember(pages, draggedIndex, dragOffsetY, newPageButtonTopInRoot, newPageButtonBottomInRoot) {
+    val isHoveringOverDelete by remember {
         derivedStateOf {
             val d = draggedIndex
-            if (d == null || newPageButtonBottomInRoot <= 0f) {
+            if (d == null) {
                 false
             } else {
                 val page = pages.getOrNull(d)
                 if (page == null || !page.canDelete) {
                     false
                 } else {
-                    val touchY = dragStartItemTopInRoot + dragStartTouchOffsetY + dragOffsetY
-                    val itemCenterY = dragStartItemTopInRoot + (draggedItemHeightPx / 2f) + dragOffsetY
-                    (touchY >= newPageButtonTopInRoot - with(density) { 16.dp.toPx() } &&
-                     touchY <= newPageButtonBottomInRoot + with(density) { 36.dp.toPx() }) ||
-                    (itemCenterY >= newPageButtonTopInRoot - with(density) { 12.dp.toPx() } &&
-                     itemCenterY <= newPageButtonBottomInRoot + with(density) { 24.dp.toPx() })
+                    // Check relative slot offset (always reliable)
+                    val distanceToLastSlot = (pages.size - 1 - d) * itemSlotPx
+                    val isPastLastSlot = dragOffsetY >= distanceToLastSlot + with(density) { 15.dp.toPx() }
+
+                    // Also verify root coordinates when measured
+                    val rootCheck = if (newPageButtonBottomInRoot > 0f) {
+                        val touchY = dragStartItemTopInRoot + dragStartTouchOffsetY + dragOffsetY
+                        val itemCenterY = dragStartItemTopInRoot + (draggedItemHeightPx / 2f) + dragOffsetY
+                        (touchY >= newPageButtonTopInRoot - with(density) { 16.dp.toPx() } &&
+                         touchY <= newPageButtonBottomInRoot + with(density) { 40.dp.toPx() }) ||
+                        (itemCenterY >= newPageButtonTopInRoot - with(density) { 12.dp.toPx() } &&
+                         itemCenterY <= newPageButtonBottomInRoot + with(density) { 30.dp.toPx() })
+                    } else false
+
+                    isPastLastSlot || rootCheck
                 }
             }
         }
     }
 
-    val currentTargetIndex by remember(pages.size, itemSlotPx, isHoveringOverDelete) {
+    val currentTargetIndex by remember {
         derivedStateOf {
             if (isHoveringOverDelete) {
                 null
@@ -315,7 +324,9 @@ fun PagesMenuDropdown(
 
                         Column(
                             verticalArrangement = Arrangement.spacedBy(itemGap),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .zIndex(if (draggedIndex != null) 50f else 1f)
                         ) {
                             pages.forEachIndexed { index, page ->
                                 key(page.id) {
@@ -326,15 +337,21 @@ fun PagesMenuDropdown(
                                     val canMoveUp = (index > 0)
                                     val canMoveDown = (index < pages.size - 1)
 
-                                    val targetDisplacement = remember(index, draggedIndex, currentTargetIndex, itemSlotPx) {
-                                        val d = draggedIndex
-                                        val target = currentTargetIndex
-                                        if (d == null || target == null || index == d) 0f
-                                        else if (target > d) {
-                                            if (index in (d + 1)..target) -itemSlotPx else 0f
-                                        } else if (target < d) {
-                                            if (index in target until d) itemSlotPx else 0f
-                                        } else 0f
+                                    // Compute displacement reactively so other pages reorder live while dragging
+                                    val targetDisplacement = when {
+                                        draggedIndex == null -> 0f
+                                        isHoveringOverDelete -> {
+                                            // When hovering over delete button, items below slide up to preview closing the slot
+                                            if (index > draggedIndex!!) -itemSlotPx else 0f
+                                        }
+                                        currentTargetIndex == null || index == draggedIndex -> 0f
+                                        currentTargetIndex!! > draggedIndex!! -> {
+                                            if (index in (draggedIndex!! + 1)..currentTargetIndex!!) -itemSlotPx else 0f
+                                        }
+                                        currentTargetIndex!! < draggedIndex!! -> {
+                                            if (index in currentTargetIndex!! until draggedIndex!!) itemSlotPx else 0f
+                                        }
+                                        else -> 0f
                                     }
 
                                     val animatedDisplacement by animateFloatAsState(
@@ -431,7 +448,11 @@ fun PagesMenuDropdown(
                                                         },
                                                         onDrag = { change, dragAmount ->
                                                             change.consume()
-                                                            dragOffsetY += dragAmount.y
+                                                            // Constrain dragging strictly within the pages container:
+                                                            // Cannot drag above slot 0, and cannot drag below the delete button
+                                                            val minDragY = -(index * itemSlotPx)
+                                                            val maxDragY = (pages.size - 1 - index) * itemSlotPx + with(density) { 56.dp.toPx() }
+                                                            dragOffsetY = (dragOffsetY + dragAmount.y).coerceIn(minDragY, maxDragY)
                                                         },
                                                         onDragEnd = {
                                                             val d = draggedIndex
@@ -664,12 +685,17 @@ fun PagesMenuDropdown(
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
-                        HorizontalDivider(color = NothingBorder, thickness = 0.5.dp)
+                        HorizontalDivider(
+                            modifier = Modifier.zIndex(0f),
+                            color = NothingBorder,
+                            thickness = 0.5.dp
+                        )
                         Spacer(modifier = Modifier.height(10.dp))
 
                         // Add / Create Page Section
                         AnimatedContent(
                             targetState = isTemplateSelectorOpen,
+                            modifier = Modifier.zIndex(0f),
                             transitionSpec = {
                                 (fadeIn() + expandVertically()).togetherWith(fadeOut() + shrinkVertically())
                             },
@@ -813,6 +839,7 @@ fun PagesMenuDropdown(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .zIndex(0f)
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(NothingDarkBackground)
                                     .border(1.dp, NothingBorder, RoundedCornerShape(10.dp))
