@@ -100,6 +100,10 @@ object DashboardPagesManager {
         DashboardPageItem(id = "page_squad", title = "SQUAD", type = DashboardPageType.SQUAD, canDelete = false)
     )
 
+    val DEFAULT_PAGE_IDS = setOf("page_left", "page_main", "page_inventory", "page_squad")
+
+    fun isDefaultPage(pageId: String): Boolean = pageId in DEFAULT_PAGE_IDS
+
     fun loadPages(context: Context): List<DashboardPageItem> {
         val prefs = context.getSharedPreferences("buddygotchi_prefs", Context.MODE_PRIVATE)
         val jsonString = prefs.getString(PREFS_KEY_PAGES, null) ?: return DEFAULT_PAGES
@@ -112,7 +116,8 @@ object DashboardPagesManager {
                 val title = obj.getString("title")
                 val typeStr = obj.optString("type", DashboardPageType.CUSTOM_GRID.name)
                 val type = try { DashboardPageType.valueOf(typeStr) } catch (_: Exception) { DashboardPageType.CUSTOM_GRID }
-                val canDelete = obj.optBoolean("canDelete", type == DashboardPageType.CUSTOM_GRID && id != "page_left" && id != "page_inventory")
+                val isDefault = isDefaultPage(id) || type == DashboardPageType.MAIN || type == DashboardPageType.SQUAD
+                val canDelete = !isDefault
                 list.add(DashboardPageItem(id, title, type, canDelete))
             }
             if (list.isEmpty()) {
@@ -182,7 +187,8 @@ object DashboardPagesManager {
     }
 
     fun deletePage(context: Context, pageId: String): List<DashboardPageItem> {
-        val current = loadPages(context).filter { it.id != pageId || !it.canDelete }
+        if (isDefaultPage(pageId)) return loadPages(context)
+        val current = loadPages(context).filter { it.id != pageId }
         savePages(context, current)
         val prefs = context.getSharedPreferences("buddygotchi_prefs", Context.MODE_PRIVATE)
         prefs.edit().remove("$PREFS_PAGE_LAYOUT_PREFIX$pageId").apply()

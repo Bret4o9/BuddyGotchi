@@ -32,6 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -110,22 +112,55 @@ fun PagesMenuDropdown(
 
     var isTemplateSelectorOpen by remember { mutableStateOf(false) }
 
-    // Long-press drag reordering state
+    // Long-press drag reordering & drag-to-delete state
     var draggedIndex by remember { mutableStateOf<Int?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
     val dropAnimOffsetY = remember { Animatable(0f) }
     var isDropping by remember { mutableStateOf(false) }
+
+    // Coordinates tracking in root window space for hover-over-delete detection
+    var dragStartItemTopInRoot by remember { mutableFloatStateOf(0f) }
+    var dragStartTouchOffsetY by remember { mutableFloatStateOf(0f) }
+    var draggedItemHeightPx by remember { mutableFloatStateOf(0f) }
+
+    var newPageButtonTopInRoot by remember { mutableFloatStateOf(0f) }
+    var newPageButtonBottomInRoot by remember { mutableFloatStateOf(0f) }
 
     val activeDragY = if (isDropping) dropAnimOffsetY.value else dragOffsetY
     val itemHeight = 54.dp
     val itemGap = 6.dp
     val itemSlotPx = with(density) { (itemHeight + itemGap).toPx() }
 
-    val currentTargetIndex by remember(pages.size, itemSlotPx) {
+    val isHoveringOverDelete by remember(pages, draggedIndex, dragOffsetY, newPageButtonTopInRoot, newPageButtonBottomInRoot) {
         derivedStateOf {
-            draggedIndex?.let { d ->
-                val offsetSlots = (activeDragY / itemSlotPx).roundToInt()
-                (d + offsetSlots).coerceIn(0, pages.size - 1)
+            val d = draggedIndex
+            if (d == null || newPageButtonBottomInRoot <= 0f) {
+                false
+            } else {
+                val page = pages.getOrNull(d)
+                if (page == null || !page.canDelete) {
+                    false
+                } else {
+                    val touchY = dragStartItemTopInRoot + dragStartTouchOffsetY + dragOffsetY
+                    val itemCenterY = dragStartItemTopInRoot + (draggedItemHeightPx / 2f) + dragOffsetY
+                    (touchY >= newPageButtonTopInRoot - with(density) { 16.dp.toPx() } &&
+                     touchY <= newPageButtonBottomInRoot + with(density) { 36.dp.toPx() }) ||
+                    (itemCenterY >= newPageButtonTopInRoot - with(density) { 12.dp.toPx() } &&
+                     itemCenterY <= newPageButtonBottomInRoot + with(density) { 24.dp.toPx() })
+                }
+            }
+        }
+    }
+
+    val currentTargetIndex by remember(pages.size, itemSlotPx, isHoveringOverDelete) {
+        derivedStateOf {
+            if (isHoveringOverDelete) {
+                null
+            } else {
+                draggedIndex?.let { d ->
+                    val offsetSlots = (activeDragY / itemSlotPx).roundToInt()
+                    (d + offsetSlots).coerceIn(0, pages.size - 1)
+                }
             }
         }
     }
@@ -142,6 +177,17 @@ fun PagesMenuDropdown(
         }
         if (draggedIndex == null) {
             lastTargetIndex = null
+        }
+    }
+
+    // Haptic tick when hovering over the delete button
+    var lastHoveringOverDelete by remember { mutableStateOf(false) }
+    LaunchedEffect(isHoveringOverDelete) {
+        if (isHoveringOverDelete != lastHoveringOverDelete) {
+            if (isHoveringOverDelete) {
+                triggerTick()
+            }
+            lastHoveringOverDelete = isHoveringOverDelete
         }
     }
 
@@ -252,12 +298,12 @@ fun PagesMenuDropdown(
 
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (draggedIndex != null) "DRAGGING PAGE // RELEASE TO SET" else "HOLD & DRAG TO MOVE // ▲ UP = LEFT • ▼ DOWN = RIGHT",
+                            text = "HOLD & DRAG TO MOVE",
                             fontSize = 7.5.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
                             letterSpacing = 0.5.sp,
-                            color = if (draggedIndex != null) NothingRed else NothingTextTertiary
+                            color = NothingTextTertiary
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -311,10 +357,44 @@ fun PagesMenuDropdown(
                                         label = "scale_${page.id}"
                                     )
 
+                                    var itemTopInRoot by remember { mutableFloatStateOf(0f) }
+                                    var itemHeightPx by remember { mutableFloatStateOf(0f) }
+
+                                    val isTargetedForDeletion = isThisItemDragged && isHoveringOverDelete
+
+                                    val itemBorderColor by animateColorAsState(
+                                        targetValue = when {
+                                            isTargetedForDeletion -> NothingRed
+                                            isThisItemDragged -> NothingRed.copy(alpha = 0.95f)
+                                            isActive -> NothingRed.copy(alpha = 0.8f)
+                                            isMain -> NothingRed.copy(alpha = 0.35f)
+                                            else -> NothingBorder.copy(alpha = 0.5f)
+                                        },
+                                        label = "borderColor_${page.id}"
+                                    )
+
+                                    val itemBgColor by animateColorAsState(
+                                        targetValue = when {
+                                            isTargetedForDeletion -> Color(0xFF3B1214)
+                                            isThisItemDragged -> Color(0xFF261818)
+                                            isActive -> Color(0x1AD71920)
+                                            isMain -> Color(0x0ED71920)
+                                            else -> NothingSurfaceVariant.copy(alpha = 0.5f)
+                                        },
+                                        label = "bgColor_${page.id}"
+                                    )
+
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(itemHeight)
+                                            .onGloballyPositioned { coords ->
+                                                if (draggedIndex == null) {
+                                                    val pos = coords.positionInRoot()
+                                                    itemTopInRoot = pos.y
+                                                    itemHeightPx = coords.size.height.toFloat()
+                                                }
+                                            }
                                             .zIndex(if (isThisItemDragged) 100f else 1f)
                                             .offset { IntOffset(0, effectiveOffsetY.roundToInt()) }
                                             .graphicsLayer {
@@ -324,38 +404,28 @@ fun PagesMenuDropdown(
                                                 clip = false
                                             }
                                             .clip(RoundedCornerShape(10.dp))
-                                            .background(
-                                                when {
-                                                    isThisItemDragged -> Color(0xFF261818)
-                                                    isActive -> Color(0x1AD71920)
-                                                    isMain -> Color(0x0ED71920)
-                                                    else -> NothingSurfaceVariant.copy(alpha = 0.5f)
-                                                }
-                                            )
+                                            .background(itemBgColor)
                                             .border(
                                                 if (isThisItemDragged) 1.5.dp else 1.dp,
-                                                when {
-                                                    isThisItemDragged -> NothingRed.copy(alpha = 0.95f)
-                                                    isActive -> NothingRed.copy(alpha = 0.8f)
-                                                    isMain -> NothingRed.copy(alpha = 0.35f)
-                                                    else -> NothingBorder.copy(alpha = 0.5f)
-                                                },
+                                                itemBorderColor,
                                                 RoundedCornerShape(10.dp)
                                             )
-                                            .padding(start = 8.dp, end = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                            .padding(horizontal = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         // Draggable & Tappable Body (Page Number, Title, Position Badge, Tactile Grip Handle)
                                         Row(
                                             modifier = Modifier
-                                                .weight(1f)
+                                                .fillMaxWidth()
                                                 .fillMaxHeight()
                                                 .pointerInput(page.id, index) {
                                                     detectDragGesturesAfterLongPress(
-                                                        onDragStart = {
+                                                        onDragStart = { offset ->
                                                             draggedIndex = index
                                                             dragOffsetY = 0f
+                                                            dragStartItemTopInRoot = itemTopInRoot
+                                                            dragStartTouchOffsetY = offset.y
+                                                            draggedItemHeightPx = itemHeightPx
                                                             isDropping = false
                                                             triggerPickUpHaptic()
                                                         },
@@ -366,37 +436,46 @@ fun PagesMenuDropdown(
                                                         onDragEnd = {
                                                             val d = draggedIndex
                                                             if (d != null) {
-                                                                val offsetSlots = (dragOffsetY / itemSlotPx).roundToInt()
-                                                                val t = (d + offsetSlots).coerceIn(0, pages.size - 1)
-                                                                coroutineScope.launch {
-                                                                    try {
-                                                                        isDropping = true
-                                                                        dropAnimOffsetY.snapTo(dragOffsetY)
-                                                                        if (t != d) {
-                                                                            val landingOffset = (t - d) * itemSlotPx
-                                                                            dropAnimOffsetY.animateTo(
-                                                                                targetValue = landingOffset,
-                                                                                animationSpec = spring(
-                                                                                    dampingRatio = Spring.DampingRatioLowBouncy,
-                                                                                    stiffness = Spring.StiffnessMedium
+                                                                val pageToHandle = pages.getOrNull(d)
+                                                                if (isHoveringOverDelete && pageToHandle != null && pageToHandle.canDelete) {
+                                                                    triggerDropHaptic()
+                                                                    onDeletePage(pageToHandle.id)
+                                                                    draggedIndex = null
+                                                                    dragOffsetY = 0f
+                                                                    isDropping = false
+                                                                } else {
+                                                                    val offsetSlots = (dragOffsetY / itemSlotPx).roundToInt()
+                                                                    val t = (d + offsetSlots).coerceIn(0, pages.size - 1)
+                                                                    coroutineScope.launch {
+                                                                        try {
+                                                                            isDropping = true
+                                                                            dropAnimOffsetY.snapTo(dragOffsetY)
+                                                                            if (t != d) {
+                                                                                val landingOffset = (t - d) * itemSlotPx
+                                                                                dropAnimOffsetY.animateTo(
+                                                                                    targetValue = landingOffset,
+                                                                                    animationSpec = spring(
+                                                                                        dampingRatio = Spring.DampingRatioLowBouncy,
+                                                                                        stiffness = Spring.StiffnessMedium
+                                                                                    )
                                                                                 )
-                                                                            )
-                                                                            onMovePage(d, t)
-                                                                            triggerDropHaptic()
-                                                                        } else {
-                                                                            dropAnimOffsetY.animateTo(
-                                                                                targetValue = 0f,
-                                                                                animationSpec = spring(
-                                                                                    dampingRatio = Spring.DampingRatioLowBouncy,
-                                                                                    stiffness = Spring.StiffnessMedium
+                                                                                onMovePage(d, t)
+                                                                                triggerDropHaptic()
+                                                                            } else {
+                                                                                dropAnimOffsetY.animateTo(
+                                                                                    targetValue = 0f,
+                                                                                    animationSpec = spring(
+                                                                                        dampingRatio = Spring.DampingRatioLowBouncy,
+                                                                                        stiffness = Spring.StiffnessMedium
+                                                                                    )
                                                                                 )
-                                                                            )
+                                                                            }
+                                                                        } finally {
+                                                                            dragOffsetY = 0f
+                                                                            dropAnimOffsetY.snapTo(0f)
+                                                                            isDropping = false
+                                                                            draggedIndex = null
                                                                         }
-                                                                    } finally {
-                                                                        dragOffsetY = 0f
-                                                                        dropAnimOffsetY.snapTo(0f)
-                                                                        isDropping = false
-                                                                        draggedIndex = null
                                                                     }
                                                                 }
                                                             }
@@ -432,190 +511,149 @@ fun PagesMenuDropdown(
                                                         onDismiss()
                                                     }
                                                 },
-                                            verticalAlignment = Alignment.CenterVertically
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
-                                            // Tactile Nothing OS 6-dot grip handle
-                                            Column(
-                                                modifier = Modifier.padding(end = 7.dp),
-                                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                                            Row(
+                                                modifier = Modifier.weight(1f),
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                repeat(3) {
-                                                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .size(2.5.dp)
-                                                                .clip(CircleShape)
-                                                                .background(
-                                                                    if (isThisItemDragged) NothingRed
-                                                                    else NothingTextTertiary.copy(alpha = 0.45f)
-                                                                )
-                                                        )
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .size(2.5.dp)
-                                                                .clip(CircleShape)
-                                                                .background(
-                                                                    if (isThisItemDragged) NothingRed
-                                                                    else NothingTextTertiary.copy(alpha = 0.45f)
-                                                                )
-                                                        )
-                                                    }
-                                                }
-                                            }
-
-                                            // Page Number in DSEG7
-                                            Text(
-                                                text = String.format("%02d", index + 1),
-                                                fontFamily = Dseg7FontFamily,
-                                                fontSize = 11.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isThisItemDragged || isActive || isMain) NothingRed else NothingTextSecondary
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-
-                                            // Title & Position Tag
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                // Tactile Nothing OS 6-dot grip handle
+                                                Column(
+                                                    modifier = Modifier.padding(end = 7.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(2.dp)
                                                 ) {
-                                                    Text(
-                                                        text = page.title,
-                                                        fontSize = 10.5.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        fontFamily = FontFamily.Monospace,
-                                                        letterSpacing = 0.5.sp,
-                                                        color = if (isThisItemDragged || isActive || isMain) NothingWhite else NothingTextSecondary,
-                                                        maxLines = 1
-                                                    )
-                                                    if (isActive) {
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .clip(RoundedCornerShape(3.dp))
-                                                                .background(NothingRed.copy(alpha = 0.2f))
-                                                                .border(0.5.dp, NothingRed, RoundedCornerShape(3.dp))
-                                                                .padding(horizontal = 4.dp, vertical = 1.dp)
-                                                        ) {
-                                                            Text(
-                                                                text = "LIVE",
-                                                                fontSize = 6.5.sp,
-                                                                fontWeight = FontWeight.Bold,
-                                                                fontFamily = FontFamily.Monospace,
-                                                                color = NothingRed
+                                                    repeat(3) {
+                                                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .size(2.5.dp)
+                                                                    .clip(CircleShape)
+                                                                    .background(
+                                                                        if (isThisItemDragged) NothingRed
+                                                                        else NothingTextTertiary.copy(alpha = 0.45f)
+                                                                    )
+                                                            )
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .size(2.5.dp)
+                                                                    .clip(CircleShape)
+                                                                    .background(
+                                                                        if (isThisItemDragged) NothingRed
+                                                                        else NothingTextTertiary.copy(alpha = 0.45f)
+                                                                    )
                                                             )
                                                         }
                                                     }
                                                 }
-                                                // Position relative to MAIN badge
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                when {
-                                                    page.type == DashboardPageType.SQUAD -> {
+
+                                                // Page Number in DSEG7
+                                                Text(
+                                                    text = String.format("%02d", index + 1),
+                                                    fontFamily = Dseg7FontFamily,
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isThisItemDragged || isActive || isMain) NothingRed else NothingTextSecondary
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+
+                                                // Title & Position Tag
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                    ) {
                                                         Text(
-                                                            text = "◈ DEDICATED SQUAD HUB",
-                                                            fontSize = 7.5.sp,
+                                                            text = page.title,
+                                                            fontSize = 10.5.sp,
                                                             fontWeight = FontWeight.Bold,
                                                             fontFamily = FontFamily.Monospace,
-                                                            color = NothingRed.copy(alpha = 0.9f),
-                                                            letterSpacing = 0.3.sp
+                                                            letterSpacing = 0.5.sp,
+                                                            color = if (isThisItemDragged || isActive || isMain) NothingWhite else NothingTextSecondary,
+                                                            maxLines = 1
                                                         )
+                                                        if (isActive) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .clip(RoundedCornerShape(3.dp))
+                                                                    .background(NothingRed.copy(alpha = 0.2f))
+                                                                    .border(0.5.dp, NothingRed, RoundedCornerShape(3.dp))
+                                                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                            ) {
+                                                                Text(
+                                                                    text = "LIVE",
+                                                                    fontSize = 6.5.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    fontFamily = FontFamily.Monospace,
+                                                                    color = NothingRed
+                                                                )
+                                                            }
+                                                        }
                                                     }
-                                                    distFromMain < 0 -> {
-                                                        val stepsLeft = -distFromMain
-                                                        Text(
-                                                            text = "← L$stepsLeft (LEFT)",
-                                                            fontSize = 7.5.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            fontFamily = FontFamily.Monospace,
-                                                            color = NothingTextTertiary,
-                                                            letterSpacing = 0.3.sp
-                                                        )
-                                                    }
-                                                    distFromMain == 0 -> {
-                                                        Text(
-                                                            text = "⊙ CENTER POINT",
-                                                            fontSize = 7.5.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            fontFamily = FontFamily.Monospace,
-                                                            color = NothingRed.copy(alpha = 0.9f),
-                                                            letterSpacing = 0.3.sp
-                                                        )
-                                                    }
-                                                    else -> {
-                                                        val stepsRight = distFromMain
-                                                        Text(
-                                                            text = "R$stepsRight → (RIGHT)",
-                                                            fontSize = 7.5.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            fontFamily = FontFamily.Monospace,
-                                                            color = NothingTextTertiary,
-                                                            letterSpacing = 0.3.sp
-                                                        )
+                                                    // Position relative to MAIN badge
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    when {
+                                                        page.type == DashboardPageType.SQUAD -> {
+                                                            Text(
+                                                                text = "◈ DEDICATED SQUAD HUB",
+                                                                fontSize = 7.5.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace,
+                                                                color = NothingRed.copy(alpha = 0.9f),
+                                                                letterSpacing = 0.3.sp
+                                                            )
+                                                        }
+                                                        distFromMain < 0 -> {
+                                                            val stepsLeft = -distFromMain
+                                                            Text(
+                                                                text = "← L$stepsLeft (LEFT)",
+                                                                fontSize = 7.5.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace,
+                                                                color = NothingTextTertiary,
+                                                                letterSpacing = 0.3.sp
+                                                            )
+                                                        }
+                                                        distFromMain == 0 -> {
+                                                            Text(
+                                                                text = "⊙ CENTER POINT",
+                                                                fontSize = 7.5.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace,
+                                                                color = NothingRed.copy(alpha = 0.9f),
+                                                                letterSpacing = 0.3.sp
+                                                            )
+                                                        }
+                                                        else -> {
+                                                            val stepsRight = distFromMain
+                                                            Text(
+                                                                text = "R$stepsRight → (RIGHT)",
+                                                                fontSize = 7.5.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace,
+                                                                color = NothingTextTertiary,
+                                                                letterSpacing = 0.3.sp
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }
-                                        }
 
-                                        // Action buttons: [▲] [▼] [✕]
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            // Move Up button
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(28.dp)
-                                                    .clip(RoundedCornerShape(7.dp))
-                                                    .background(if (canMoveUp) Color(0xFF242424) else Color(0xFF141414))
-                                                    .border(0.5.dp, if (canMoveUp) Color(0xFF3B3B3B) else Color(0xFF222222), RoundedCornerShape(7.dp))
-                                                    .clickable(enabled = canMoveUp) {
-                                                        onMovePage(index, index - 1)
-                                                    },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = "▲",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (canMoveUp) NothingWhite else NothingTextTertiary.copy(alpha = 0.25f)
-                                                )
-                                            }
-
-                                            // Move Down button
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(28.dp)
-                                                    .clip(RoundedCornerShape(7.dp))
-                                                    .background(if (canMoveDown) Color(0xFF242424) else Color(0xFF141414))
-                                                    .border(0.5.dp, if (canMoveDown) Color(0xFF3B3B3B) else Color(0xFF222222), RoundedCornerShape(7.dp))
-                                                    .clickable(enabled = canMoveDown) {
-                                                        onMovePage(index, index + 1)
-                                                    },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = "▼",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (canMoveDown) NothingWhite else NothingTextTertiary.copy(alpha = 0.25f)
-                                                )
-                                            }
-
-                                            // Delete button (for custom deletable pages)
-                                            if (page.canDelete) {
+                                            // Trailing indicator: Shows red deletion tag while hovering over delete button
+                                            if (isTargetedForDeletion) {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(28.dp)
-                                                        .clip(CircleShape)
-                                                        .background(Color(0xFF241515))
-                                                        .border(0.5.dp, NothingRed.copy(alpha = 0.4f), CircleShape)
-                                                        .clickable { onDeletePage(page.id) },
-                                                    contentAlignment = Alignment.Center
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(NothingRed)
+                                                        .padding(horizontal = 6.dp, vertical = 3.dp)
                                                 ) {
                                                     Text(
-                                                        text = "✕",
-                                                        fontSize = 11.sp,
+                                                        text = "DROP TO DELETE",
+                                                        fontSize = 7.5.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        color = NothingRed
+                                                        fontFamily = FontFamily.Monospace,
+                                                        letterSpacing = 0.5.sp,
+                                                        color = Color.White
                                                     )
                                                 }
                                             }
@@ -638,25 +676,47 @@ fun PagesMenuDropdown(
                             label = "AddPageSectionTransition"
                         ) { isSelectorOpen ->
                             if (!isSelectorOpen) {
-                                // + NEW PAGE Button
+                                val buttonBgColor by animateColorAsState(
+                                    targetValue = if (isHoveringOverDelete) NothingRed else NothingSurfaceVariant,
+                                    label = "newPageBtnBg"
+                                )
+                                val buttonBorderColor by animateColorAsState(
+                                    targetValue = if (isHoveringOverDelete) NothingRed else NothingBorder,
+                                    label = "newPageBtnBorder"
+                                )
+                                val buttonTextColor by animateColorAsState(
+                                    targetValue = if (isHoveringOverDelete) Color.White else NothingWhite,
+                                    label = "newPageBtnText"
+                                )
+
+                                // + NEW PAGE Button (turns into "DELETE PAGE" while hovering with a deletable page)
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .onGloballyPositioned { coords ->
+                                            val pos = coords.positionInRoot()
+                                            newPageButtonTopInRoot = pos.y
+                                            newPageButtonBottomInRoot = pos.y + coords.size.height
+                                        }
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(NothingSurfaceVariant)
-                                        .border(1.dp, NothingBorder, RoundedCornerShape(10.dp))
-                                        .clickable { isTemplateSelectorOpen = true }
+                                        .background(buttonBgColor)
+                                        .border(
+                                            if (isHoveringOverDelete) 1.5.dp else 1.dp,
+                                            buttonBorderColor,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable(enabled = draggedIndex == null) { isTemplateSelectorOpen = true }
                                         .padding(vertical = 9.dp),
                                     horizontalArrangement = Arrangement.Center,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "+ NEW PAGE",
+                                        text = if (isHoveringOverDelete) "🗑 DELETE PAGE" else "+ NEW PAGE",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = FontFamily.Monospace,
                                         letterSpacing = 1.2.sp,
-                                        color = NothingWhite
+                                        color = buttonTextColor
                                     )
                                 }
                             } else {
