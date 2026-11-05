@@ -96,6 +96,7 @@ fun SquadDashboardPage(
     var showCreateDialog by remember { mutableStateOf(false) }
     var showAddFriendDialog by remember { mutableStateOf(false) }
     var showEnlargedQrDialog by remember { mutableStateOf(false) }
+    var viewingFriendProfile by remember { mutableStateOf<SquadFriend?>(null) }
     var showAccountHubDialog by remember { mutableStateOf(false) }
     var accountHubTab by remember { mutableStateOf(AccountHubTab.ACCOUNT) }
 
@@ -413,7 +414,7 @@ fun SquadDashboardPage(
                         }
 
                         Text(
-                            text = "HOLD TO DRAG",
+                            text = "DRAG TO INVITE",
                             fontFamily = FontFamily.Monospace,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,
@@ -471,11 +472,7 @@ fun SquadDashboardPage(
                                     )
                                     .clickable {
                                         triggerTick()
-                                        stagedInviteCodes = if (isStaged) {
-                                            stagedInviteCodes - friend.buddyCode
-                                        } else {
-                                            stagedInviteCodes + friend.buddyCode
-                                        }
+                                        viewingFriendProfile = friend
                                     }
                                     .pointerInput(friend.buddyCode) {
                                         detectDragGesturesAfterLongPress(
@@ -1433,6 +1430,25 @@ fun SquadDashboardPage(
                 }
             }
         }
+    }
+
+    if (viewingFriendProfile != null) {
+        val targetFriend = viewingFriendProfile!!
+        SquadFriendProfileDialog(
+            friend = targetFriend,
+            isStaged = targetFriend.buddyCode in stagedInviteCodes,
+            onDismiss = { viewingFriendProfile = null },
+            onToggleStage = {
+                val isCurrentlyStaged = targetFriend.buddyCode in stagedInviteCodes
+                if (isCurrentlyStaged) {
+                    stagedInviteCodes = stagedInviteCodes - targetFriend.buddyCode
+                    triggerTick()
+                } else {
+                    stagedInviteCodes = stagedInviteCodes + targetFriend.buddyCode
+                    triggerConfirmPulse()
+                }
+            }
+        )
     }
 
     if (showAddFriendDialog) {
