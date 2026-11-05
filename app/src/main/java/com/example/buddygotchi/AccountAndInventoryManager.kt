@@ -865,7 +865,7 @@ object AccountAndInventoryManager {
                     .edit()
                     .putLong(KEY_LAST_SYNC_TIME, now)
                     .apply()
-                syncStatusMessageState.value = "CLOUD SYNC COMPLETE • ALL PETS & ITEMS SAVED"
+                syncStatusMessageState.value = null
                 onComplete?.invoke(true)
             }
             .addOnFailureListener { e ->

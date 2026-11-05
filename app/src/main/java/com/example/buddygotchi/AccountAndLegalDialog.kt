@@ -301,7 +301,7 @@ fun AccountAndLegalHubDialog(
                     }
                 }
 
-                if (!statusMsg.isNullOrBlank()) {
+                if (!statusMsg.isNullOrBlank() && statusMsg!!.contains("WARNING", ignoreCase = true)) {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = Color(0xFF1E1415),
@@ -399,33 +399,6 @@ private fun AccountTabContent(
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Optional Account Notice
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = NothingSurfaceVariant,
-            border = BorderStroke(1.dp, NothingBorder),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "OPTIONAL CROSS-DEVICE CLOUD ACCOUNT",
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = NothingWhite
-                )
-                Text(
-                    text = "Creating an account is completely optional. It backs up your Companion Level, XP, Pets, and Gear Inventory across devices. Passwords stored in your Passwords Widget remain 100% local on your phone and are never uploaded.",
-                    fontSize = 11.sp,
-                    color = NothingTextSecondary,
-                    lineHeight = 15.sp
-                )
-            }
-        }
-
         if (isLoggedIn) {
             // Signed-In Account Card
             Surface(
@@ -459,13 +432,13 @@ private fun AccountTabContent(
                         color = NothingTextSecondary
                     )
                     Text(
-                        text = "SYNCED INVENTORY: $unlockedPetsCount PETS • $unlockedItemsCount ITEMS",
+                        text = "INVENTORY: $unlockedPetsCount PETS • $unlockedItemsCount ITEMS",
                         fontFamily = FontFamily.Monospace,
                         fontSize = 10.sp,
                         color = NothingTextSecondary
                     )
                     Text(
-                        text = "✓ AUTO-SYNC ACTIVE (SYNCS AUTOMATICALLY ON LOGIN & CHANGES)",
+                        text = "✓ AUTO-SYNC ACTIVE",
                         fontFamily = FontFamily.Monospace,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
@@ -482,7 +455,10 @@ private fun AccountTabContent(
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(NothingRed)
                                 .clickable {
-                                    AccountAndInventoryManager.syncAccountToCloud(context) {
+                                    AccountAndInventoryManager.syncAccountToCloud(context) { success ->
+                                        if (success) {
+                                            android.widget.Toast.makeText(context, "Cloud sync complete!", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
                                         onDataChanged()
                                     }
                                 }
@@ -1010,6 +986,33 @@ private fun LegalAndPrivacyTabContent(
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Optional Cross-Device Cloud Account Notice
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = NothingSurfaceVariant,
+            border = BorderStroke(1.dp, NothingBorder),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "OPTIONAL CROSS-DEVICE CLOUD ACCOUNT",
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = NothingWhite
+                )
+                Text(
+                    text = "Creating an account is completely optional. It backs up your Companion Level, XP, Pets, and Gear Inventory across devices. Passwords stored in your Passwords Widget remain 100% local on your phone and are never uploaded.",
+                    fontSize = 11.sp,
+                    color = NothingTextSecondary,
+                    lineHeight = 15.sp
+                )
+            }
+        }
+
         // 1. Live Consent, Unsubscribe & Data Deletion Controls
         Surface(
             shape = RoundedCornerShape(14.dp),
