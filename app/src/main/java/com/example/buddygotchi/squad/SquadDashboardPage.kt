@@ -239,14 +239,13 @@ fun SquadDashboardPage(
                         }
                     }
 
-                    // Cross-Device Account, Inventory & Legal Action Row
+                    // Cross-Device Account & Legal Action Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         listOf(
                             "CLOUD ACCOUNT" to AccountHubTab.ACCOUNT,
-                            "PETS & ITEMS" to AccountHubTab.INVENTORY,
                             "PRIVACY & LEGAL" to AccountHubTab.LEGAL
                         ).forEach { (btnLabel, tabTarget) ->
                             Box(

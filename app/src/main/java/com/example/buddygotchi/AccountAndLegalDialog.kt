@@ -37,7 +37,6 @@ import com.example.buddygotchi.ui.theme.*
 
 enum class AccountHubTab(val label: String) {
     ACCOUNT("ACCOUNT"),
-    INVENTORY("PETS & ITEMS"),
     LEGAL("LEGAL & PRIVACY")
 }
 
@@ -193,16 +192,11 @@ fun AccountAndLegalHubDialog(
     val accountEmail by AccountAndInventoryManager.accountEmailState
     val accountUsername by AccountAndInventoryManager.accountUsernameState
     val accountBuddyCode by AccountAndInventoryManager.accountBuddyCodeState
-    val equippedPetId by AccountAndInventoryManager.equippedPetIdState
     val unlockedPets = AccountAndInventoryManager.unlockedPetIdsState
     val unlockedItems = AccountAndInventoryManager.unlockedItemIdsState
-    val equippedItems = AccountAndInventoryManager.equippedItemIdsState
     val cloudSyncConsent by AccountAndInventoryManager.cloudSyncConsentState
     val updatesSubscribed by AccountAndInventoryManager.updatesSubscribedState
     val statusMsg by AccountAndInventoryManager.syncStatusMessageState
-
-    val xp = remember(statusMsg, equippedPetId) { TaskManager.getBuddyXp(context) }
-    val level = (xp / 50) + 1
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -240,7 +234,7 @@ fun AccountAndLegalHubDialog(
                         )
                         Column {
                             Text(
-                                text = "ACCOUNT, INVENTORY & LEGAL HUB",
+                                text = "ACCOUNT & LEGAL HUB",
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
@@ -338,17 +332,6 @@ fun AccountAndLegalHubDialog(
                                     activeLegalDoc = docType
                                     activeTab = AccountHubTab.LEGAL
                                 },
-                                onDataChanged = onDataChanged
-                            )
-                        }
-                        AccountHubTab.INVENTORY -> {
-                            InventoryTabContent(
-                                level = level,
-                                xp = xp,
-                                equippedPetId = equippedPetId,
-                                unlockedPets = unlockedPets,
-                                unlockedItems = unlockedItems,
-                                equippedItems = equippedItems,
                                 onDataChanged = onDataChanged
                             )
                         }
@@ -701,268 +684,6 @@ private fun AccountTabContent(
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun InventoryTabContent(
-    level: Int,
-    xp: Int,
-    equippedPetId: String,
-    unlockedPets: List<String>,
-    unlockedItems: List<String>,
-    equippedItems: List<String>,
-    onDataChanged: () -> Unit
-) {
-    val context = LocalContext.current
-    val scrollState = rememberScrollState()
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = NothingSurfaceVariant,
-            border = BorderStroke(1.dp, NothingBorder),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "OPERATOR LEVEL $level • $xp XP",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NothingWhite
-                    )
-                    Text(
-                        text = "EARN XP BY COMPLETING TASKS & PETTING BUDDY • $0 HIDDEN FEES",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 8.5.sp,
-                        color = NothingTextSecondary
-                    )
-                }
-            }
-        }
-
-        val displayMode by Buddy3DManager.displayModeState
-        val filteredPets = remember(displayMode) {
-            AccountAndInventoryManager.petCatalog.filter { it.displayMode == displayMode }
-        }
-
-        // 1. Companion Pets Section
-        Text(
-            text = if (displayMode == BuddyDisplayMode.CLASSIC_2D) {
-                "2D COMPANION PETS (${filteredPets.count { it.id in unlockedPets || level >= it.requiredLevel }}/${filteredPets.size} UNLOCKED)"
-            } else {
-                "3D COMPANION PETS (${filteredPets.count { it.id in unlockedPets || level >= it.requiredLevel }}/${filteredPets.size} UNLOCKED)"
-            },
-            fontFamily = FontFamily.Monospace,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = NothingTextSecondary
-        )
-
-        filteredPets.forEach { pet ->
-            val isUnlocked = pet.id in unlockedPets || level >= pet.requiredLevel
-            val isEquipped = equippedPetId == pet.id
-
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFF181818),
-                border = BorderStroke(1.dp, if (isEquipped) NothingRed else NothingBorder),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val screenshot = remember(pet.id) {
-                        Buddy3DManager.getBuddyScreenshotBitmap(context, pet.id)
-                    }
-                    if (screenshot != null) {
-                        Image(
-                            bitmap = screenshot.asImageBitmap(),
-                            contentDescription = pet.name,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                    }
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = pet.name,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NothingWhite
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(Color(0xFF252525))
-                                    .padding(horizontal = 5.dp, vertical = 1.dp)
-                            ) {
-                                Text(
-                                    text = pet.licenseBadge,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 7.5.sp,
-                                    color = NothingTextSecondary
-                                )
-                            }
-                        }
-                        Text(
-                            text = pet.subtitle,
-                            fontSize = 10.sp,
-                            color = NothingTextSecondary
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                when {
-                                    isEquipped -> NothingRed
-                                    isUnlocked -> NothingSurfaceVariant
-                                    else -> Color(0xFF1F1F1F)
-                                }
-                            )
-                            .border(
-                                1.dp,
-                                if (isEquipped) NothingRed else NothingBorder,
-                                RoundedCornerShape(8.dp)
-                            )
-                            .clickable(enabled = isUnlocked) {
-                                AccountAndInventoryManager.equipPet(context, pet.id)
-                                onDataChanged()
-                            }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = when {
-                                isEquipped -> "EQUIPPED"
-                                isUnlocked -> "EQUIP"
-                                else -> "LVL ${pet.requiredLevel}"
-                            },
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isUnlocked) Color.White else NothingTextTertiary
-                        )
-                    }
-                }
-            }
-        }
-
-        // 2. Companion Items & Gear Section
-        Text(
-            text = "COMPANION GEAR & ITEMS (${unlockedItems.size}/${AccountAndInventoryManager.itemCatalog.size} UNLOCKED)",
-            fontFamily = FontFamily.Monospace,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = NothingTextSecondary
-        )
-
-        AccountAndInventoryManager.itemCatalog.forEach { item ->
-            val isUnlocked = item.id in unlockedItems || level >= item.requiredLevel
-            val isEquipped = item.id in equippedItems
-
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFF181818),
-                border = BorderStroke(1.dp, if (isEquipped) NothingRed else NothingBorder),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = item.name,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NothingWhite
-                            )
-                            Text(
-                                text = "[${item.slot}]",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 8.5.sp,
-                                color = NothingRed
-                            )
-                        }
-                        Text(
-                            text = item.description,
-                            fontSize = 10.sp,
-                            color = NothingTextSecondary
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                when {
-                                    isEquipped -> NothingRed
-                                    isUnlocked -> NothingSurfaceVariant
-                                    else -> Color(0xFF1F1F1F)
-                                }
-                            )
-                            .border(
-                                1.dp,
-                                if (isEquipped) NothingRed else NothingBorder,
-                                RoundedCornerShape(8.dp)
-                            )
-                            .clickable(enabled = isUnlocked) {
-                                AccountAndInventoryManager.toggleEquipGearItem(context, item.id)
-                                onDataChanged()
-                            }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = when {
-                                isEquipped -> "EQUIPPED"
-                                isUnlocked -> "EQUIP"
-                                else -> "LVL ${item.requiredLevel}"
-                            },
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isUnlocked) Color.White else NothingTextTertiary
-                        )
-                    }
-                }
             }
         }
     }
