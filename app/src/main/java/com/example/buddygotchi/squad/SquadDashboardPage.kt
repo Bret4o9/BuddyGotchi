@@ -364,15 +364,16 @@ fun SquadDashboardPage(
 
                 val petCatalog = remember { AccountAndInventoryManager.petCatalog }
                 val gridHeight = when {
-                    friends.size <= 3 -> 110.dp
-                    friends.size <= 6 -> 224.dp
-                    else -> 338.dp
+                    friends.size <= 3 -> 95.dp
+                    friends.size <= 6 -> 185.dp
+                    else -> 275.dp
                 }
 
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = 22.dp)
                         .height(gridHeight)
                         .clipToBounds(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -401,12 +402,12 @@ fun SquadDashboardPage(
                                 .onGloballyPositioned { coords ->
                                     cardCenterInRoot = coords.boundsInRoot().center
                                 }
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(10.dp))
                                 .background(if (isStaged) NothingRed.copy(alpha = 0.16f) else Color(0xFF181818))
                                 .border(
                                     width = if (isStaged || isBeingDragged) 1.5.dp else 1.dp,
                                     color = if (isBeingDragged) NothingRed else if (isStaged) NothingRed else Color(0xFF2B2B2B),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(10.dp)
                                 )
                                 .clickable {
                                     triggerTick()
@@ -460,7 +461,7 @@ fun SquadDashboardPage(
                                         }
                                     )
                                 }
-                                .padding(horizontal = 4.dp, vertical = 6.dp),
+                                .padding(horizontal = 4.dp, vertical = 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(
@@ -471,8 +472,8 @@ fun SquadDashboardPage(
                                 // Buddy Pet Thumbnail
                                 Box(
                                     modifier = Modifier
-                                        .size(42.dp)
-                                        .clip(RoundedCornerShape(8.dp))
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(7.dp))
                                         .background(Color(0xFF101010)),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -482,10 +483,10 @@ fun SquadDashboardPage(
                                             contentDescription = friend.displayName,
                                             modifier = Modifier
                                                 .fillMaxSize()
-                                                .clip(RoundedCornerShape(8.dp))
+                                                .clip(RoundedCornerShape(7.dp))
                                         )
                                     } else {
-                                        Text(text = friend.avatarEmoji, fontSize = 20.sp)
+                                        Text(text = friend.avatarEmoji, fontSize = 18.sp)
                                     }
 
                                     if (isStaged) {
@@ -495,15 +496,15 @@ fun SquadDashboardPage(
                                                 .background(NothingRed.copy(alpha = 0.45f)),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(text = "✓", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                            Text(text = "✓", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                         }
                                     } else {
                                         // Online indicator dot
                                         Box(
                                             modifier = Modifier
                                                 .align(Alignment.TopEnd)
-                                                .padding(3.dp)
-                                                .size(6.dp)
+                                                .padding(2.5.dp)
+                                                .size(5.dp)
                                                 .clip(CircleShape)
                                                 .background(if (friend.isOnline) Color(0xFF00E676) else Color.Gray)
                                         )
@@ -518,7 +519,7 @@ fun SquadDashboardPage(
                                     Text(
                                         text = friend.displayName.uppercase(),
                                         fontFamily = FontFamily.Monospace,
-                                        fontSize = 9.sp,
+                                        fontSize = 8.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = if (isStaged) NothingWhite else Color(0xFFDDDDDD),
                                         maxLines = 1,
@@ -528,7 +529,7 @@ fun SquadDashboardPage(
                                     Text(
                                         text = if (isStaged) "STAGED" else "LVL ${friend.level}",
                                         fontFamily = FontFamily.Monospace,
-                                        fontSize = 7.5.sp,
+                                        fontSize = 7.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = if (isStaged) NothingRed else NothingTextTertiary
                                     )
