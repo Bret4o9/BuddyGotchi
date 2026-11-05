@@ -1,10 +1,18 @@
 package com.example.buddygotchi.squad
 
+import android.app.Activity
 import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -230,6 +238,23 @@ fun CreateEventDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        val view = LocalView.current
+        val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+        SideEffect {
+            dialogWindow?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
+        val imm = remember { context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager }
+
+        val hideKeyboard: () -> Unit = {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+            view.clearFocus()
+            imm?.hideSoftInputFromWindow(view.windowToken, 0)
+            imm?.hideSoftInputFromWindow(view.applicationWindowToken, 0)
+            dialogWindow?.let { imm?.hideSoftInputFromWindow(it.decorView.windowToken, 0) }
+            (context as? Activity)?.let { imm?.hideSoftInputFromWindow(it.window.decorView.windowToken, 0) }
+        }
+
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.94f)
@@ -237,8 +262,7 @@ fun CreateEventDialog(
                 .imePadding()
                 .pointerInput(Unit) {
                     detectTapGestures(onTap = {
-                        focusManager.clearFocus()
-                        keyboardController?.hide()
+                        hideKeyboard()
                     })
                 },
             shape = RoundedCornerShape(24.dp),
@@ -344,7 +368,14 @@ fun CreateEventDialog(
                                             )
                                             BasicTextField(
                                                 value = titleInput,
-                                                onValueChange = { titleInput = it.uppercase() },
+                                                onValueChange = { input ->
+                                                    if (input.contains("\n") || input.contains("\r")) {
+                                                        titleInput = input.replace("\r", "").replace("\n", "").uppercase()
+                                                        hideKeyboard()
+                                                    } else {
+                                                        titleInput = input.uppercase()
+                                                    }
+                                                },
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .clip(RoundedCornerShape(12.dp))
@@ -354,7 +385,15 @@ fun CreateEventDialog(
                                                         if (titleInput.isNotBlank()) NothingRed else Color(0xFF2B2B2B),
                                                         RoundedCornerShape(12.dp)
                                                     )
-                                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                                    .padding(horizontal = 14.dp, vertical = 12.dp)
+                                                    .onKeyEvent { keyEvent ->
+                                                        if (keyEvent.key == Key.Enter || keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_ENTER) {
+                                                            hideKeyboard()
+                                                            true
+                                                        } else {
+                                                            false
+                                                        }
+                                                    },
                                                 textStyle = TextStyle(
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 14.sp,
@@ -365,17 +404,12 @@ fun CreateEventDialog(
                                                 cursorBrush = SolidColor(NothingRed),
                                                 keyboardOptions = KeyboardOptions(
                                                     capitalization = KeyboardCapitalization.Characters,
-                                                    imeAction = ImeAction.Next
+                                                    imeAction = ImeAction.Done
                                                 ),
                                                 keyboardActions = KeyboardActions(
-                                                    onNext = {
-                                                        focusManager.clearFocus()
-                                                        keyboardController?.hide()
-                                                    },
-                                                    onDone = {
-                                                        focusManager.clearFocus()
-                                                        keyboardController?.hide()
-                                                    }
+                                                    onNext = { hideKeyboard() },
+                                                    onDone = { hideKeyboard() },
+                                                    onGo = { hideKeyboard() }
                                                 ),
                                                 singleLine = true,
                                                 decorationBox = { innerTextField ->
@@ -478,23 +512,29 @@ fun CreateEventDialog(
                                             BasicTextField(
                                                 value = locationInput,
                                                 onValueChange = { input ->
-                                                    val trimmed = input.trim()
-                                                    if (GoogleMapsLinkResolver.isResolvable(trimmed)) {
-                                                        locationInput = "● RESOLVING LINK..."
-                                                        isResolvingLocation = true
-                                                        coroutineScope.launch {
-                                                            val res = GoogleMapsLinkResolver.resolve(trimmed)
-                                                            if (res != null) {
-                                                                locationInput = res.title
-                                                                selectedLatitude = res.latitude
-                                                                selectedLongitude = res.longitude
-                                                            } else {
-                                                                locationInput = input.uppercase()
-                                                            }
-                                                            isResolvingLocation = false
-                                                        }
+                                                    if (input.contains("\n") || input.contains("\r")) {
+                                                        val clean = input.replace("\r", "").replace("\n", "")
+                                                        locationInput = clean
+                                                        hideKeyboard()
                                                     } else {
-                                                        locationInput = input
+                                                        val trimmed = input.trim()
+                                                        if (GoogleMapsLinkResolver.isResolvable(trimmed)) {
+                                                            locationInput = "● RESOLVING LINK..."
+                                                            isResolvingLocation = true
+                                                            coroutineScope.launch {
+                                                                val res = GoogleMapsLinkResolver.resolve(trimmed)
+                                                                if (res != null) {
+                                                                    locationInput = res.title
+                                                                    selectedLatitude = res.latitude
+                                                                    selectedLongitude = res.longitude
+                                                                } else {
+                                                                    locationInput = input.uppercase()
+                                                                }
+                                                                isResolvingLocation = false
+                                                            }
+                                                        } else {
+                                                            locationInput = input
+                                                        }
                                                     }
                                                 },
                                                 modifier = Modifier
@@ -506,7 +546,15 @@ fun CreateEventDialog(
                                                         if (locationInput.isNotBlank()) Color(0xFF444444) else Color(0xFF2B2B2B),
                                                         RoundedCornerShape(12.dp)
                                                     )
-                                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                                    .padding(horizontal = 14.dp, vertical = 12.dp)
+                                                    .onKeyEvent { keyEvent ->
+                                                        if (keyEvent.key == Key.Enter || keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_ENTER) {
+                                                            hideKeyboard()
+                                                            true
+                                                        } else {
+                                                            false
+                                                        }
+                                                    },
                                                 textStyle = TextStyle(
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 13.sp,
@@ -520,10 +568,11 @@ fun CreateEventDialog(
                                                     imeAction = ImeAction.Done
                                                 ),
                                                 keyboardActions = KeyboardActions(
-                                                    onDone = {
-                                                        focusManager.clearFocus()
-                                                        keyboardController?.hide()
-                                                    }
+                                                    onDone = { hideKeyboard() },
+                                                    onNext = { hideKeyboard() },
+                                                    onGo = { hideKeyboard() },
+                                                    onSearch = { hideKeyboard() },
+                                                    onSend = { hideKeyboard() }
                                                 ),
                                                 singleLine = true,
                                                 decorationBox = { innerTextField ->
@@ -1347,6 +1396,7 @@ fun CreateEventDialog(
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(if (canProceed) NothingRed else Color(0xFF222222))
                                     .clickable(enabled = canProceed) {
+                                        hideKeyboard()
                                         triggerConfirmPulse()
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(
