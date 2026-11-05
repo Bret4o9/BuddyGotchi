@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.window.Dialog
 import com.example.buddygotchi.AccountAndInventoryManager
 import com.example.buddygotchi.Buddy3DManager
 import com.example.buddygotchi.DashboardGridDefaults
@@ -94,6 +95,7 @@ fun SquadDashboardPage(
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var showAddFriendDialog by remember { mutableStateOf(false) }
+    var showEnlargedQrDialog by remember { mutableStateOf(false) }
     var showAccountHubDialog by remember { mutableStateOf(false) }
     var accountHubTab by remember { mutableStateOf(AccountHubTab.ACCOUNT) }
 
@@ -218,107 +220,94 @@ fun SquadDashboardPage(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    // Header Row: Operator Name (ONLINE pill removed)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(NothingRed)
-                            )
-                            Text(
-                                text = "OPERATOR // ${profile.displayName}",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.2.sp,
-                                color = NothingWhite
-                            )
-                        }
-
-                        // Status pill
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF1E281E))
-                                .border(1.dp, Color(0xFF00E676).copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
-                        ) {
-                            Text(
-                                text = "ONLINE",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF00E676),
-                                letterSpacing = 0.5.sp
-                            )
-                        }
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(NothingRed)
+                        )
+                        Text(
+                            text = "OPERATOR // ${profile.displayName}",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp,
+                            color = NothingWhite
+                        )
                     }
 
-                    // Buddy Code Display
+                    // Body Row: Left Column (Buddy Code + "+ BUDDY" below) & Right Column (QR Code in place of Copy & +Buddy)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(
-                                text = "YOUR SQUAD BUDDY CODE",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 8.5.sp,
-                                color = NothingTextTertiary,
-                                letterSpacing = 0.8.sp
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = profile.buddyCode,
-                                fontFamily = Dseg7FontFamily,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 2.sp,
-                                color = NothingWhite
-                            )
-                        }
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            // Copy button
-                            Box(
+                        // Left Column: Buddy Code & + BUDDY button below
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            // Clickable Buddy Code Container (Tap to copy)
+                            Column(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0xFF202020))
-                                    .border(1.dp, Color(0xFF333333), RoundedCornerShape(10.dp))
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF141414))
+                                    .border(1.dp, Color(0xFF282828), RoundedCornerShape(12.dp))
                                     .clickable { copyBuddyCode() }
-                                    .padding(horizontal = 10.dp, vertical = 7.dp)
+                                    .padding(horizontal = 12.dp, vertical = 9.dp)
                             ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "BUDDY CODE",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 8.5.sp,
+                                        color = NothingTextTertiary,
+                                        letterSpacing = 0.8.sp
+                                    )
+                                    Text(
+                                        text = "• TAP TO COPY",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 7.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = NothingRed,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(3.dp))
                                 Text(
-                                    text = "COPY",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp,
+                                    text = profile.buddyCode,
+                                    fontFamily = Dseg7FontFamily,
+                                    fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = NothingWhite,
-                                    letterSpacing = 0.5.sp
+                                    letterSpacing = 2.sp,
+                                    color = NothingWhite
                                 )
                             }
 
-                            // Add friend button
+                            // "+ BUDDY" Button placed below the buddy code
                             Box(
                                 modifier = Modifier
+                                    .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(NothingRed)
                                     .clickable {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         showAddFriendDialog = true
                                     }
-                                    .padding(horizontal = 10.dp, vertical = 7.dp)
+                                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = "+ BUDDY",
@@ -326,42 +315,57 @@ fun SquadDashboardPage(
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White,
-                                    letterSpacing = 0.5.sp
+                                    letterSpacing = 0.8.sp
                                 )
                             }
                         }
-                    }
 
-                    // Cross-Device Account & Legal Action Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        listOf(
-                            "CLOUD ACCOUNT" to AccountHubTab.ACCOUNT,
-                            "PRIVACY & LEGAL" to AccountHubTab.LEGAL
-                        ).forEach { (btnLabel, tabTarget) ->
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        // Right Column: Generated QR Code in place of Copy & +Buddy buttons
+                        val qrBitmap = remember(profile.buddyCode) {
+                            QrCodeGenerator.generateQrBitmap(
+                                content = profile.buddyCode,
+                                size = 256,
+                                darkColor = android.graphics.Color.BLACK,
+                                lightColor = android.graphics.Color.WHITE
+                            )
+                        }
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(5.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color(0xFF141414))
+                                .border(1.dp, Color(0xFF282828), RoundedCornerShape(14.dp))
+                                .clickable {
+                                    showEnlargedQrDialog = true
+                                }
+                                .padding(10.dp)
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .size(76.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFF1E1E1E))
-                                    .border(1.dp, NothingBorder, RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        accountHubTab = tabTarget
-                                        showAccountHubDialog = true
-                                    }
-                                    .padding(vertical = 6.dp),
+                                    .background(Color.White)
+                                    .padding(4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = btnLabel,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 8.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = NothingTextSecondary
+                                Image(
+                                    bitmap = qrBitmap.asImageBitmap(),
+                                    contentDescription = "Squad Buddy QR Code",
+                                    modifier = Modifier.fillMaxSize()
                                 )
                             }
+                            Text(
+                                text = "SCAN QR",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 7.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingTextTertiary,
+                                letterSpacing = 0.8.sp
+                            )
                         }
                     }
                 }
@@ -1300,6 +1304,137 @@ fun SquadDashboardPage(
     }
 
     // Dialogs
+    // Enlarged QR Code Dialog
+    if (showEnlargedQrDialog) {
+        Dialog(onDismissRequest = { showEnlargedQrDialog = false }) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(24.dp),
+                color = NothingCardSurface,
+                border = BorderStroke(1.dp, NothingBorder)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(NothingRed)
+                            )
+                            Text(
+                                text = "SQUAD BUDDY QR",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp,
+                                color = NothingWhite
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.08f))
+                                .clickable { showEnlargedQrDialog = false },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "✕",
+                                fontSize = 11.sp,
+                                color = NothingTextSecondary
+                            )
+                        }
+                    }
+
+                    val largeQrBitmap = remember(profile.buddyCode) {
+                        QrCodeGenerator.generateQrBitmap(
+                            content = profile.buddyCode,
+                            size = 512,
+                            darkColor = android.graphics.Color.BLACK,
+                            lightColor = android.graphics.Color.WHITE
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(200.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color.White)
+                            .padding(12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            bitmap = largeQrBitmap.asImageBitmap(),
+                            contentDescription = "Squad Buddy QR Code",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = profile.buddyCode,
+                            fontFamily = Dseg7FontFamily,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp,
+                            color = NothingWhite
+                        )
+                        Text(
+                            text = "SHOW TO ANY BUDDYGOTCHI USER TO CONNECT",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NothingTextTertiary,
+                            letterSpacing = 0.8.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(NothingRed)
+                            .clickable {
+                                copyBuddyCode()
+                                showEnlargedQrDialog = false
+                            }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "COPY CODE & CLOSE",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     if (showAddFriendDialog) {
         AddFriendDialog(
             onDismiss = { showAddFriendDialog = false },
