@@ -210,15 +210,14 @@ fun CreateEventDialog(
     // If friends list is empty, provide default squad mates so user can test and enjoy the 3x3 grid
     val effectiveFriends = remember(friends) {
         if (friends.isNotEmpty()) friends else listOf(
-            SquadFriend("BG-4182", "POLI", 12, isOnline = true),
-            SquadFriend("BG-7731", "SANI", 16, isOnline = true),
-            SquadFriend("BG-9055", "GERI", 8, isOnline = false),
-            SquadFriend("BG-1204", "ALEX", 10, isOnline = true),
-            SquadFriend("BG-3391", "VIKI", 14, isOnline = true),
-            SquadFriend("BG-8842", "NICK", 11, isOnline = false),
-            SquadFriend("BG-5521", "LILI", 9, isOnline = true),
-            SquadFriend("BG-6710", "DANI", 15, isOnline = true),
-            SquadFriend("BG-2209", "MAYA", 13, isOnline = false)
+            SquadFriend("BG-4182", "POLI", 12, isOnline = true, buddyColorHex = "#FF7A00"),
+            SquadFriend("BG-7731", "SANI", 16, isOnline = true, buddyColorHex = "#00E676"),
+            SquadFriend("BG-9055", "GERI", 8, isOnline = false, buddyColorHex = "#FF4081"),
+            SquadFriend("BG-3104", "IVELIN", 15, isOnline = true, buddyColorHex = "#2979FF"),
+            SquadFriend("BG-5829", "IVO", 11, isOnline = true, buddyColorHex = "#FFD600"),
+            SquadFriend("BG-6411", "ILIQN", 13, isOnline = false, buddyColorHex = "#7C4DFF"),
+            SquadFriend("BG-7284", "DONI", 14, isOnline = true, buddyColorHex = "#00E5FF"),
+            SquadFriend("BG-9915", "IZABELA", 17, isOnline = false, buddyColorHex = "#FF4081")
         )
     }
 
@@ -1129,6 +1128,7 @@ fun CreateEventDialog(
 
                                                 Box(
                                                     modifier = Modifier
+                                                        .aspectRatio(1f)
                                                         .offset { IntOffset(localDragOffset.x.roundToInt(), localDragOffset.y.roundToInt()) }
                                                         .zIndex(if (isBeingDragged) 100f else 1f)
                                                         .clip(RoundedCornerShape(12.dp))

@@ -48,16 +48,22 @@ object SquadManager {
     }
 
     fun getFriends(context: Context): List<SquadFriend> {
+        val testAccounts = listOf(
+            SquadFriend("BG-4182", "POLI", 12, isOnline = true, buddyColorHex = "#FF7A00"),
+            SquadFriend("BG-7731", "SANI", 16, isOnline = true, buddyColorHex = "#00E676"),
+            SquadFriend("BG-9055", "GERI", 8, isOnline = false, buddyColorHex = "#FF4081"),
+            SquadFriend("BG-3104", "IVELIN", 15, isOnline = true, buddyColorHex = "#2979FF"),
+            SquadFriend("BG-5829", "IVO", 11, isOnline = true, buddyColorHex = "#FFD600"),
+            SquadFriend("BG-6411", "ILIQN", 13, isOnline = false, buddyColorHex = "#7C4DFF"),
+            SquadFriend("BG-7284", "DONI", 14, isOnline = true, buddyColorHex = "#00E5FF"),
+            SquadFriend("BG-9915", "IZABELA", 17, isOnline = false, buddyColorHex = "#FF4081")
+        )
+
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val jsonStr = prefs.getString(KEY_FRIENDS, null)
         if (jsonStr == null) {
-            val defaults = listOf(
-                SquadFriend("BG-4182", "POLI", 12, isOnline = true, buddyColorHex = "#FF7A00"),
-                SquadFriend("BG-7731", "SANI", 16, isOnline = true, buddyColorHex = "#00E676"),
-                SquadFriend("BG-9055", "GERI", 8, isOnline = false, buddyColorHex = "#FF4081")
-            )
-            saveFriends(context, defaults)
-            return defaults
+            saveFriends(context, testAccounts)
+            return testAccounts
         }
         return try {
             val array = JSONArray(jsonStr)
@@ -101,12 +107,23 @@ object SquadManager {
                     else -> friend
                 }
             }
-            if (modified) {
-                saveFriends(context, updated)
+
+            // Ensure requested test accounts exist
+            val existingNames = updated.map { it.displayName.trim().uppercase() }.toSet()
+            val missing = testAccounts.filter { it.displayName.trim().uppercase() !in existingNames }
+            val finalList = if (missing.isNotEmpty()) {
+                modified = true
+                updated + missing
+            } else {
+                updated
             }
-            updated
+
+            if (modified) {
+                saveFriends(context, finalList)
+            }
+            finalList
         } catch (_: Exception) {
-            emptyList()
+            testAccounts
         }
     }
 

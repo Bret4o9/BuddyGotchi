@@ -40,6 +40,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -362,13 +363,18 @@ fun SquadDashboardPage(
                 }
 
                 val petCatalog = remember { AccountAndInventoryManager.petCatalog }
-                val gridHeight = if (friends.size <= 3) 105.dp else 215.dp
+                val gridHeight = when {
+                    friends.size <= 3 -> 110.dp
+                    friends.size <= 6 -> 224.dp
+                    else -> 338.dp
+                }
 
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(gridHeight),
+                        .height(gridHeight)
+                        .clipToBounds(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -386,6 +392,7 @@ fun SquadDashboardPage(
 
                         Box(
                             modifier = Modifier
+                                .aspectRatio(1f)
                                 .graphicsLayer {
                                     alpha = if (isBeingDragged) 0.3f else 1f
                                     scaleX = if (isBeingDragged) 0.95f else 1f
@@ -453,17 +460,18 @@ fun SquadDashboardPage(
                                         }
                                     )
                                 }
-                                .padding(horizontal = 6.dp, vertical = 8.dp),
+                                .padding(horizontal = 4.dp, vertical = 6.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(
+                                modifier = Modifier.fillMaxSize(),
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                verticalArrangement = Arrangement.SpaceEvenly
                             ) {
                                 // Buddy Pet Thumbnail
                                 Box(
                                     modifier = Modifier
-                                        .size(46.dp)
+                                        .size(42.dp)
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(Color(0xFF101010)),
                                     contentAlignment = Alignment.Center
@@ -477,7 +485,7 @@ fun SquadDashboardPage(
                                                 .clip(RoundedCornerShape(8.dp))
                                         )
                                     } else {
-                                        Text(text = friend.avatarEmoji, fontSize = 22.sp)
+                                        Text(text = friend.avatarEmoji, fontSize = 20.sp)
                                     }
 
                                     if (isStaged) {
@@ -494,7 +502,7 @@ fun SquadDashboardPage(
                                         Box(
                                             modifier = Modifier
                                                 .align(Alignment.TopEnd)
-                                                .padding(4.dp)
+                                                .padding(3.dp)
                                                 .size(6.dp)
                                                 .clip(CircleShape)
                                                 .background(if (friend.isOnline) Color(0xFF00E676) else Color.Gray)
@@ -503,23 +511,28 @@ fun SquadDashboardPage(
                                 }
 
                                 // Name & Level
-                                Text(
-                                    text = friend.displayName.uppercase(),
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isStaged) NothingWhite else Color(0xFFDDDDDD),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(1.dp)
+                                ) {
+                                    Text(
+                                        text = friend.displayName.uppercase(),
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isStaged) NothingWhite else Color(0xFFDDDDDD),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
 
-                                Text(
-                                    text = if (isStaged) "STAGED" else "LVL ${friend.level}",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 7.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isStaged) NothingRed else NothingTextTertiary
-                                )
+                                    Text(
+                                        text = if (isStaged) "STAGED" else "LVL ${friend.level}",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 7.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isStaged) NothingRed else NothingTextTertiary
+                                    )
+                                }
                             }
                         }
                     }
