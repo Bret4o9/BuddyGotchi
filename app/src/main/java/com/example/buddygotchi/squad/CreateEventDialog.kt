@@ -96,6 +96,7 @@ import kotlin.math.roundToInt
 fun CreateEventDialog(
     currentUser: UserProfile,
     friends: List<SquadFriend>,
+    initialInvitedCodes: Set<String> = emptySet(),
     onDismiss: () -> Unit,
     onEventCreated: (GroupEvent) -> Unit
 ) {
@@ -221,8 +222,8 @@ fun CreateEventDialog(
         )
     }
 
-    var selectedFriendCodes by remember {
-        mutableStateOf(setOf<String>())
+    var selectedFriendCodes by remember(initialInvitedCodes) {
+        mutableStateOf(initialInvitedCodes)
     }
 
     // Drag-and-drop state for Page 3

@@ -3,7 +3,16 @@ package com.example.buddygotchi.squad
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -11,9 +20,11 @@ import androidx.compose.animation.core.animateOffsetAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -27,17 +38,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import com.example.buddygotchi.AccountAndInventoryManager
+import com.example.buddygotchi.Buddy3DManager
 import com.example.buddygotchi.DashboardGridDefaults
 import com.example.buddygotchi.AccountAndLegalHubDialog
 import com.example.buddygotchi.AccountHubTab
@@ -46,6 +68,8 @@ import com.example.buddygotchi.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 fun SquadDashboardPage(
@@ -76,6 +100,48 @@ fun SquadDashboardPage(
     }
     var viewingMapEvent by remember { mutableStateOf<GroupEvent?>(null) }
     val scrollState = rememberScrollState()
+
+    // Easter Egg Drag & Drop State
+    var stagedInviteCodes by remember { mutableStateOf(setOf<String>()) }
+    var draggedFriend by remember { mutableStateOf<SquadFriend?>(null) }
+    var dragTouchInRoot by remember { mutableStateOf(Offset.Zero) }
+    var isHoveringGroupEvents by remember { mutableStateOf(false) }
+    var groupEventsBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+
+    // Haptics & Vibration helper
+    val vibrator = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+    }
+
+    fun triggerTick() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(VibrationEffect.createOneShot(15, VibrationEffect.DEFAULT_AMPLITUDE))
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun triggerConfirmPulse() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+            }
+        } catch (_: Exception) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
 
     LaunchedEffect(Unit) {
         FirebaseSquadSync.initialize(context) { updatedEvents ->
@@ -298,17 +364,71 @@ fun SquadDashboardPage(
                     items(friends) { friend ->
                         val buddyColor = getSquadBuddyColor(friend)
                         var tapBlink by remember { mutableStateOf(false) }
+                        var cardCenterInRoot by remember { mutableStateOf(Offset.Zero) }
+                        val isBeingDragged = draggedFriend?.buddyCode == friend.buddyCode
+                        val isStaged = friend.buddyCode in stagedInviteCodes
 
                         Surface(
                             shape = RoundedCornerShape(14.dp),
-                            color = NothingCardSurface,
-                            border = BorderStroke(1.dp, buddyColor.copy(alpha = 0.35f)),
+                            color = if (isStaged) NothingRed.copy(alpha = 0.12f) else NothingCardSurface,
+                            border = BorderStroke(
+                                width = if (isStaged || isBeingDragged) 1.5.dp else 1.dp,
+                                color = if (isBeingDragged) NothingRed else if (isStaged) NothingRed.copy(alpha = 0.8f) else buddyColor.copy(alpha = 0.35f)
+                            ),
                             modifier = Modifier
                                 .width(146.dp)
+                                .graphicsLayer {
+                                    alpha = if (isBeingDragged) 0.3f else 1f
+                                    scaleX = if (isBeingDragged) 0.95f else 1f
+                                    scaleY = if (isBeingDragged) 0.95f else 1f
+                                }
+                                .onGloballyPositioned { coords ->
+                                    cardCenterInRoot = coords.boundsInRoot().center
+                                }
                                 .clip(RoundedCornerShape(14.dp))
                                 .clickable {
                                     tapBlink = true
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                }
+                                .pointerInput(friend.buddyCode) {
+                                    detectDragGestures(
+                                        onDragStart = {
+                                            draggedFriend = friend
+                                            dragTouchInRoot = cardCenterInRoot
+                                            triggerTick()
+                                        },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            dragTouchInRoot += dragAmount
+                                            val bounds = groupEventsBoundsInRoot
+                                            isHoveringGroupEvents = if (bounds != null) {
+                                                dragTouchInRoot.y >= bounds.top - 50f &&
+                                                dragTouchInRoot.y <= bounds.bottom + 50f &&
+                                                dragTouchInRoot.x >= bounds.left - 50f &&
+                                                dragTouchInRoot.x <= bounds.right + 50f
+                                            } else {
+                                                false
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            if (isHoveringGroupEvents && draggedFriend != null) {
+                                                triggerConfirmPulse()
+                                                stagedInviteCodes = stagedInviteCodes + friend.buddyCode
+                                                showCreateDialog = true
+                                                Toast.makeText(
+                                                    context,
+                                                    "⚡ ${friend.displayName} DROPPED INTO SQUAD EVENT!",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                            draggedFriend = null
+                                            isHoveringGroupEvents = false
+                                        },
+                                        onDragCancel = {
+                                            draggedFriend = null
+                                            isHoveringGroupEvents = false
+                                        }
+                                    )
                                 }
                         ) {
                             Column(
@@ -328,14 +448,14 @@ fun SquadDashboardPage(
                                             modifier = Modifier
                                                 .size(6.dp)
                                                 .clip(CircleShape)
-                                                .background(if (friend.isOnline) Color(0xFF00E676) else Color.Gray)
+                                                .background(if (isStaged) NothingRed else if (friend.isOnline) Color(0xFF00E676) else Color.Gray)
                                         )
                                         Text(
-                                            text = if (friend.isOnline) "LIVE" else "AWAY",
+                                            text = if (isStaged) "STAGED ⚡" else if (friend.isOnline) "LIVE" else "AWAY",
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 7.5.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (friend.isOnline) Color(0xFF00E676) else Color.Gray,
+                                            color = if (isStaged) NothingRed else if (friend.isOnline) Color(0xFF00E676) else Color.Gray,
                                             letterSpacing = 0.5.sp
                                         )
                                     }
@@ -384,7 +504,14 @@ fun SquadDashboardPage(
             }
 
             // 3. Group Events Section
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { coords ->
+                        groupEventsBoundsInRoot = coords.boundsInRoot()
+                    },
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -408,6 +535,29 @@ fun SquadDashboardPage(
                             letterSpacing = 1.2.sp,
                             color = NothingTextSecondary
                         )
+
+                        if (stagedInviteCodes.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(NothingRed.copy(alpha = 0.2f))
+                                    .border(1.dp, NothingRed, RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        stagedInviteCodes = emptySet()
+                                        triggerTick()
+                                        Toast.makeText(context, "STAGED FRIENDS CLEARED", Toast.LENGTH_SHORT).show()
+                                    }
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "● ${stagedInviteCodes.size} STAGED ✕",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NothingRed
+                                )
+                            }
+                        }
                     }
 
                     // Create event action
@@ -432,11 +582,46 @@ fun SquadDashboardPage(
                     }
                 }
 
+                // Drop indicator banner when hovering
+                AnimatedVisibility(
+                    visible = isHoveringGroupEvents,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = NothingRed.copy(alpha = 0.18f),
+                        border = BorderStroke(1.5.dp, NothingRed),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp, horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "⚡ RELEASE TO DROP ${draggedFriend?.displayName ?: "FRIEND"} & START EVENT ⚡",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                letterSpacing = 0.8.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+
                 if (events.isEmpty()) {
                     Surface(
                         shape = RoundedCornerShape(18.dp),
-                        color = NothingCardSurface,
-                        border = BorderStroke(1.dp, NothingBorder),
+                        color = if (isHoveringGroupEvents) NothingRed.copy(alpha = 0.10f) else NothingCardSurface,
+                        border = BorderStroke(
+                            if (isHoveringGroupEvents) 2.dp else 1.dp,
+                            if (isHoveringGroupEvents) NothingRed else NothingBorder
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 12.dp)
@@ -449,18 +634,18 @@ fun SquadDashboardPage(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = "NO ACTIVE SQUAD EVENTS",
+                                text = if (isHoveringGroupEvents) "⬇ DROP FRIEND HERE TO INITIATE SQUAD EVENT ⬇" else "NO ACTIVE SQUAD EVENTS",
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = NothingTextSecondary,
+                                color = if (isHoveringGroupEvents) Color.White else NothingTextSecondary,
                                 letterSpacing = 1.sp
                             )
                             Text(
-                                text = "TAP '+ NEW EVENT' TO SCHEDULE A SESSION",
+                                text = if (isHoveringGroupEvents) "RELEASING OPENS EVENT CREATOR WITH FRIEND INVITED" else "TAP '+ NEW EVENT' OR DRAG A FRIEND HERE TO SCHEDULE",
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 8.5.sp,
-                                color = NothingTextTertiary
+                                color = if (isHoveringGroupEvents) NothingRed else NothingTextTertiary
                             )
                         }
                     }
@@ -789,6 +974,86 @@ fun SquadDashboardPage(
                 }
             }
         }
+
+        // Floating Drag Ghost Overlay (Easter Egg Drag-to-Events)
+        if (draggedFriend != null) {
+            val activeFriend = draggedFriend!!
+            val petCatalog = remember { AccountAndInventoryManager.petCatalog }
+            val deterministicPetId = remember(activeFriend.buddyCode) {
+                val idx = abs(activeFriend.buddyCode.hashCode()) % petCatalog.size
+                petCatalog[idx].id
+            }
+            val petScreenshot = remember(deterministicPetId) {
+                Buddy3DManager.getBuddyScreenshotBitmap(context, deterministicPetId)
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(9999f)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFF181818).copy(alpha = 0.95f),
+                    border = BorderStroke(
+                        width = 2.dp,
+                        color = if (isHoveringGroupEvents) NothingRed else NothingRed.copy(alpha = 0.7f)
+                    ),
+                    shadowElevation = 18.dp,
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                (dragTouchInRoot.x - 70.dp.toPx()).roundToInt(),
+                                (dragTouchInRoot.y - 70.dp.toPx()).roundToInt()
+                            )
+                        }
+                        .width(140.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF101010)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (petScreenshot != null) {
+                                Image(
+                                    bitmap = petScreenshot.asImageBitmap(),
+                                    contentDescription = activeFriend.displayName,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(10.dp))
+                                )
+                            } else {
+                                Text(text = activeFriend.avatarEmoji, fontSize = 22.sp)
+                            }
+                        }
+
+                        Text(
+                            text = activeFriend.displayName.uppercase(),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+
+                        Text(
+                            text = if (isHoveringGroupEvents) "DROP TO CREATE ⚡" else "DRAGGING TO EVENTS",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 7.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isHoveringGroupEvents) NothingRed else NothingTextSecondary,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+            }
+        }
     }
 
     // Dialogs
@@ -818,8 +1083,10 @@ fun SquadDashboardPage(
         CreateEventDialog(
             currentUser = profile,
             friends = friends,
+            initialInvitedCodes = stagedInviteCodes,
             onDismiss = { showCreateDialog = false },
             onEventCreated = { newEvent ->
+                stagedInviteCodes = emptySet()
                 events = SquadManager.createEvent(context, newEvent)
                 Toast.makeText(context, "EVENT DEPLOYED & ALARM SCHEDULED", Toast.LENGTH_SHORT).show()
             }
