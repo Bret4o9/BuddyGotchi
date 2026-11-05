@@ -413,11 +413,15 @@ fun SquadDashboardPage(
                                         onDragEnd = {
                                             if (isHoveringGroupEvents && draggedFriend != null) {
                                                 triggerConfirmPulse()
+                                                val wasAlreadyStaged = friend.buddyCode in stagedInviteCodes
                                                 stagedInviteCodes = stagedInviteCodes + friend.buddyCode
-                                                showCreateDialog = true
+                                                val count = stagedInviteCodes.size
                                                 Toast.makeText(
                                                     context,
-                                                    "⚡ ${friend.displayName} DROPPED INTO SQUAD EVENT!",
+                                                    if (!wasAlreadyStaged)
+                                                        "${friend.displayName} ADDED TO EVENT ($count STAGED)"
+                                                    else
+                                                        "${friend.displayName} ALREADY STAGED ($count STAGED)",
                                                     Toast.LENGTH_SHORT
                                                 ).show()
                                             }
@@ -451,7 +455,7 @@ fun SquadDashboardPage(
                                                 .background(if (isStaged) NothingRed else if (friend.isOnline) Color(0xFF00E676) else Color.Gray)
                                         )
                                         Text(
-                                            text = if (isStaged) "STAGED ⚡" else if (friend.isOnline) "LIVE" else "AWAY",
+                                            text = if (isStaged) "STAGED" else if (friend.isOnline) "LIVE" else "AWAY",
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 7.5.sp,
                                             fontWeight = FontWeight.Bold,
@@ -512,6 +516,10 @@ fun SquadDashboardPage(
                     },
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                val stagedFriends = remember(stagedInviteCodes, friends) {
+                    friends.filter { it.buddyCode in stagedInviteCodes }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -560,19 +568,26 @@ fun SquadDashboardPage(
                         }
                     }
 
-                    // Create event action
+                    // Create / Confirm event action
+                    val newEventButtonLabel = if (stagedInviteCodes.isNotEmpty()) {
+                        "CONFIRM (${stagedInviteCodes.size}) →"
+                    } else {
+                        "+ NEW EVENT"
+                    }
+
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
                             .background(NothingRed)
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                triggerConfirmPulse()
                                 showCreateDialog = true
                             }
                             .padding(horizontal = 10.dp, vertical = 5.dp)
                     ) {
                         Text(
-                            text = "+ NEW EVENT",
+                            text = newEventButtonLabel,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 9.5.sp,
                             fontWeight = FontWeight.Bold,
@@ -582,7 +597,7 @@ fun SquadDashboardPage(
                     }
                 }
 
-                // Drop indicator banner when hovering
+                // Drop indicator banner when hovering (NO emojis)
                 AnimatedVisibility(
                     visible = isHoveringGroupEvents,
                     enter = fadeIn() + expandVertically(),
@@ -602,7 +617,7 @@ fun SquadDashboardPage(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "⚡ RELEASE TO DROP ${draggedFriend?.displayName ?: "FRIEND"} & START EVENT ⚡",
+                                text = "RELEASE TO DROP ${draggedFriend?.displayName ?: "FRIEND"} INTO SQUAD EVENT",
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
@@ -610,6 +625,149 @@ fun SquadDashboardPage(
                                 letterSpacing = 0.8.sp,
                                 textAlign = TextAlign.Center
                             )
+                        }
+                    }
+                }
+
+                // Dedicated Staged Friends Container (Multi-drop confirmation zone)
+                if (stagedFriends.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFF161616),
+                        border = BorderStroke(1.5.dp, NothingRed),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(NothingRed)
+                                    )
+                                    Text(
+                                        text = "STAGED SQUAD MEMBERS [ ${stagedFriends.size} ]",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = NothingWhite,
+                                        letterSpacing = 1.sp
+                                    )
+                                }
+
+                                Text(
+                                    text = "CLEAR ALL",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NothingTextTertiary,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .clickable {
+                                            stagedInviteCodes = emptySet()
+                                            triggerTick()
+                                            Toast.makeText(context, "STAGED FRIENDS CLEARED", Toast.LENGTH_SHORT).show()
+                                        }
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+
+                            // Horizontal list of staged friends with quick remove
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(stagedFriends) { friend ->
+                                    val petCatalog = remember { AccountAndInventoryManager.petCatalog }
+                                    val deterministicPetId = remember(friend.buddyCode) {
+                                        val idx = abs(friend.buddyCode.hashCode()) % petCatalog.size
+                                        petCatalog[idx].id
+                                    }
+                                    val petScreenshot = remember(deterministicPetId) {
+                                        Buddy3DManager.getBuddyScreenshotBitmap(context, deterministicPetId)
+                                    }
+
+                                    Row(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0xFF222222))
+                                            .border(1.dp, NothingRed.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 8.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        if (petScreenshot != null) {
+                                            Image(
+                                                bitmap = petScreenshot.asImageBitmap(),
+                                                contentDescription = friend.displayName,
+                                                modifier = Modifier
+                                                    .size(22.dp)
+                                                    .clip(RoundedCornerShape(4.dp))
+                                            )
+                                        } else {
+                                            Text(text = friend.avatarEmoji, fontSize = 13.sp)
+                                        }
+
+                                        Text(
+                                            text = friend.displayName,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = NothingWhite
+                                        )
+
+                                        Text(
+                                            text = "✕",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = NothingRed,
+                                            modifier = Modifier
+                                                .clickable {
+                                                    stagedInviteCodes = stagedInviteCodes - friend.buddyCode
+                                                    triggerTick()
+                                                }
+                                                .padding(start = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Confirm & Create Event Button
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(NothingRed)
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        triggerConfirmPulse()
+                                        showCreateDialog = true
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "CONFIRM & CREATE EVENT (${stagedFriends.size} INVITED) →",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    letterSpacing = 1.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -634,7 +792,7 @@ fun SquadDashboardPage(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = if (isHoveringGroupEvents) "⬇ DROP FRIEND HERE TO INITIATE SQUAD EVENT ⬇" else "NO ACTIVE SQUAD EVENTS",
+                                text = if (isHoveringGroupEvents) "DROP FRIEND HERE TO STAGE FOR EVENT" else "NO ACTIVE SQUAD EVENTS",
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
@@ -642,7 +800,7 @@ fun SquadDashboardPage(
                                 letterSpacing = 1.sp
                             )
                             Text(
-                                text = if (isHoveringGroupEvents) "RELEASING OPENS EVENT CREATOR WITH FRIEND INVITED" else "TAP '+ NEW EVENT' OR DRAG A FRIEND HERE TO SCHEDULE",
+                                text = if (isHoveringGroupEvents) "RELEASE TO ADD TO STAGED SQUAD MEMBERS" else "TAP '+ NEW EVENT' OR DRAG FRIENDS HERE TO SCHEDULE",
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 8.5.sp,
                                 color = if (isHoveringGroupEvents) NothingRed else NothingTextTertiary
@@ -1043,7 +1201,7 @@ fun SquadDashboardPage(
                         )
 
                         Text(
-                            text = if (isHoveringGroupEvents) "DROP TO CREATE ⚡" else "DRAGGING TO EVENTS",
+                            text = if (isHoveringGroupEvents) "RELEASE TO DROP" else "DRAGGING TO EVENTS",
                             fontFamily = FontFamily.Monospace,
                             fontSize = 7.5.sp,
                             fontWeight = FontWeight.Bold,
