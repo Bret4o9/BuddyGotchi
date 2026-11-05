@@ -514,12 +514,13 @@ fun SquadDashboardPage(
                     .onGloballyPositioned { coords ->
                         groupEventsBoundsInRoot = coords.boundsInRoot()
                     },
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 val stagedFriends = remember(stagedInviteCodes, friends) {
                     friends.filter { it.buddyCode in stagedInviteCodes }
                 }
 
+                // Top Header Row with spacious breathing room
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -543,51 +544,21 @@ fun SquadDashboardPage(
                             letterSpacing = 1.2.sp,
                             color = NothingTextSecondary
                         )
-
-                        if (stagedInviteCodes.isNotEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(NothingRed.copy(alpha = 0.2f))
-                                    .border(1.dp, NothingRed, RoundedCornerShape(6.dp))
-                                    .clickable {
-                                        stagedInviteCodes = emptySet()
-                                        triggerTick()
-                                        Toast.makeText(context, "STAGED FRIENDS CLEARED", Toast.LENGTH_SHORT).show()
-                                    }
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = "● ${stagedInviteCodes.size} STAGED ✕",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = NothingRed
-                                )
-                            }
-                        }
                     }
 
-                    // Create / Confirm event action
-                    val newEventButtonLabel = if (stagedInviteCodes.isNotEmpty()) {
-                        "CONFIRM (${stagedInviteCodes.size}) →"
-                    } else {
-                        "+ NEW EVENT"
-                    }
-
+                    // Top button stays strictly "+ NEW EVENT" (no transforming, spacious breathing room)
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
                             .background(NothingRed)
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                triggerConfirmPulse()
                                 showCreateDialog = true
                             }
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
-                            text = newEventButtonLabel,
+                            text = "+ NEW EVENT",
                             fontFamily = FontFamily.Monospace,
                             fontSize = 9.5.sp,
                             fontWeight = FontWeight.Bold,
@@ -597,7 +568,7 @@ fun SquadDashboardPage(
                     }
                 }
 
-                // Drop indicator banner when hovering (NO emojis)
+                // Drop indicator banner when hovering (NO emojis, spacious breathing room)
                 AnimatedVisibility(
                     visible = isHoveringGroupEvents,
                     enter = fadeIn() + expandVertically(),
@@ -607,12 +578,14 @@ fun SquadDashboardPage(
                         shape = RoundedCornerShape(14.dp),
                         color = NothingRed.copy(alpha = 0.18f),
                         border = BorderStroke(1.5.dp, NothingRed),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 12.dp, horizontal = 16.dp),
+                                .padding(vertical = 14.dp, horizontal = 16.dp),
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -629,19 +602,21 @@ fun SquadDashboardPage(
                     }
                 }
 
-                // Dedicated Staged Friends Container (Multi-drop confirmation zone)
+                // Dedicated Staged Friends Container (Multi-drop confirmation zone with generous breathing room)
                 if (stagedFriends.isNotEmpty()) {
                     Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color(0xFF161616),
-                        border = BorderStroke(1.5.dp, NothingRed),
-                        modifier = Modifier.fillMaxWidth()
+                        shape = RoundedCornerShape(18.dp),
+                        color = Color(0xFF141414),
+                        border = BorderStroke(1.5.dp, NothingRed.copy(alpha = 0.85f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp)
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -650,7 +625,7 @@ fun SquadDashboardPage(
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(7.dp)
                                 ) {
                                     Box(
                                         modifier = Modifier
@@ -661,7 +636,7 @@ fun SquadDashboardPage(
                                     Text(
                                         text = "STAGED SQUAD MEMBERS [ ${stagedFriends.size} ]",
                                         fontFamily = FontFamily.Monospace,
-                                        fontSize = 9.sp,
+                                        fontSize = 9.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = NothingWhite,
                                         letterSpacing = 1.sp
@@ -675,19 +650,19 @@ fun SquadDashboardPage(
                                     fontWeight = FontWeight.Bold,
                                     color = NothingTextTertiary,
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
+                                        .clip(RoundedCornerShape(6.dp))
                                         .clickable {
                                             stagedInviteCodes = emptySet()
                                             triggerTick()
                                             Toast.makeText(context, "STAGED FRIENDS CLEARED", Toast.LENGTH_SHORT).show()
                                         }
-                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
 
-                            // Horizontal list of staged friends with quick remove
+                            // Horizontal list of staged friends with comfortable chip spacing
                             LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 items(stagedFriends) { friend ->
@@ -702,67 +677,72 @@ fun SquadDashboardPage(
 
                                     Row(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0xFF222222))
-                                            .border(1.dp, NothingRed.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                            .padding(horizontal = 8.dp, vertical = 5.dp),
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(Color(0xFF202020))
+                                            .border(1.dp, NothingRed.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                                            .padding(horizontal = 10.dp, vertical = 7.dp),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         if (petScreenshot != null) {
                                             Image(
                                                 bitmap = petScreenshot.asImageBitmap(),
                                                 contentDescription = friend.displayName,
                                                 modifier = Modifier
-                                                    .size(22.dp)
-                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .size(24.dp)
+                                                    .clip(RoundedCornerShape(5.dp))
                                             )
                                         } else {
-                                            Text(text = friend.avatarEmoji, fontSize = 13.sp)
+                                            Text(text = friend.avatarEmoji, fontSize = 14.sp)
                                         }
 
                                         Text(
                                             text = friend.displayName,
                                             fontFamily = FontFamily.Monospace,
-                                            fontSize = 10.sp,
+                                            fontSize = 10.5.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = NothingWhite
                                         )
 
-                                        Text(
-                                            text = "✕",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = NothingRed,
+                                        Box(
                                             modifier = Modifier
+                                                .clip(CircleShape)
                                                 .clickable {
                                                     stagedInviteCodes = stagedInviteCodes - friend.buddyCode
                                                     triggerTick()
                                                 }
-                                                .padding(start = 2.dp)
-                                        )
+                                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "✕",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = NothingRed
+                                            )
+                                        }
                                     }
                                 }
                             }
 
-                            // Confirm & Create Event Button
+                            // Confirm & Create Event Button with generous breathing room
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .clip(RoundedCornerShape(12.dp))
                                     .background(NothingRed)
                                     .clickable {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         triggerConfirmPulse()
                                         showCreateDialog = true
                                     }
-                                    .padding(vertical = 10.dp),
+                                    .padding(vertical = 14.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = "CONFIRM & CREATE EVENT (${stagedFriends.size} INVITED) →",
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp,
+                                    fontSize = 10.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White,
                                     letterSpacing = 1.sp
