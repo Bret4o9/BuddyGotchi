@@ -25,6 +25,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -49,7 +50,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.delay
@@ -112,6 +117,23 @@ fun SquadDashboardPage(
     var dragTouchInRoot by remember { mutableStateOf(Offset.Zero) }
     var isHoveringGroupEvents by remember { mutableStateOf(false) }
     var groupEventsBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+
+    // Isolated nested scroll connection to prevent child scrollables from scrolling the outer page
+    val isolatedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset = Offset.Zero
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset = available
+
+            override suspend fun onPreFling(available: Velocity): Velocity = Velocity.Zero
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity = available
+        }
+    }
 
     // Haptics & Vibration helper
     val vibrator = remember {
@@ -345,194 +367,242 @@ fun SquadDashboardPage(
                 }
             }
 
-            // 2. Connected Squad 3x3 Grid
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "CONNECTED SQUAD [ ${String.format(Locale.getDefault(), "%02d", friends.size)} ]",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.2.sp,
-                        color = NothingTextSecondary
-                    )
-                }
-
-                val petCatalog = remember { AccountAndInventoryManager.petCatalog }
-                val gridHeight = when {
-                    friends.size <= 3 -> 95.dp
-                    friends.size <= 6 -> 185.dp
-                    else -> 275.dp
-                }
-
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
+            // 2. Connected Squad Card
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = NothingCardSurface,
+                border = BorderStroke(1.dp, NothingBorder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .nestedScroll(isolatedScrollConnection)
+            ) {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 22.dp)
-                        .height(gridHeight)
-                        .clipToBounds(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(friends) { friend ->
-                        val isStaged = friend.buddyCode in stagedInviteCodes
-                        val deterministicPetId = remember(friend.buddyCode) {
-                            val idx = abs(friend.buddyCode.hashCode()) % petCatalog.size
-                            petCatalog[idx].id
-                        }
-                        val petScreenshot = remember(deterministicPetId) {
-                            Buddy3DManager.getBuddyScreenshotBitmap(context, deterministicPetId)
-                        }
-                        var cardCenterInRoot by remember { mutableStateOf(Offset.Zero) }
-                        val isBeingDragged = draggedFriend?.buddyCode == friend.buddyCode
-
-                        Box(
-                            modifier = Modifier
-                                .aspectRatio(1f)
-                                .graphicsLayer {
-                                    alpha = if (isBeingDragged) 0.3f else 1f
-                                    scaleX = if (isBeingDragged) 0.95f else 1f
-                                    scaleY = if (isBeingDragged) 0.95f else 1f
-                                }
-                                .onGloballyPositioned { coords ->
-                                    cardCenterInRoot = coords.boundsInRoot().center
-                                }
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (isStaged) NothingRed.copy(alpha = 0.16f) else Color(0xFF181818))
-                                .border(
-                                    width = if (isStaged || isBeingDragged) 1.5.dp else 1.dp,
-                                    color = if (isBeingDragged) NothingRed else if (isStaged) NothingRed else Color(0xFF2B2B2B),
-                                    shape = RoundedCornerShape(10.dp)
-                                )
-                                .clickable {
-                                    triggerTick()
-                                    stagedInviteCodes = if (isStaged) {
-                                        stagedInviteCodes - friend.buddyCode
-                                    } else {
-                                        stagedInviteCodes + friend.buddyCode
-                                    }
-                                }
-                                .pointerInput(friend.buddyCode) {
-                                    detectDragGestures(
-                                        onDragStart = {
-                                            draggedFriend = friend
-                                            dragTouchInRoot = cardCenterInRoot
-                                            triggerTick()
-                                        },
-                                        onDrag = { change, dragAmount ->
-                                            change.consume()
-                                            dragTouchInRoot += dragAmount
-                                            val bounds = groupEventsBoundsInRoot
-                                            isHoveringGroupEvents = if (bounds != null) {
-                                                dragTouchInRoot.y >= bounds.top - 50f &&
-                                                dragTouchInRoot.y <= bounds.bottom + 50f &&
-                                                dragTouchInRoot.x >= bounds.left - 50f &&
-                                                dragTouchInRoot.x <= bounds.right + 50f
-                                            } else {
-                                                false
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            if (isHoveringGroupEvents && draggedFriend != null) {
-                                                triggerConfirmPulse()
-                                                val wasAlreadyStaged = friend.buddyCode in stagedInviteCodes
-                                                stagedInviteCodes = stagedInviteCodes + friend.buddyCode
-                                                val count = stagedInviteCodes.size
-                                                Toast.makeText(
-                                                    context,
-                                                    if (!wasAlreadyStaged)
-                                                        "${friend.displayName} ADDED TO EVENT ($count STAGED)"
-                                                    else
-                                                        "${friend.displayName} ALREADY STAGED ($count STAGED)",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            }
-                                            draggedFriend = null
-                                            isHoveringGroupEvents = false
-                                        },
-                                        onDragCancel = {
-                                            draggedFriend = null
-                                            isHoveringGroupEvents = false
-                                        }
-                                    )
-                                }
-                                .padding(horizontal = 4.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center
+                    // Header Row with Red Dot Indicator
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                // Buddy Pet Thumbnail
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(RoundedCornerShape(7.dp))
-                                        .background(Color(0xFF101010)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (petScreenshot != null) {
-                                        Image(
-                                            bitmap = petScreenshot.asImageBitmap(),
-                                            contentDescription = friend.displayName,
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .clip(RoundedCornerShape(7.dp))
-                                        )
-                                    } else {
-                                        Text(text = friend.avatarEmoji, fontSize = 18.sp)
-                                    }
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(NothingRed)
+                            )
+                            Text(
+                                text = "CONNECTED SQUAD [ ${String.format(Locale.getDefault(), "%02d", friends.size)} ]",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp,
+                                color = NothingWhite
+                            )
+                        }
 
-                                    if (isStaged) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(NothingRed.copy(alpha = 0.45f)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(text = "✓", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "HOLD TO DRAG",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.8.sp,
+                            color = NothingTextTertiary
+                        )
+                    }
+
+                    val petCatalog = remember { AccountAndInventoryManager.petCatalog }
+                    val gridHeight = when {
+                        friends.size <= 3 -> 105.dp
+                        friends.size <= 6 -> 218.dp
+                        else -> 230.dp
+                    }
+
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(gridHeight)
+                            .clipToBounds()
+                            .nestedScroll(isolatedScrollConnection),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(friends) { friend ->
+                            val isStaged = friend.buddyCode in stagedInviteCodes
+                            val deterministicPetId = remember(friend.buddyCode) {
+                                val idx = abs(friend.buddyCode.hashCode()) % petCatalog.size
+                                petCatalog[idx].id
+                            }
+                            val petScreenshot = remember(deterministicPetId) {
+                                Buddy3DManager.getBuddyScreenshotBitmap(context, deterministicPetId)
+                            }
+                            var cardCenterInRoot by remember { mutableStateOf(Offset.Zero) }
+                            val isBeingDragged = draggedFriend?.buddyCode == friend.buddyCode
+
+                            Box(
+                                modifier = Modifier
+                                    .aspectRatio(1f)
+                                    .graphicsLayer {
+                                        alpha = if (isBeingDragged) 0.3f else 1f
+                                        scaleX = if (isBeingDragged) 0.95f else 1f
+                                        scaleY = if (isBeingDragged) 0.95f else 1f
+                                    }
+                                    .onGloballyPositioned { coords ->
+                                        cardCenterInRoot = coords.boundsInRoot().center
+                                    }
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isStaged) NothingRed.copy(alpha = 0.16f) else Color(0xFF181818))
+                                    .border(
+                                        width = if (isStaged || isBeingDragged) 1.5.dp else 1.dp,
+                                        color = if (isBeingDragged) NothingRed else if (isStaged) NothingRed else Color(0xFF2B2B2B),
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable {
+                                        triggerTick()
+                                        stagedInviteCodes = if (isStaged) {
+                                            stagedInviteCodes - friend.buddyCode
+                                        } else {
+                                            stagedInviteCodes + friend.buddyCode
                                         }
-                                    } else {
-                                        // Online indicator dot
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .padding(2.5.dp)
-                                                .size(5.dp)
-                                                .clip(CircleShape)
-                                                .background(if (friend.isOnline) Color(0xFF00E676) else Color.Gray)
+                                    }
+                                    .pointerInput(friend.buddyCode) {
+                                        detectDragGesturesAfterLongPress(
+                                            onDragStart = {
+                                                draggedFriend = friend
+                                                dragTouchInRoot = cardCenterInRoot
+                                                triggerTick()
+                                            },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                dragTouchInRoot += dragAmount
+                                                val bounds = groupEventsBoundsInRoot
+                                                isHoveringGroupEvents = if (bounds != null) {
+                                                    dragTouchInRoot.y >= bounds.top - 50f &&
+                                                    dragTouchInRoot.y <= bounds.bottom + 50f &&
+                                                    dragTouchInRoot.x >= bounds.left - 50f &&
+                                                    dragTouchInRoot.x <= bounds.right + 50f
+                                                } else {
+                                                    false
+                                                }
+                                            },
+                                            onDragEnd = {
+                                                if (isHoveringGroupEvents && draggedFriend != null) {
+                                                    triggerConfirmPulse()
+                                                    val wasAlreadyStaged = friend.buddyCode in stagedInviteCodes
+                                                    stagedInviteCodes = stagedInviteCodes + friend.buddyCode
+                                                    val count = stagedInviteCodes.size
+                                                    Toast.makeText(
+                                                        context,
+                                                        if (!wasAlreadyStaged)
+                                                            "${friend.displayName} ADDED TO EVENT ($count STAGED)"
+                                                        else
+                                                            "${friend.displayName} ALREADY STAGED ($count STAGED)",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
+                                                draggedFriend = null
+                                                isHoveringGroupEvents = false
+                                            },
+                                            onDragCancel = {
+                                                draggedFriend = null
+                                                isHoveringGroupEvents = false
+                                            }
                                         )
                                     }
-                                }
-
-                                // Name & Level
+                                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Column(
+                                    modifier = Modifier.fillMaxSize(),
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(1.dp)
+                                    verticalArrangement = Arrangement.SpaceEvenly
                                 ) {
-                                    Text(
-                                        text = friend.displayName.uppercase(),
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 8.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isStaged) NothingWhite else Color(0xFFDDDDDD),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    // Buddy Pet Thumbnail
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(7.dp))
+                                            .background(Color(0xFF101010)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (petScreenshot != null) {
+                                            Image(
+                                                bitmap = petScreenshot.asImageBitmap(),
+                                                contentDescription = "Pet Thumbnail",
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        } else {
+                                            Text(
+                                                text = friend.displayName.take(1).uppercase(),
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = NothingWhite
+                                            )
+                                        }
 
-                                    Text(
-                                        text = if (isStaged) "STAGED" else "LVL ${friend.level}",
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 7.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isStaged) NothingRed else NothingTextTertiary
-                                    )
+                                        if (isStaged) {
+                                            // Staged check badge
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .padding(2.dp)
+                                                    .size(10.dp)
+                                                    .clip(CircleShape)
+                                                    .background(NothingRed),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "✓",
+                                                    fontSize = 7.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White
+                                                )
+                                            }
+                                        } else {
+                                            // Online indicator dot
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .padding(2.5.dp)
+                                                    .size(5.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (friend.isOnline) Color(0xFF00E676) else Color.Gray)
+                                            )
+                                        }
+                                    }
+
+                                    // Name & Level
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(1.dp)
+                                    ) {
+                                        Text(
+                                            text = friend.displayName.uppercase(),
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 8.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isStaged) NothingWhite else Color(0xFFDDDDDD),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+
+                                        Text(
+                                            text = if (isStaged) "STAGED" else "LVL ${friend.level}",
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 7.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isStaged) NothingRed else NothingTextTertiary
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -696,7 +766,9 @@ fun SquadDashboardPage(
                             // Horizontal list of staged friends with comfortable chip spacing
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .nestedScroll(isolatedScrollConnection)
                             ) {
                                 items(stagedFriends) { friend ->
                                     val petCatalog = remember { AccountAndInventoryManager.petCatalog }
