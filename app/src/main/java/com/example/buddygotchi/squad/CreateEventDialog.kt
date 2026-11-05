@@ -16,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -52,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -93,6 +95,7 @@ fun CreateEventDialog(
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val clipboardManager = LocalClipboardManager.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -230,7 +233,14 @@ fun CreateEventDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.94f)
-                .fillMaxHeight(0.88f),
+                .fillMaxHeight(0.88f)
+                .imePadding()
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = {
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                    })
+                },
             shape = RoundedCornerShape(24.dp),
             color = NothingCardSurface,
             border = BorderStroke(1.dp, NothingBorder)
@@ -241,86 +251,41 @@ fun CreateEventDialog(
                     .padding(horizontal = 18.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Top Header with Step Drum-Roll Breadcrumb
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Top Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(NothingRed)
-                            )
-                            Text(
-                                text = "CREATE SQUAD EVENT",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.2.sp,
-                                color = NothingWhite
-                            )
-                        }
-
                         Box(
                             modifier = Modifier
-                                .size(26.dp)
+                                .size(8.dp)
                                 .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.08f))
-                                .clickable { onDismiss() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(text = "✕", fontSize = 11.sp, color = NothingTextSecondary)
-                        }
+                                .background(NothingRed)
+                        )
+                        Text(
+                            text = "CREATE SQUAD EVENT",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp,
+                            color = NothingWhite
+                        )
                     }
 
-                    // Step Pills Indicator
-                    Row(
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFF161616))
-                            .border(1.dp, Color(0xFF2A2A2A), RoundedCornerShape(10.dp))
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .clickable { onDismiss() },
+                        contentAlignment = Alignment.Center
                     ) {
-                        val steps = listOf("01 DETAILS", "02 SCHEDULE", "03 SQUAD")
-                        steps.forEachIndexed { index, label ->
-                            val isCurrent = pagerState.currentPage == index
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isCurrent) NothingRed else Color.Transparent)
-                                    .clickable {
-                                        if (index == 0 || (index == 1 && titleInput.isNotBlank()) || (index == 2 && titleInput.isNotBlank())) {
-                                            coroutineScope.launch {
-                                                pagerState.animateScrollToPage(
-                                                    index,
-                                                    animationSpec = tween(450, easing = FastOutSlowInEasing)
-                                                )
-                                            }
-                                        }
-                                    }
-                                    .padding(vertical = 5.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = label,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 8.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isCurrent) Color.White else NothingTextTertiary,
-                                    letterSpacing = 0.5.sp
-                                )
-                            }
-                        }
+                        Text(text = "✕", fontSize = 11.sp, color = NothingTextSecondary)
                     }
                 }
 
@@ -401,6 +366,16 @@ fun CreateEventDialog(
                                                 keyboardOptions = KeyboardOptions(
                                                     capitalization = KeyboardCapitalization.Characters,
                                                     imeAction = ImeAction.Next
+                                                ),
+                                                keyboardActions = KeyboardActions(
+                                                    onNext = {
+                                                        focusManager.clearFocus()
+                                                        keyboardController?.hide()
+                                                    },
+                                                    onDone = {
+                                                        focusManager.clearFocus()
+                                                        keyboardController?.hide()
+                                                    }
                                                 ),
                                                 singleLine = true,
                                                 decorationBox = { innerTextField ->
@@ -544,7 +519,12 @@ fun CreateEventDialog(
                                                     capitalization = KeyboardCapitalization.None,
                                                     imeAction = ImeAction.Done
                                                 ),
-                                                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                                                keyboardActions = KeyboardActions(
+                                                    onDone = {
+                                                        focusManager.clearFocus()
+                                                        keyboardController?.hide()
+                                                    }
+                                                ),
                                                 singleLine = true,
                                                 decorationBox = { innerTextField ->
                                                     if (locationInput.isEmpty()) {
@@ -588,46 +568,6 @@ fun CreateEventDialog(
                                                             selectedLatitude = null
                                                             selectedLongitude = null
                                                         }
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        // Host Info Card
-                                        Surface(
-                                            shape = RoundedCornerShape(12.dp),
-                                            color = Color(0xFF141414),
-                                            border = BorderStroke(1.dp, Color(0xFF252525)),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(12.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(36.dp)
-                                                        .clip(CircleShape)
-                                                        .background(NothingRed.copy(alpha = 0.15f))
-                                                        .border(1.dp, NothingRed, CircleShape),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(text = "👑", fontSize = 18.sp)
-                                                }
-                                                Column {
-                                                    Text(
-                                                        text = "EVENT HOST: ${currentUser.displayName.ifBlank { "YOU" }}",
-                                                        fontFamily = FontFamily.Monospace,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = NothingWhite
-                                                    )
-                                                    Text(
-                                                        text = "CALLSIGN: ${currentUser.buddyCode}",
-                                                        fontFamily = FontFamily.Monospace,
-                                                        fontSize = 8.5.sp,
-                                                        color = NothingTextSecondary
                                                     )
                                                 }
                                             }
