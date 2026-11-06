@@ -1,5 +1,7 @@
 package com.example.buddygotchi.squad
 
+import com.example.buddygotchi.ui.SlimScrollWheel
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -1298,6 +1300,14 @@ fun SquadDashboardPage(
                 }
             }
         }
+
+        SlimScrollWheel(
+            scrollState = scrollState,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(top = 16.dp, bottom = 48.dp, end = 3.dp)
+                .fillMaxHeight()
+        )
     }
 
     // Dialogs

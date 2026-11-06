@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.example.buddygotchi.ui.theme.*
+import com.example.buddygotchi.ui.SlimScrollWheel
 
 /**
  * Thin strip residing directly below the BUDDYGOTCHI title row and above the widget grid.
@@ -279,129 +280,113 @@ fun ShelfOverlay(
                 .padding(
                     start = 16.dp,
                     end = 16.dp,
-                    top = 130.dp, // Positioned directly below the shelf strip
-                    bottom = 24.dp
+                    top = 104.dp, // Reach top of shelf button
+                    bottom = 16.dp // Reach almost the bottom of screen
                 )
         ) {
             Surface(
-                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp, topStart = 16.dp, topEnd = 16.dp),
+                shape = RoundedCornerShape(20.dp),
                 color = Color(0xFF131313),
                 border = BorderStroke(1.dp, NothingBorder),
                 shadowElevation = 24.dp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.78f)
+                    .fillMaxHeight()
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Shelf Header
+                    // Shelf Header (compact Nothing OS design with top-left back button)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        // Top Left: Back button with arrow
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFF1E1E1E),
+                            border = BorderStroke(1.dp, NothingBorder),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    triggerSnap()
+                                    onClose()
+                                }
+                        ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(NothingRed)
-                                )
                                 Text(
-                                    text = "SHELF STORAGE",
+                                    text = "←",
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.5.sp,
-                                    color = NothingWhite
-                                )
-                                Text(
-                                    text = "[ 0${shelfWidgets.size} ]",
-                                    fontFamily = Dseg7FontFamily,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
                                     color = NothingRed
                                 )
-                            }
-                            Text(
-                                text = "STASHED WIDGETS · TAP TO DEPLOY TO CURRENT PAGE",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 8.5.sp,
-                                letterSpacing = 0.5.sp,
-                                color = NothingTextTertiary
-                            )
-                        }
-
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Color(0xFF1E1E1E),
-                                    border = BorderStroke(1.dp, NothingRed.copy(alpha = 0.7f)),
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable {
-                                            triggerSnap()
-                                            val appWidgetManager = context.getSystemService(AppWidgetManager::class.java)
-                                            val provider = ComponentName(context, BuddyTaskWidgetProvider::class.java)
-                                            if (appWidgetManager != null && appWidgetManager.isRequestPinAppWidgetSupported) {
-                                                appWidgetManager.requestPinAppWidget(provider, null, null)
-                                            }
-                                        }
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(5.dp)
-                                                .clip(CircleShape)
-                                                .background(NothingRed)
-                                        )
-                                        Text(
-                                            text = "+ HOME",
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = NothingWhite
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Close button
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = NothingSurfaceVariant,
-                                border = BorderStroke(1.dp, NothingBorder),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        triggerSnap()
-                                        onClose()
-                                    }
-                            ) {
                                 Text(
-                                    text = "✕ CLOSE",
+                                    text = "BACK",
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 9.5.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = NothingTextSecondary,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                    letterSpacing = 1.sp,
+                                    color = NothingWhite
                                 )
                             }
+                        }
+
+                        // Shelf Storage Title
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(NothingRed)
+                            )
+                            Text(
+                                text = "SHELF STORAGE",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp,
+                                color = NothingWhite
+                            )
+                            Text(
+                                text = "[ 0${shelfWidgets.size} ]",
+                                fontFamily = Dseg7FontFamily,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingRed
+                            )
+                        }
+
+                        // Top Right: Compact Close button
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = NothingSurfaceVariant,
+                            border = BorderStroke(1.dp, NothingBorder),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    triggerSnap()
+                                    onClose()
+                                }
+                        ) {
+                            Text(
+                                text = "✕",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingTextSecondary,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                            )
                         }
                     }
 
@@ -413,16 +398,20 @@ fun ShelfOverlay(
                             .background(NothingBorder)
                     )
 
-                    // Scrollable Shelf Racks
+                    // Scrollable Shelf Racks with mechanical SlimScrollWheel
                     val scrollState = rememberScrollState()
-                    Column(
+                    Box(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            .verticalScroll(scrollState)
-                            .padding(horizontal = 14.dp, vertical = 14.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(scrollState)
+                                .padding(horizontal = 14.dp, vertical = 14.dp),
+                            verticalArrangement = Arrangement.spacedBy(20.dp)
+                        ) {
                         if (shelfWidgets.isEmpty()) {
                             // Empty Shelf Slot
                             Surface(
@@ -492,6 +481,15 @@ fun ShelfOverlay(
                                 )
                             }
                         }
+                        }
+
+                        SlimScrollWheel(
+                            scrollState = scrollState,
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(top = 8.dp, bottom = 8.dp, end = 3.dp)
+                                .fillMaxHeight()
+                        )
                     }
 
                     // Bottom Drawer Pull Handle
