@@ -46,18 +46,41 @@ fun ShelfStrip(
     isOpen: Boolean,
     stashedCount: Int,
     onClick: () -> Unit,
+    isDropTargetHovered: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val stripBorderColor by animateColorAsState(
+        targetValue = if (isDropTargetHovered) NothingRed
+        else if (isOpen) NothingRed.copy(alpha = 0.85f)
+        else if (stashedCount > 0) NothingBorder
+        else NothingBorder.copy(alpha = 0.5f),
+        label = "shelfStripBorder"
+    )
+    val stripBgColor by animateColorAsState(
+        targetValue = if (isDropTargetHovered) Color(0x33D71921)
+        else if (isOpen) NothingCardSurface
+        else NothingCardSurface.copy(alpha = 0.88f),
+        label = "shelfStripBg"
+    )
+    val stripBorderWidth by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isDropTargetHovered) 2.dp else 1.dp,
+        label = "shelfStripBorderWidth"
+    )
+    val stripHeight by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isDropTargetHovered) 36.dp else 30.dp,
+        label = "shelfStripHeight"
+    )
+
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = if (isOpen) NothingCardSurface else NothingCardSurface.copy(alpha = 0.88f),
+        color = stripBgColor,
         border = BorderStroke(
-            width = 1.dp,
-            color = if (isOpen) NothingRed.copy(alpha = 0.85f) else if (stashedCount > 0) NothingBorder else NothingBorder.copy(alpha = 0.5f)
+            width = stripBorderWidth,
+            color = stripBorderColor
         ),
         modifier = modifier
             .fillMaxWidth()
-            .height(30.dp)
+            .height(stripHeight)
             .clip(RoundedCornerShape(14.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -79,9 +102,9 @@ fun ShelfStrip(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(5.dp)
+                        .size(if (isDropTargetHovered) 6.dp else 5.dp)
                         .clip(CircleShape)
-                        .background(if (stashedCount > 0) NothingRed else NothingTextTertiary)
+                        .background(if (isDropTargetHovered || stashedCount > 0) NothingRed else NothingTextTertiary)
                 )
                 Text(
                     text = "SHELF",
@@ -89,43 +112,65 @@ fun ShelfStrip(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.5.sp,
-                    color = if (isOpen) NothingRed else NothingWhite
+                    color = if (isDropTargetHovered || isOpen) NothingRed else NothingWhite
                 )
                 Text(
                     text = "[ ${stashedCount.toString().padStart(2, '0')} ]",
                     fontFamily = Dseg7FontFamily,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (stashedCount > 0) NothingRed else NothingTextTertiary
+                    color = if (isDropTargetHovered || stashedCount > 0) NothingRed else NothingTextTertiary
                 )
             }
 
-            // Center: Mechanical Grip Handle (drawer slot)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(32.dp)
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(1.5.dp))
-                        .background(if (isOpen) NothingRed.copy(alpha = 0.7f) else Color(0x33FFFFFF))
-                )
+            // Center: Mechanical Grip Handle (drawer slot) OR Drop Hint
+            if (isDropTargetHovered) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .clip(CircleShape)
+                            .background(NothingRed)
+                    )
+                    Text(
+                        text = "DROP HERE TO STASH",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp,
+                        color = NothingRed
+                    )
+                }
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(32.dp)
+                            .height(3.dp)
+                            .clip(RoundedCornerShape(1.5.dp))
+                            .background(if (isOpen) NothingRed.copy(alpha = 0.7f) else Color(0x33FFFFFF))
+                    )
+                }
             }
 
-            // Right: Expand/Collapse indicator
+            // Right: Expand/Collapse indicator or Drop prompt
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = if (isOpen) "COLLAPSE ▲" else if (stashedCount > 0) "OPEN ▼" else "EMPTY",
+                    text = if (isDropTargetHovered) "STASH ↘" else if (isOpen) "COLLAPSE ▲" else if (stashedCount > 0) "OPEN ▼" else "EMPTY",
                     fontFamily = FontFamily.Monospace,
                     fontSize = 9.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 0.5.sp,
-                    color = if (isOpen) NothingRed else if (stashedCount > 0) NothingTextSecondary else NothingTextTertiary
+                    color = if (isDropTargetHovered || isOpen) NothingRed else if (stashedCount > 0) NothingTextSecondary else NothingTextTertiary
                 )
             }
         }

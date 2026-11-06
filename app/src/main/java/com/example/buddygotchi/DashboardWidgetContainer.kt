@@ -23,6 +23,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,10 +66,12 @@ fun DashboardWidgetContainer(
     onResize: (WidgetSize) -> Unit,
     onDragReorderStart: () -> Unit,
     onDragReorderMove: (dragY: Float) -> Unit,
-    onDragReorderEnd: () -> Unit,
+    onDragReorderEnd: (isDroppedOnShelf: Boolean) -> Unit,
     onResizePreview: ((WidgetSize?, ResizeDotType?) -> Unit)? = null,
     onStashToShelf: (() -> Unit)? = null,
     isPickedUp: Boolean = false,
+    isHoveringShelf: Boolean = false,
+    onCheckOverShelf: ((pointerInRoot: Offset?, cardTopInRoot: Float?) -> Boolean)? = null,
     modifier: Modifier = Modifier,
     content: @Composable (liveSize: WidgetSize) -> Unit
 ) {
@@ -180,9 +185,15 @@ fun DashboardWidgetContainer(
         label = "widgetContentAlpha"
     )
 
+    var containerCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var isOverShelf by remember { mutableStateOf(false) }
+
     Box(
         modifier = modifier
             .zIndex(if (activeDot != null || isSettling) 80f else 1f)
+            .onGloballyPositioned { coords ->
+                containerCoords = coords
+            }
             .onSizeChanged { size ->
                 cardWidthPx = size.width.toFloat()
                 cardHeightPx = size.height.toFloat()
@@ -244,25 +255,65 @@ fun DashboardWidgetContainer(
                 }
             }
             // 2. In edit mode: Card body dragging for reordering widgets (disabled while resizing)
+            // Intercepts in PointerEventPass.Initial with root coordinate deltas so parent verticalScroll does not steal widget drags
             .pointerInput(isEditMode, activeDot, isSettling) {
                 if (isEditMode && activeDot == null && !isSettling) {
-                    detectDragGesturesAfterLongPress(
-                        onDragStart = {
-                            triggerTick()
-                            onDragReorderStart()
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            onDragReorderMove(dragAmount.y)
-                        },
-                        onDragEnd = {
-                            triggerTick()
-                            onDragReorderEnd()
-                        },
-                        onDragCancel = {
-                            onDragReorderEnd()
+                    awaitEachGesture {
+                        val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+                        val startRootPos = containerCoords?.takeIf { it.isAttached }?.localToRoot(down.position)
+                        var lastRootY = startRootPos?.y ?: down.position.y
+                        val startY = lastRootY
+                        var isDragging = false
+                        val dragSlopPx = 6.dp.toPx()
+
+                        while (true) {
+                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+
+                            if (!change.pressed) {
+                                if (isDragging) {
+                                    change.consume()
+                                    val dropped = isOverShelf
+                                    isOverShelf = false
+                                    onCheckOverShelf?.invoke(null, null)
+                                    onDragReorderEnd(dropped)
+                                }
+                                break
+                            }
+
+                            val coords = containerCoords
+                            val currentRootPos = coords?.takeIf { it.isAttached }?.localToRoot(change.position)
+                            val currentRootY = currentRootPos?.y ?: change.position.y
+                            val cardTop = coords?.takeIf { it.isAttached }?.localToRoot(Offset.Zero)?.y
+
+                            val totalDist = kotlin.math.abs(currentRootY - startY)
+                            if (!isDragging && totalDist > dragSlopPx) {
+                                isDragging = true
+                                down.consume()
+                                change.consume()
+                                triggerTick()
+                                val over = if (item.widgetId.canRemove) {
+                                    onCheckOverShelf?.invoke(currentRootPos, cardTop) ?: false
+                                } else false
+                                isOverShelf = over
+                                onDragReorderStart()
+                            }
+
+                            if (isDragging) {
+                                val deltaY = currentRootY - lastRootY
+                                lastRootY = currentRootY
+                                change.consume()
+                                val over = if (item.widgetId.canRemove) {
+                                    onCheckOverShelf?.invoke(currentRootPos, cardTop) ?: false
+                                } else false
+                                if (over != isOverShelf) {
+                                    isOverShelf = over
+                                    if (over) triggerTick()
+                                }
+                                onDragReorderMove(deltaY)
+                            }
                         }
-                    )
+                    }
                 }
             }
             .graphicsLayer {
@@ -277,6 +328,7 @@ fun DashboardWidgetContainer(
                     Modifier.border(
                         width = if (isPickedUp) 2.dp else 1.5.dp,
                         color = if (activeDot != null) Color.Transparent
+                        else if (isPickedUp && isHoveringShelf) NothingRed
                         else if (isPickedUp) NothingRed.copy(alpha = 0.85f)
                         else if (isSettling) NothingRed
                         else MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
@@ -351,6 +403,45 @@ fun DashboardWidgetContainer(
         }
 
         // Floating "SHELF ↘" stash button removed: user can drag & drop widgets directly onto the shelf strip
+
+        // Visual indicator when dragged card is hovering over the shelf drop zone
+        if (isPickedUp && (isHoveringShelf || isOverShelf) && item.widgetId.canRemove) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(cornerRadius))
+                    .background(Color.Black.copy(alpha = 0.52f))
+                    .zIndex(150f),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xEE1E0000),
+                    border = BorderStroke(1.dp, NothingRed)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .clip(CircleShape)
+                                .background(NothingRed)
+                        )
+                        Text(
+                            text = "DROP TO STASH IN SHELF ↘",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.8.sp,
+                            color = NothingRed
+                        )
+                    }
+                }
+            }
+        }
 
         // 4 Resize Dots (Visible strictly in Edit Mode, except for the Clock widget)
         if (isEditMode && isResizable) {

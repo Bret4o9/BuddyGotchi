@@ -21,6 +21,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -70,12 +72,33 @@ fun LeftDashboardPage(
     onPasswordsExpandedChanged: (Boolean) -> Unit = {},
     onGroceryExpandedChanged: (Boolean) -> Unit = {},
     onDraggingChanged: (Boolean) -> Unit = {},
+    isShelfHovered: Boolean = false,
+    onHoverShelf: (Boolean) -> Unit = {},
+    shelfBounds: Rect? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
+
+    fun checkDropOnShelf(pointerInRoot: Offset?, cardTopInRoot: Float?, dragY: Float, canRemove: Boolean): Boolean {
+        if (!canRemove) return false
+        val bounds = shelfBounds
+        val thresholdY = if (bounds != null) {
+            bounds.bottom + with(density) { 36.dp.toPx() }
+        } else {
+            with(density) { 150.dp.toPx() }
+        }
+        val pointerOver = pointerInRoot?.let { pt ->
+            pt.y <= thresholdY
+        } ?: false
+        val cardTopOver = cardTopInRoot?.let { topY ->
+            val cardShelfThreshold = if (bounds != null) bounds.bottom + with(density) { 10.dp.toPx() } else with(density) { 120.dp.toPx() }
+            topY <= cardShelfThreshold && dragY <= -with(density) { 30.dp.toPx() }
+        } ?: false
+        return pointerOver || cardTopOver
+    }
 
     val vibrator = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -340,7 +363,7 @@ fun LeftDashboardPage(
                                 val isThisItemDragged = (itemIndex == draggedIndex && itemIndex != -1)
 
                                 val itemScale by animateFloatAsState(
-                                    targetValue = if (isThisItemDragged) 0.94f else 1f,
+                                    targetValue = if (isThisItemDragged) (if (isShelfHovered) 0.84f else 0.94f) else 1f,
                                     animationSpec = spring(
                                         dampingRatio = Spring.DampingRatioLowBouncy,
                                         stiffness = Spring.StiffnessMediumLow
@@ -380,20 +403,38 @@ fun LeftDashboardPage(
                                             updateLayout(LeftDashboardLayoutManager.removeWidget(layout, item.widgetId))
                                         },
                                         isPickedUp = isThisItemDragged,
+                                        isHoveringShelf = isThisItemDragged && isShelfHovered,
+                                        onCheckOverShelf = { rootPos, cardTop ->
+                                            val over = checkDropOnShelf(rootPos, cardTop, dragOffsetY, item.widgetId.canRemove)
+                                            onHoverShelf(over)
+                                            over
+                                        },
                                         onDragReorderStart = {
                                             if (itemIndex != -1) {
                                                 draggedIndex = itemIndex
                                                 dragOffsetY = 0f
                                                 isDropping = false
+                                                onHoverShelf(false)
                                             }
                                         },
                                         onDragReorderMove = { dy ->
                                             dragOffsetY += dy
                                         },
-                                        onDragReorderEnd = {
+                                        onDragReorderEnd = { droppedOnShelf ->
                                             coroutineScope.launch {
                                                 val d = draggedIndex
+                                                onHoverShelf(false)
                                                 if (d != null && d != -1) {
+                                                    val draggedItem = layout.getOrNull(d)
+                                                    if (droppedOnShelf && draggedItem != null && draggedItem.widgetId.canRemove) {
+                                                        triggerDropHaptic()
+                                                        updateLayout(LeftDashboardLayoutManager.removeWidget(layout, draggedItem.widgetId))
+                                                        dragOffsetY = 0f
+                                                        dropAnimOffsetY.snapTo(0f)
+                                                        isDropping = false
+                                                        draggedIndex = null
+                                                        return@launch
+                                                    }
                                                     try {
                                                         val t = DashboardDragUtils.computeTargetIndex(d, dragOffsetY, layout, density, gapPx)
                                                         isDropping = true
@@ -534,7 +575,7 @@ fun LeftDashboardPage(
                                         val isThisItemDragged = (itemIndex == draggedIndex && itemIndex != -1)
 
                                         val itemScale by animateFloatAsState(
-                                            targetValue = if (isThisItemDragged) 0.94f else 1f,
+                                            targetValue = if (isThisItemDragged) (if (isShelfHovered) 0.84f else 0.94f) else 1f,
                                             animationSpec = spring(
                                                 dampingRatio = Spring.DampingRatioLowBouncy,
                                                 stiffness = Spring.StiffnessMediumLow
@@ -574,20 +615,38 @@ fun LeftDashboardPage(
                                                     updateLayout(LeftDashboardLayoutManager.removeWidget(layout, item.widgetId))
                                                 },
                                                 isPickedUp = isThisItemDragged,
+                                                isHoveringShelf = isThisItemDragged && isShelfHovered,
+                                                onCheckOverShelf = { rootPos, cardTop ->
+                                                    val over = checkDropOnShelf(rootPos, cardTop, dragOffsetY, item.widgetId.canRemove)
+                                                    onHoverShelf(over)
+                                                    over
+                                                },
                                                 onDragReorderStart = {
                                                     if (itemIndex != -1) {
                                                         draggedIndex = itemIndex
                                                         dragOffsetY = 0f
                                                         isDropping = false
+                                                        onHoverShelf(false)
                                                     }
                                                 },
                                                 onDragReorderMove = { dy ->
                                                     dragOffsetY += dy
                                                 },
-                                                onDragReorderEnd = {
+                                                onDragReorderEnd = { droppedOnShelf ->
                                                     coroutineScope.launch {
                                                         val d = draggedIndex
+                                                        onHoverShelf(false)
                                                         if (d != null && d != -1) {
+                                                            val draggedItem = layout.getOrNull(d)
+                                                            if (droppedOnShelf && draggedItem != null && draggedItem.widgetId.canRemove) {
+                                                                triggerDropHaptic()
+                                                                updateLayout(LeftDashboardLayoutManager.removeWidget(layout, draggedItem.widgetId))
+                                                                dragOffsetY = 0f
+                                                                dropAnimOffsetY.snapTo(0f)
+                                                                isDropping = false
+                                                                draggedIndex = null
+                                                                return@launch
+                                                            }
                                                             try {
                                                                 val t = DashboardDragUtils.computeTargetIndex(d, dragOffsetY, layout, density, gapPx)
                                                                 isDropping = true

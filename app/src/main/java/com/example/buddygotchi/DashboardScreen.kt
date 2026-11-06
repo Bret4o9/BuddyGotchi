@@ -32,6 +32,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -88,6 +92,18 @@ fun DashboardScreen(
             }
         } catch (_: Exception) {}
         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+
+    fun triggerSnap() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(30)
+            }
+        } catch (_: Exception) {}
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
     }
 
     fun triggerTick() {
@@ -277,6 +293,26 @@ fun DashboardScreen(
     }
 
     var isShelfOpen by remember { mutableStateOf(false) }
+    var isHoveringShelf by remember { mutableStateOf(false) }
+    var shelfBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+
+    fun checkDropOnShelf(pointerInRoot: Offset?, cardTopInRoot: Float?, dragY: Float, canRemove: Boolean): Boolean {
+        if (!canRemove) return false
+        val bounds = shelfBoundsInRoot
+        val thresholdY = if (bounds != null) {
+            bounds.bottom + with(density) { 36.dp.toPx() }
+        } else {
+            with(density) { 150.dp.toPx() }
+        }
+        val pointerOver = pointerInRoot?.let { pt ->
+            pt.y <= thresholdY
+        } ?: false
+        val cardTopOver = cardTopInRoot?.let { topY ->
+            val cardShelfThreshold = if (bounds != null) bounds.bottom + with(density) { 10.dp.toPx() } else with(density) { 120.dp.toPx() }
+            topY <= cardShelfThreshold && dragY <= -with(density) { 30.dp.toPx() }
+        } ?: false
+        return pointerOver || cardTopOver
+    }
     LaunchedEffect(isCurrentPageSquad) {
         if (isCurrentPageSquad && isShelfOpen) {
             isShelfOpen = false
@@ -468,12 +504,17 @@ fun DashboardScreen(
                 ShelfStrip(
                     isOpen = isShelfOpen,
                     stashedCount = shelfWidgets.size,
+                    isDropTargetHovered = isHoveringShelf,
                     onClick = { isShelfOpen = !isShelfOpen },
-                    modifier = Modifier.padding(
-                        start = DashboardGridDefaults.HORIZONTAL_PADDING,
-                        end = DashboardGridDefaults.HORIZONTAL_PADDING,
-                        bottom = 10.dp
-                    )
+                    modifier = Modifier
+                        .onGloballyPositioned { coords ->
+                            shelfBoundsInRoot = coords.boundsInRoot()
+                        }
+                        .padding(
+                            start = DashboardGridDefaults.HORIZONTAL_PADDING,
+                            end = DashboardGridDefaults.HORIZONTAL_PADDING,
+                            bottom = 10.dp
+                        )
                 )
             }
 
@@ -542,7 +583,10 @@ fun DashboardScreen(
                                 onNotesExpandedChanged = { isNotesExpanded = it },
                                 onPasswordsExpandedChanged = { isPasswordsExpanded = it },
                                 onGroceryExpandedChanged = { isGroceryExpanded = it },
-                                onDraggingChanged = { isChildPageDraggingWidget = it }
+                                onDraggingChanged = { isChildPageDraggingWidget = it },
+                                isShelfHovered = isHoveringShelf,
+                                onHoverShelf = { isHoveringShelf = it },
+                                shelfBounds = shelfBoundsInRoot
                             )
                         }
                         currentPageItem.type == DashboardPageType.MAIN -> {
@@ -650,7 +694,7 @@ fun DashboardScreen(
                                         val isThisItemDragged = (itemIndex == draggedIndex && itemIndex != -1)
 
                                         val itemScale by animateFloatAsState(
-                                            targetValue = if (isThisItemDragged) 0.94f else 1f,
+                                            targetValue = if (isThisItemDragged) (if (isHoveringShelf) 0.84f else 0.94f) else 1f,
                                             animationSpec = spring(
                                                 dampingRatio = Spring.DampingRatioLowBouncy,
                                                 stiffness = Spring.StiffnessMediumLow
@@ -690,20 +734,38 @@ fun DashboardScreen(
                                                     updateLayout(DashboardLayoutManager.removeWidget(layout, item.widgetId))
                                                 },
                                                 isPickedUp = isThisItemDragged,
+                                                isHoveringShelf = isThisItemDragged && isHoveringShelf,
+                                                onCheckOverShelf = { rootPos, cardTop ->
+                                                    val over = checkDropOnShelf(rootPos, cardTop, dragOffsetY, item.widgetId.canRemove)
+                                                    isHoveringShelf = over
+                                                    over
+                                                },
                                                 onDragReorderStart = {
                                                     if (itemIndex != -1) {
                                                         draggedIndex = itemIndex
                                                         dragOffsetY = 0f
                                                         isDropping = false
+                                                        isHoveringShelf = false
                                                     }
                                                 },
                                                 onDragReorderMove = { dy ->
                                                     dragOffsetY += dy
                                                 },
-                                                onDragReorderEnd = {
+                                                onDragReorderEnd = { droppedOnShelf ->
                                                     coroutineScope.launch {
                                                         val d = draggedIndex
+                                                        isHoveringShelf = false
                                                         if (d != null && d != -1) {
+                                                            val draggedItem = layout.getOrNull(d)
+                                                            if (droppedOnShelf && draggedItem != null && draggedItem.widgetId.canRemove) {
+                                                                triggerSnap()
+                                                                updateLayout(DashboardLayoutManager.removeWidget(layout, draggedItem.widgetId))
+                                                                dragOffsetY = 0f
+                                                                dropAnimOffsetY.snapTo(0f)
+                                                                isDropping = false
+                                                                draggedIndex = null
+                                                                return@launch
+                                                            }
                                                             try {
                                                                 val t = computeTargetIndex(d, dragOffsetY, layout, density, gapPx)
                                                                 isDropping = true
@@ -849,7 +911,7 @@ fun DashboardScreen(
                                                 val isThisItemDragged = (itemIndex == draggedIndex && itemIndex != -1)
 
                                                 val itemScale by animateFloatAsState(
-                                                    targetValue = if (isThisItemDragged) 0.94f else 1f,
+                                                    targetValue = if (isThisItemDragged) (if (isHoveringShelf) 0.84f else 0.94f) else 1f,
                                                     animationSpec = spring(
                                                         dampingRatio = Spring.DampingRatioLowBouncy,
                                                         stiffness = Spring.StiffnessMediumLow
@@ -889,20 +951,38 @@ fun DashboardScreen(
                                                             updateLayout(DashboardLayoutManager.removeWidget(layout, item.widgetId))
                                                         },
                                                         isPickedUp = isThisItemDragged,
+                                                        isHoveringShelf = isThisItemDragged && isHoveringShelf,
+                                                        onCheckOverShelf = { rootPos, cardTop ->
+                                                            val over = checkDropOnShelf(rootPos, cardTop, dragOffsetY, item.widgetId.canRemove)
+                                                            isHoveringShelf = over
+                                                            over
+                                                        },
                                                         onDragReorderStart = {
                                                             if (itemIndex != -1) {
                                                                 draggedIndex = itemIndex
                                                                 dragOffsetY = 0f
                                                                 isDropping = false
+                                                                isHoveringShelf = false
                                                             }
                                                         },
                                                         onDragReorderMove = { dy ->
                                                             dragOffsetY += dy
                                                         },
-                                                        onDragReorderEnd = {
+                                                        onDragReorderEnd = { droppedOnShelf ->
                                                             coroutineScope.launch {
                                                                 val d = draggedIndex
+                                                                isHoveringShelf = false
                                                                 if (d != null && d != -1) {
+                                                                    val draggedItem = layout.getOrNull(d)
+                                                                    if (droppedOnShelf && draggedItem != null && draggedItem.widgetId.canRemove) {
+                                                                        triggerSnap()
+                                                                        updateLayout(DashboardLayoutManager.removeWidget(layout, draggedItem.widgetId))
+                                                                        dragOffsetY = 0f
+                                                                        dropAnimOffsetY.snapTo(0f)
+                                                                        isDropping = false
+                                                                        draggedIndex = null
+                                                                        return@launch
+                                                                    }
                                                                     try {
                                                                         val t = computeTargetIndex(d, dragOffsetY, layout, density, gapPx)
                                                                         isDropping = true
@@ -1083,7 +1163,10 @@ fun DashboardScreen(
                                 onNotesExpandedChanged = { isNotesExpanded = it },
                                 onPasswordsExpandedChanged = { isPasswordsExpanded = it },
                                 onGroceryExpandedChanged = { isGroceryExpanded = it },
-                                onDraggingChanged = { isChildPageDraggingWidget = it }
+                                onDraggingChanged = { isChildPageDraggingWidget = it },
+                                isShelfHovered = isHoveringShelf,
+                                onHoverShelf = { isHoveringShelf = it },
+                                shelfBounds = shelfBoundsInRoot
                             )
                         }
                     }
