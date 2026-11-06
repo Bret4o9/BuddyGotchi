@@ -128,6 +128,10 @@ fun DashboardWidgetContainer(
     // Live preview size calculated during drag
     var livePreviewSize by remember(item.size) { mutableStateOf(item.size) }
 
+    // Animatables for the shake/anticipation feedback during long-press
+    val shakeRotationZ = remember { Animatable(0f) }
+    val shakeScale = remember { Animatable(1f) }
+
     // Spring animatables for smooth release transition
     val animStretchX = remember { Animatable(1f) }
     val animStretchY = remember { Animatable(1f) }
@@ -183,43 +187,58 @@ fun DashboardWidgetContainer(
                 cardWidthPx = size.width.toFloat()
                 cardHeightPx = size.height.toFloat()
             }
-            // 1. Corner Tap-and-Hold detector to enter edit mode (active when not in edit mode)
+            // 1. Full-card Tap-and-Hold detector to enter edit mode (active anywhere on the card when not in edit mode)
+            // Includes a mechanical anticipation shake animation and extended hold duration to avoid accidental triggers.
             .pointerInput(isEditMode) {
                 if (!isEditMode) {
-                    val cornerPx = 64.dp.toPx()
                     awaitEachGesture {
                         val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
                         val pos = down.position
-                        val w = size.width
-                        val h = size.height
 
-                        val isCorner = (pos.x <= cornerPx || pos.x >= w - cornerPx) &&
-                                (pos.y <= cornerPx || pos.y >= h - cornerPx)
+                        val holdDurationMs = 600L
+                        val shakeStartDelayMs = 260L
+                        val startTime = System.currentTimeMillis()
 
-                        if (isCorner) {
-                            val timeoutMs = 320L
-                            var isHeld = false
-                            try {
-                                withTimeout(timeoutMs) {
-                                    while (true) {
-                                        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
-                                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                        if (!change.pressed) return@withTimeout
-                                        val dist = (change.position - pos).getDistance()
-                                        if (dist > 24.dp.toPx()) return@withTimeout
-                                    }
+                        var isHeld = false
+                        val shakeJob = coroutineScope.launch {
+                            kotlinx.coroutines.delay(shakeStartDelayMs)
+                            shakeScale.animateTo(
+                                targetValue = 0.98f,
+                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh)
+                            )
+                            val shakeAngles = listOf(1.4f, -1.4f, 1.0f, -1.0f, 0.6f, -0.6f, 0f)
+                            for (angle in shakeAngles) {
+                                shakeRotationZ.snapTo(angle)
+                                kotlinx.coroutines.delay(45L)
+                            }
+                        }
+
+                        try {
+                            withTimeout(holdDurationMs) {
+                                while (true) {
+                                    val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!change.pressed) return@withTimeout
+                                    val dist = (change.position - pos).getDistance()
+                                    if (dist > 28.dp.toPx()) return@withTimeout
                                 }
-                            } catch (_: TimeoutCancellationException) {
-                                isHeld = true
-                            } catch (_: PointerEventTimeoutCancellationException) {
-                                isHeld = true
                             }
+                        } catch (_: TimeoutCancellationException) {
+                            isHeld = true
+                        } catch (_: PointerEventTimeoutCancellationException) {
+                            isHeld = true
+                        } finally {
+                            shakeJob.cancel()
+                            coroutineScope.launch {
+                                shakeRotationZ.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                                shakeScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                            }
+                        }
 
-                            if (isHeld) {
-                                down.consume()
-                                triggerSnap()
-                                onEnterEditMode()
-                            }
+                        if (isHeld) {
+                            down.consume()
+                            triggerSnap()
+                            onEnterEditMode()
                         }
                     }
                 }
@@ -247,8 +266,9 @@ fun DashboardWidgetContainer(
                 }
             }
             .graphicsLayer {
-                scaleX = currentStretchX
-                scaleY = currentStretchY
+                scaleX = currentStretchX * shakeScale.value
+                scaleY = currentStretchY * shakeScale.value
+                rotationZ = shakeRotationZ.value
                 this.transformOrigin = currentTransformOrigin
                 clip = false
             }
@@ -330,49 +350,7 @@ fun DashboardWidgetContainer(
             }
         }
 
-        // Floating "SHELF ↘" stash button in Edit Mode (removes widget from page to shelf)
-        if (isEditMode && item.widgetId.canRemove && onStashToShelf != null && activeDot == null && !isSettling) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .zIndex(120f)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color(0xEE181818),
-                    border = BorderStroke(1.dp, NothingBorder),
-                    shadowElevation = 6.dp,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable {
-                            triggerSnap()
-                            onStashToShelf.invoke()
-                        }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .clip(CircleShape)
-                                .background(NothingRed)
-                        )
-                        Text(
-                            text = "SHELF ↘",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp,
-                            color = NothingWhite
-                        )
-                    }
-                }
-            }
-        }
+        // Floating "SHELF ↘" stash button removed: user can drag & drop widgets directly onto the shelf strip
 
         // 4 Resize Dots (Visible strictly in Edit Mode, except for the Clock widget)
         if (isEditMode && isResizable) {

@@ -410,7 +410,7 @@ fun ShelfOverlay(
                                         color = NothingTextSecondary
                                     )
                                     Text(
-                                        text = "ENTER EDIT MODE ON ANY PAGE AND TAP [SHELF ↘] TO STASH WIDGETS HERE",
+                                        text = "DRAG WIDGETS TO THE SHELF STRIP IN EDIT MODE TO STASH THEM HERE",
                                         fontFamily = FontFamily.Monospace,
                                         fontSize = 9.sp,
                                         color = NothingTextTertiary,
