@@ -177,6 +177,14 @@ fun LeftDashboardPage(
     // Active resize preview state
     var activeResizeWidgetId by remember { mutableStateOf<DashboardWidgetId?>(null) }
     var activeResizePreviewSize by remember { mutableStateOf<WidgetSize?>(null) }
+    var focusedEditWidgetId by remember { mutableStateOf<DashboardWidgetId?>(null) }
+    var editFocusTrigger by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(isEditMode) {
+        if (!isEditMode) {
+            focusedEditWidgetId = null
+        }
+    }
 
     // Drag-and-drop vertical reordering state
     var draggedIndex by remember { mutableStateOf<Int?>(null) }
@@ -290,6 +298,18 @@ fun LeftDashboardPage(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     val contentWidth = maxWidth - (DashboardGridDefaults.HORIZONTAL_PADDING * 2)
+                    val viewportHeightPx = with(density) { maxHeight.toPx() }
+
+                    AutoScrollToEditingWidgetEffect(
+                        isEditMode = isEditMode,
+                        focusedWidgetId = focusedEditWidgetId,
+                        focusTrigger = editFocusTrigger,
+                        packedRows = packedRows,
+                        activeResizeWidgetId = activeResizeWidgetId,
+                        activeResizePreviewSize = activeResizePreviewSize,
+                        viewportHeightPx = viewportHeightPx,
+                        scrollState = scrollState
+                    )
 
                     // Aligned Modular Dot Grid Background (with connecting blueprint lines in edit mode & resize illumination)
                     DashboardGridBackground(
@@ -391,11 +411,24 @@ fun LeftDashboardPage(
                                     DashboardWidgetContainer(
                                         item = item,
                                         isEditMode = isEditMode,
-                                        onEnterEditMode = { onSetEditMode(true) },
+                                        onEnterEditMode = {
+                                            focusedEditWidgetId = item.widgetId
+                                            editFocusTrigger++
+                                            onSetEditMode(true)
+                                        },
+                                        onFocusInEditMode = {
+                                            focusedEditWidgetId = item.widgetId
+                                            editFocusTrigger++
+                                        },
                                         onResize = { newSize ->
+                                            focusedEditWidgetId = item.widgetId
+                                            editFocusTrigger++
                                             updateLayout(LeftDashboardLayoutManager.updateWidgetSize(layout, item.widgetId, newSize))
                                         },
                                         onResizePreview = { previewSize, _ ->
+                                            if (previewSize != null) {
+                                                focusedEditWidgetId = item.widgetId
+                                            }
                                             activeResizeWidgetId = if (previewSize != null) item.widgetId else null
                                             activeResizePreviewSize = previewSize
                                         },
@@ -411,6 +444,7 @@ fun LeftDashboardPage(
                                         },
                                         onDragReorderStart = {
                                             if (itemIndex != -1) {
+                                                focusedEditWidgetId = item.widgetId
                                                 draggedIndex = itemIndex
                                                 dragOffsetY = 0f
                                                 isDropping = false
@@ -452,6 +486,10 @@ fun LeftDashboardPage(
                                                             updateLayout(newLayout)
                                                         } else {
                                                             dropAnimOffsetY.animateTo(0f, spring(Spring.DampingRatioLowBouncy))
+                                                        }
+                                                        if (draggedItem != null) {
+                                                            focusedEditWidgetId = draggedItem.widgetId
+                                                            editFocusTrigger++
                                                         }
                                                     } finally {
                                                         dragOffsetY = 0f
@@ -604,11 +642,24 @@ fun LeftDashboardPage(
                                             DashboardWidgetContainer(
                                                 item = item,
                                                 isEditMode = isEditMode,
-                                                onEnterEditMode = { onSetEditMode(true) },
+                                                onEnterEditMode = {
+                                                    focusedEditWidgetId = item.widgetId
+                                                    editFocusTrigger++
+                                                    onSetEditMode(true)
+                                                },
+                                                onFocusInEditMode = {
+                                                    focusedEditWidgetId = item.widgetId
+                                                    editFocusTrigger++
+                                                },
                                                 onResize = { newSize ->
+                                                    focusedEditWidgetId = item.widgetId
+                                                    editFocusTrigger++
                                                     updateLayout(LeftDashboardLayoutManager.updateWidgetSize(layout, item.widgetId, newSize))
                                                 },
                                                 onResizePreview = { previewSize, _ ->
+                                                    if (previewSize != null) {
+                                                        focusedEditWidgetId = item.widgetId
+                                                    }
                                                     activeResizeWidgetId = if (previewSize != null) item.widgetId else null
                                                     activeResizePreviewSize = previewSize
                                                 },
@@ -624,6 +675,7 @@ fun LeftDashboardPage(
                                                 },
                                                 onDragReorderStart = {
                                                     if (itemIndex != -1) {
+                                                        focusedEditWidgetId = item.widgetId
                                                         draggedIndex = itemIndex
                                                         dragOffsetY = 0f
                                                         isDropping = false
@@ -665,6 +717,10 @@ fun LeftDashboardPage(
                                                                     updateLayout(newLayout)
                                                                 } else {
                                                                     dropAnimOffsetY.animateTo(0f, spring(Spring.DampingRatioLowBouncy))
+                                                                }
+                                                                if (draggedItem != null) {
+                                                                    focusedEditWidgetId = draggedItem.widgetId
+                                                                    editFocusTrigger++
                                                                 }
                                                             } finally {
                                                                 dragOffsetY = 0f

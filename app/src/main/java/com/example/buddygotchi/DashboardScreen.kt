@@ -224,6 +224,14 @@ fun DashboardScreen(
     var isGroceryExpanded by remember { mutableStateOf(false) }
     var activeResizeWidgetId by remember { mutableStateOf<DashboardWidgetId?>(null) }
     var activeResizePreviewSize by remember { mutableStateOf<WidgetSize?>(null) }
+    var focusedEditWidgetId by remember { mutableStateOf<DashboardWidgetId?>(null) }
+    var editFocusTrigger by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(isEditMode) {
+        if (!isEditMode) {
+            focusedEditWidgetId = null
+        }
+    }
 
     var leftLayout by remember {
         mutableStateOf(LeftDashboardLayoutManager.loadLayout(context))
@@ -657,6 +665,18 @@ fun DashboardScreen(
                                         modifier = Modifier.fillMaxSize()
                                     ) {
                             val contentWidth = maxWidth - (DashboardGridDefaults.HORIZONTAL_PADDING * 2)
+                            val viewportHeightPx = with(density) { maxHeight.toPx() }
+
+                            AutoScrollToEditingWidgetEffect(
+                                isEditMode = isEditMode,
+                                focusedWidgetId = focusedEditWidgetId,
+                                focusTrigger = editFocusTrigger,
+                                packedRows = packedRows,
+                                activeResizeWidgetId = activeResizeWidgetId,
+                                activeResizePreviewSize = activeResizePreviewSize,
+                                viewportHeightPx = viewportHeightPx,
+                                scrollState = scrollState
+                            )
 
                             // Aligned Modular Dot Grid Background (with connecting blueprint lines in edit mode & resize illumination)
                             DashboardGridBackground(
@@ -722,11 +742,24 @@ fun DashboardScreen(
                                             DashboardWidgetContainer(
                                                 item = item,
                                                 isEditMode = isEditMode,
-                                                onEnterEditMode = { isEditMode = true },
+                                                onEnterEditMode = {
+                                                    focusedEditWidgetId = item.widgetId
+                                                    editFocusTrigger++
+                                                    isEditMode = true
+                                                },
+                                                onFocusInEditMode = {
+                                                    focusedEditWidgetId = item.widgetId
+                                                    editFocusTrigger++
+                                                },
                                                 onResize = { newSize ->
+                                                    focusedEditWidgetId = item.widgetId
+                                                    editFocusTrigger++
                                                     updateLayout(DashboardLayoutManager.updateWidgetSize(layout, item.widgetId, newSize))
                                                 },
                                                 onResizePreview = { previewSize, _ ->
+                                                    if (previewSize != null) {
+                                                        focusedEditWidgetId = item.widgetId
+                                                    }
                                                     activeResizeWidgetId = if (previewSize != null) item.widgetId else null
                                                     activeResizePreviewSize = previewSize
                                                 },
@@ -742,6 +775,7 @@ fun DashboardScreen(
                                                 },
                                                 onDragReorderStart = {
                                                     if (itemIndex != -1) {
+                                                        focusedEditWidgetId = item.widgetId
                                                         draggedIndex = itemIndex
                                                         dragOffsetY = 0f
                                                         isDropping = false
@@ -778,12 +812,16 @@ fun DashboardScreen(
                                                                             dampingRatio = Spring.DampingRatioLowBouncy,
                                                                             stiffness = Spring.StiffnessMedium
                                                                         )
-                                                                    )
+                                     )
                                                                     val newLayout = DashboardLayoutManager.moveItem(layout, d, t)
                                                                     updateLayout(newLayout)
                                                                     triggerDropHaptic()
                                                                 } else {
                                                                     dropAnimOffsetY.animateTo(0f, spring(Spring.DampingRatioLowBouncy))
+                                                                }
+                                                                if (draggedItem != null) {
+                                                                    focusedEditWidgetId = draggedItem.widgetId
+                                                                    editFocusTrigger++
                                                                 }
                                                             } finally {
                                                                 dragOffsetY = 0f
@@ -940,11 +978,24 @@ fun DashboardScreen(
                                                     DashboardWidgetContainer(
                                                         item = item,
                                                         isEditMode = isEditMode,
-                                                        onEnterEditMode = { isEditMode = true },
+                                                        onEnterEditMode = {
+                                                            focusedEditWidgetId = item.widgetId
+                                                            editFocusTrigger++
+                                                            isEditMode = true
+                                                        },
+                                                        onFocusInEditMode = {
+                                                            focusedEditWidgetId = item.widgetId
+                                                            editFocusTrigger++
+                                                        },
                                                         onResize = { newSize ->
+                                                            focusedEditWidgetId = item.widgetId
+                                                            editFocusTrigger++
                                                             updateLayout(DashboardLayoutManager.updateWidgetSize(layout, item.widgetId, newSize))
                                                         },
                                                         onResizePreview = { previewSize, _ ->
+                                                            if (previewSize != null) {
+                                                                focusedEditWidgetId = item.widgetId
+                                                            }
                                                             activeResizeWidgetId = if (previewSize != null) item.widgetId else null
                                                             activeResizePreviewSize = previewSize
                                                         },
@@ -960,6 +1011,7 @@ fun DashboardScreen(
                                                         },
                                                         onDragReorderStart = {
                                                             if (itemIndex != -1) {
+                                                                focusedEditWidgetId = item.widgetId
                                                                 draggedIndex = itemIndex
                                                                 dragOffsetY = 0f
                                                                 isDropping = false
@@ -1002,6 +1054,10 @@ fun DashboardScreen(
                                                                             triggerDropHaptic()
                                                                         } else {
                                                                             dropAnimOffsetY.animateTo(0f, spring(Spring.DampingRatioLowBouncy))
+                                                                        }
+                                                                        if (draggedItem != null) {
+                                                                            focusedEditWidgetId = draggedItem.widgetId
+                                                                            editFocusTrigger++
                                                                         }
                                                                     } finally {
                                                                         dragOffsetY = 0f
