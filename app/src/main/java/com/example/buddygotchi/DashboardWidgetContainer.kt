@@ -171,19 +171,7 @@ fun DashboardWidgetContainer(
         else -> 1f
     }
 
-    val currentStretchX = if (isSettling) animStretchX.value else targetScaleX
-    val currentStretchY = if (isSettling) animStretchY.value else targetScaleY
-
     val cornerRadius = if (item.size.cols == 1) 20.dp else 24.dp
-
-    val widgetContentAlpha by animateFloatAsState(
-        targetValue = if (activeDot != null) 0f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "widgetContentAlpha"
-    )
 
     var containerCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var isOverShelf by remember { mutableStateOf(false) }
@@ -208,7 +196,6 @@ fun DashboardWidgetContainer(
 
                         val holdDurationMs = 600L
                         val shakeStartDelayMs = 260L
-                        val startTime = System.currentTimeMillis()
 
                         var isHeld = false
                         val shakeJob = coroutineScope.launch {
@@ -254,20 +241,41 @@ fun DashboardWidgetContainer(
                     }
                 }
             }
-            // 2. In edit mode: Card body dragging for reordering widgets (disabled while resizing)
-            // Intercepts in PointerEventPass.Initial with root coordinate deltas so parent verticalScroll does not steal widget drags
-            .pointerInput(isEditMode, activeDot, isSettling) {
+            // 2. In edit mode: Card body dragging for reordering widgets (disabled while resizing or when touching a resize handle)
+            .pointerInput(isEditMode, activeDot, isSettling, isResizable) {
                 if (isEditMode && activeDot == null && !isSettling) {
                     awaitEachGesture {
                         val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+                        if (activeDot != null) return@awaitEachGesture
+
+                        // Do not intercept touches that land on any of the 4 edge resize handles
+                        if (isResizable && cardWidthPx > 0f && cardHeightPx > 0f) {
+                            val handleHalfSpanPx = 42.dp.toPx()
+                            val handleEdgeDepthPx = 32.dp.toPx()
+                            val x = down.position.x
+                            val y = down.position.y
+                            val midX = cardWidthPx / 2f
+                            val midY = cardHeightPx / 2f
+
+                            val onTopHandle = y <= handleEdgeDepthPx && kotlin.math.abs(x - midX) <= handleHalfSpanPx
+                            val onBottomHandle = y >= (cardHeightPx - handleEdgeDepthPx) && kotlin.math.abs(x - midX) <= handleHalfSpanPx
+                            val onLeftHandle = x <= handleEdgeDepthPx && kotlin.math.abs(y - midY) <= handleHalfSpanPx
+                            val onRightHandle = x >= (cardWidthPx - handleEdgeDepthPx) && kotlin.math.abs(y - midY) <= handleHalfSpanPx
+
+                            if (onTopHandle || onBottomHandle || onLeftHandle || onRightHandle) {
+                                return@awaitEachGesture
+                            }
+                        }
+
                         val startRootPos = containerCoords?.takeIf { it.isAttached }?.localToRoot(down.position)
                         var lastRootY = startRootPos?.y ?: down.position.y
                         val startY = lastRootY
                         var isDragging = false
-                        val dragSlopPx = 6.dp.toPx()
+                        val dragSlopPx = 8.dp.toPx()
 
                         while (true) {
                             val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                            if (activeDot != null) break
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
 
                             if (!change.pressed) {
@@ -317,17 +325,16 @@ fun DashboardWidgetContainer(
                 }
             }
             .graphicsLayer {
-                scaleX = currentStretchX * shakeScale.value
-                scaleY = currentStretchY * shakeScale.value
+                scaleX = shakeScale.value
+                scaleY = shakeScale.value
                 rotationZ = shakeRotationZ.value
-                this.transformOrigin = currentTransformOrigin
                 clip = false
             }
             .then(
                 if (isEditMode) {
                     Modifier.border(
                         width = if (isPickedUp) 2.dp else 1.5.dp,
-                        color = if (activeDot != null) Color.Transparent
+                        color = if (activeDot != null) NothingRed.copy(alpha = 0.85f)
                         else if (isPickedUp && isHoveringShelf) NothingRed
                         else if (isPickedUp) NothingRed.copy(alpha = 0.85f)
                         else if (isSettling) NothingRed
@@ -339,31 +346,19 @@ fun DashboardWidgetContainer(
                 }
             )
     ) {
-        // Main Widget Content (hidden with 0% opacity during resize drag so only the preview is shown)
+        // Main Widget Content (never non-uniformly stretched so 3D/2D Buddy preserves 1:1 aspect ratio)
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = 1f / currentStretchX
-                    scaleY = 1f / currentStretchY
-                    this.transformOrigin = currentTransformOrigin
-                    this.alpha = widgetContentAlpha
-                }
+            modifier = Modifier.fillMaxSize()
         ) {
             content(item.size)
         }
 
-        // Floating Snap Target Pill Badge (visible when actively dragging or settling)
-        if (activeDot != null || isSettling) {
+        // Floating Snap Target Pill Badge (visible when actively dragging a resize dot)
+        if (activeDot != null) {
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .zIndex(100f)
-                    .graphicsLayer {
-                        scaleX = 1f / currentStretchX
-                        scaleY = 1f / currentStretchY
-                        this.transformOrigin = currentTransformOrigin
-                    }
             ) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -500,46 +495,14 @@ fun DashboardWidgetContainer(
                 onResizePreview?.invoke(null, null)
                 val finalSize = livePreviewSize
                 val oldSize = currentItem.size
+                activeDot = null
+                dragDeltaX = 0f
+                dragDeltaY = 0f
+                isSettling = false
 
-                coroutineScope.launch {
-                    isSettling = true
-
-                    val (oldW, oldH) = getEstimatedSizeDp(oldSize)
-                    val (newW, newH) = getEstimatedSizeDp(finalSize)
-                    val startScaleX = (targetScaleX * (oldW / newW)).coerceIn(0.4f, 2.5f)
-                    val startScaleY = (targetScaleY * (oldH / newH)).coerceIn(0.4f, 2.5f)
-
-                    animStretchX.snapTo(startScaleX)
-                    animStretchY.snapTo(startScaleY)
-
-                    if (finalSize != oldSize) {
-                        triggerSnap()
-                        currentOnResize(finalSize)
-                    }
-
-                    launch {
-                        animStretchX.animateTo(
-                            targetValue = 1f,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioLowBouncy,
-                                stiffness = Spring.StiffnessMediumLow
-                            )
-                        )
-                    }
-                    launch {
-                        animStretchY.animateTo(
-                            targetValue = 1f,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioLowBouncy,
-                                stiffness = Spring.StiffnessMediumLow
-                            )
-                        )
-                    }.join()
-
-                    activeDot = null
-                    dragDeltaX = 0f
-                    dragDeltaY = 0f
-                    isSettling = false
+                if (finalSize != oldSize) {
+                    triggerSnap()
+                    currentOnResize(finalSize)
                 }
             }
 
@@ -548,27 +511,50 @@ fun DashboardWidgetContainer(
                 alignment = Alignment.TopCenter,
                 isDragging = activeDot == ResizeDotType.TOP,
                 isVisible = activeDot == null || activeDot == ResizeDotType.TOP,
-                counterScaleX = 1f / currentStretchX,
-                counterScaleY = 1f / currentStretchY,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .offset(y = (-4).dp)
-                    .pointerInput(item.widgetId, item.size) {
-                        detectDragGestures(
-                            onDragStart = {
-                                activeDot = ResizeDotType.TOP
-                                dragDeltaY = 0f
-                                livePreviewSize = currentItem.size
-                                onResizePreview?.invoke(livePreviewSize, ResizeDotType.TOP)
-                                triggerTick()
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                handleVerticalDrag(ResizeDotType.TOP, dragAmount.y)
-                            },
-                            onDragEnd = { finishDrag() },
-                            onDragCancel = { finishDrag() }
+                    .offset {
+                        IntOffset(
+                            0,
+                            if (activeDot == ResizeDotType.TOP) dragDeltaY.roundToInt() else 0
                         )
+                    }
+                    .pointerInput(item.widgetId, item.size) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+                            down.consume()
+                            val startRoot = containerCoords?.takeIf { it.isAttached }?.localToRoot(down.position)
+                            var lastRootY = startRoot?.y ?: down.position.y
+                            activeDot = ResizeDotType.TOP
+                            dragDeltaY = 0f
+                            livePreviewSize = currentItem.size
+                            onResizePreview?.invoke(livePreviewSize, ResizeDotType.TOP)
+                            triggerTick()
+
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                    val change = event.changes.firstOrNull { it.id == down.id }
+                                        ?: event.changes.firstOrNull()
+                                        ?: break
+                                    if (!change.pressed) {
+                                        change.consume()
+                                        break
+                                    }
+                                    val curRootY = containerCoords?.takeIf { it.isAttached }?.localToRoot(change.position)?.y
+                                        ?: change.position.y
+                                    val dy = curRootY - lastRootY
+                                    lastRootY = curRootY
+                                    change.consume()
+                                    if (dy != 0f) {
+                                        handleVerticalDrag(ResizeDotType.TOP, dy)
+                                    }
+                                }
+                            } finally {
+                                finishDrag()
+                            }
+                        }
                     }
             )
 
@@ -577,27 +563,50 @@ fun DashboardWidgetContainer(
                 alignment = Alignment.BottomCenter,
                 isDragging = activeDot == ResizeDotType.BOTTOM,
                 isVisible = activeDot == null || activeDot == ResizeDotType.BOTTOM,
-                counterScaleX = 1f / currentStretchX,
-                counterScaleY = 1f / currentStretchY,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .offset(y = 4.dp)
-                    .pointerInput(item.widgetId, item.size) {
-                        detectDragGestures(
-                            onDragStart = {
-                                activeDot = ResizeDotType.BOTTOM
-                                dragDeltaY = 0f
-                                livePreviewSize = currentItem.size
-                                onResizePreview?.invoke(livePreviewSize, ResizeDotType.BOTTOM)
-                                triggerTick()
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                handleVerticalDrag(ResizeDotType.BOTTOM, dragAmount.y)
-                            },
-                            onDragEnd = { finishDrag() },
-                            onDragCancel = { finishDrag() }
+                    .offset {
+                        IntOffset(
+                            0,
+                            if (activeDot == ResizeDotType.BOTTOM) dragDeltaY.roundToInt() else 0
                         )
+                    }
+                    .pointerInput(item.widgetId, item.size) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+                            down.consume()
+                            val startRoot = containerCoords?.takeIf { it.isAttached }?.localToRoot(down.position)
+                            var lastRootY = startRoot?.y ?: down.position.y
+                            activeDot = ResizeDotType.BOTTOM
+                            dragDeltaY = 0f
+                            livePreviewSize = currentItem.size
+                            onResizePreview?.invoke(livePreviewSize, ResizeDotType.BOTTOM)
+                            triggerTick()
+
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                    val change = event.changes.firstOrNull { it.id == down.id }
+                                        ?: event.changes.firstOrNull()
+                                        ?: break
+                                    if (!change.pressed) {
+                                        change.consume()
+                                        break
+                                    }
+                                    val curRootY = containerCoords?.takeIf { it.isAttached }?.localToRoot(change.position)?.y
+                                        ?: change.position.y
+                                    val dy = curRootY - lastRootY
+                                    lastRootY = curRootY
+                                    change.consume()
+                                    if (dy != 0f) {
+                                        handleVerticalDrag(ResizeDotType.BOTTOM, dy)
+                                    }
+                                }
+                            } finally {
+                                finishDrag()
+                            }
+                        }
                     }
             )
 
@@ -606,27 +615,50 @@ fun DashboardWidgetContainer(
                 alignment = Alignment.CenterStart,
                 isDragging = activeDot == ResizeDotType.LEFT,
                 isVisible = activeDot == null || activeDot == ResizeDotType.LEFT,
-                counterScaleX = 1f / currentStretchX,
-                counterScaleY = 1f / currentStretchY,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .offset(x = (-4).dp)
-                    .pointerInput(item.widgetId, item.size) {
-                        detectDragGestures(
-                            onDragStart = {
-                                activeDot = ResizeDotType.LEFT
-                                dragDeltaX = 0f
-                                livePreviewSize = currentItem.size
-                                onResizePreview?.invoke(livePreviewSize, ResizeDotType.LEFT)
-                                triggerTick()
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                handleHorizontalDrag(ResizeDotType.LEFT, dragAmount.x)
-                            },
-                            onDragEnd = { finishDrag() },
-                            onDragCancel = { finishDrag() }
+                    .offset {
+                        IntOffset(
+                            if (activeDot == ResizeDotType.LEFT) dragDeltaX.roundToInt() else 0,
+                            0
                         )
+                    }
+                    .pointerInput(item.widgetId, item.size) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+                            down.consume()
+                            val startRoot = containerCoords?.takeIf { it.isAttached }?.localToRoot(down.position)
+                            var lastRootX = startRoot?.x ?: down.position.x
+                            activeDot = ResizeDotType.LEFT
+                            dragDeltaX = 0f
+                            livePreviewSize = currentItem.size
+                            onResizePreview?.invoke(livePreviewSize, ResizeDotType.LEFT)
+                            triggerTick()
+
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                    val change = event.changes.firstOrNull { it.id == down.id }
+                                        ?: event.changes.firstOrNull()
+                                        ?: break
+                                    if (!change.pressed) {
+                                        change.consume()
+                                        break
+                                    }
+                                    val curRootX = containerCoords?.takeIf { it.isAttached }?.localToRoot(change.position)?.x
+                                        ?: change.position.x
+                                    val dx = curRootX - lastRootX
+                                    lastRootX = curRootX
+                                    change.consume()
+                                    if (dx != 0f) {
+                                        handleHorizontalDrag(ResizeDotType.LEFT, dx)
+                                    }
+                                }
+                            } finally {
+                                finishDrag()
+                            }
+                        }
                     }
             )
 
@@ -635,27 +667,50 @@ fun DashboardWidgetContainer(
                 alignment = Alignment.CenterEnd,
                 isDragging = activeDot == ResizeDotType.RIGHT,
                 isVisible = activeDot == null || activeDot == ResizeDotType.RIGHT,
-                counterScaleX = 1f / currentStretchX,
-                counterScaleY = 1f / currentStretchY,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .offset(x = 4.dp)
-                    .pointerInput(item.widgetId, item.size) {
-                        detectDragGestures(
-                            onDragStart = {
-                                activeDot = ResizeDotType.RIGHT
-                                dragDeltaX = 0f
-                                livePreviewSize = currentItem.size
-                                onResizePreview?.invoke(livePreviewSize, ResizeDotType.RIGHT)
-                                triggerTick()
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                handleHorizontalDrag(ResizeDotType.RIGHT, dragAmount.x)
-                            },
-                            onDragEnd = { finishDrag() },
-                            onDragCancel = { finishDrag() }
+                    .offset {
+                        IntOffset(
+                            if (activeDot == ResizeDotType.RIGHT) dragDeltaX.roundToInt() else 0,
+                            0
                         )
+                    }
+                    .pointerInput(item.widgetId, item.size) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+                            down.consume()
+                            val startRoot = containerCoords?.takeIf { it.isAttached }?.localToRoot(down.position)
+                            var lastRootX = startRoot?.x ?: down.position.x
+                            activeDot = ResizeDotType.RIGHT
+                            dragDeltaX = 0f
+                            livePreviewSize = currentItem.size
+                            onResizePreview?.invoke(livePreviewSize, ResizeDotType.RIGHT)
+                            triggerTick()
+
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                    val change = event.changes.firstOrNull { it.id == down.id }
+                                        ?: event.changes.firstOrNull()
+                                        ?: break
+                                    if (!change.pressed) {
+                                        change.consume()
+                                        break
+                                    }
+                                    val curRootX = containerCoords?.takeIf { it.isAttached }?.localToRoot(change.position)?.x
+                                        ?: change.position.x
+                                    val dx = curRootX - lastRootX
+                                    lastRootX = curRootX
+                                    change.consume()
+                                    if (dx != 0f) {
+                                        handleHorizontalDrag(ResizeDotType.RIGHT, dx)
+                                    }
+                                }
+                            } finally {
+                                finishDrag()
+                            }
+                        }
                     }
             )
         }

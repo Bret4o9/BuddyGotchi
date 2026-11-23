@@ -809,6 +809,7 @@ fun DashboardScreen(
                                                 RenderDashboardWidgetContent(
                                                     item = item,
                                                     liveSize = liveSize,
+                                                    isEditMode = isEditMode,
                                                     tasks = tasks,
                                                     onToggleTask = { task -> tasks = TaskManager.toggleTask(context, task.id) },
                                                     onClearDoneTasks = { tasks = TaskManager.clearDoneTasks(context) },
@@ -1026,6 +1027,7 @@ fun DashboardScreen(
                                                         RenderDashboardWidgetContent(
                                                             item = item,
                                                             liveSize = liveSize,
+                                                            isEditMode = isEditMode,
                                                             tasks = tasks,
                                                             onToggleTask = { task -> tasks = TaskManager.toggleTask(context, task.id) },
                                                             onClearDoneTasks = { tasks = TaskManager.clearDoneTasks(context) },
@@ -1413,6 +1415,7 @@ private fun computeDisplacementForIndex(
 fun RenderDashboardWidgetContent(
     item: DashboardWidgetItem,
     liveSize: WidgetSize,
+    isEditMode: Boolean = false,
     tasks: List<ReminderTask>,
     onToggleTask: (ReminderTask) -> Unit,
     onClearDoneTasks: () -> Unit = {},
@@ -1461,6 +1464,7 @@ fun RenderDashboardWidgetContent(
                 xp = buddyXp,
                 level = buddyLevel,
                 size = liveSize,
+                isEditMode = isEditMode,
                 getTouchPosition = getTouchPosition
             )
         }

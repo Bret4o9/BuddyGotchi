@@ -167,17 +167,68 @@
 
         setupPointerControls(renderer.domElement);
         window.addEventListener('resize', onResize);
+        if (typeof ResizeObserver !== 'undefined') {
+          const ro = new ResizeObserver(function () {
+            syncRendererToContainer(true);
+            if (renderer && scene && camera) {
+              renderer.render(scene, camera);
+            }
+          });
+          ro.observe(container);
+        }
         requestAnimationFrame(animate);
       }
 
-      function onResize() {
-        if (!renderer || !camera) return;
-        const w = Math.max(container.clientWidth, 32);
-        const h = Math.max(container.clientHeight, 32);
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-        renderer.setSize(w, h);
+      let lastContainerW = 0;
+      let lastContainerH = 0;
+
+      function syncRendererToContainer(force) {
+        if (!renderer || !camera || !container) return false;
+        const w = Math.round(container.clientWidth);
+        const h = Math.round(container.clientHeight);
+        if (w < 16 || h < 16) return false;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const aspect = w / h;
+        if (
+          force ||
+          w !== lastContainerW ||
+          h !== lastContainerH ||
+          Math.abs(camera.aspect - aspect) > 0.002 ||
+          renderer.getPixelRatio() !== dpr
+        ) {
+          lastContainerW = w;
+          lastContainerH = h;
+          renderer.setPixelRatio(dpr);
+          renderer.setSize(w, h, false);
+          camera.aspect = aspect;
+          camera.updateProjectionMatrix();
+
+          if (currentRoot && characterGroups.length > 0) {
+            const savedRootY = currentRoot.position.y;
+            currentRoot.position.y = 0;
+            const liveBounds = computeLiveActiveBounds(aspect);
+            currentRoot.position.y = savedRootY;
+            if (liveBounds) {
+              desiredCameraTarget.copy(liveBounds.center);
+              cameraTarget.copy(liveBounds.center);
+              desiredDistance = liveBounds.requiredDist;
+              baseDistance = liveBounds.requiredDist;
+            }
+          }
+          return true;
+        }
+        return false;
       }
+
+      function onResize() {
+        syncRendererToContainer(true);
+      }
+
+      window.notifyViewportResize = function () {
+        if (syncRendererToContainer(true) && renderer && scene && camera) {
+          renderer.render(scene, camera);
+        }
+      };
 
       function setupPointerControls(domElement) {
         let isDragging = false;
@@ -404,7 +455,7 @@
         totalBox.getCenter(center);
         totalBox.getSize(size);
 
-        const aspect = Math.max(0.45, overrideAspect || (camera && camera.aspect) || 1.0);
+        const aspect = Math.max(0.25, overrideAspect || (camera && camera.aspect) || 1.0);
         const fovRad = THREE.MathUtils.degToRad((camera && camera.fov) || 36);
         const halfVertFov = fovRad * 0.5;
         const halfHorizFov = Math.atan(Math.tan(halfVertFov) * aspect);
@@ -649,12 +700,7 @@
             frames.push(capCanvas.toDataURL('image/png'));
           }
 
-          // Restore interactive viewer state
-          renderer.setPixelRatio(savedPixelRatio);
-          renderer.setSize(savedSize.x, savedSize.y, false);
-          camera.aspect = savedAspect;
-          camera.updateProjectionMatrix();
-
+          // Restore interactive viewer state using live container dimensions so resize changes are never overwritten
           userYaw = savedYaw;
           userPitch = savedPitch;
           lookYawOffset = savedLookYaw;
@@ -666,6 +712,7 @@
           currentRoot.position.y = savedRootY;
           currentRoot.rotation.y = savedRootRotY;
           currentRoot.updateMatrixWorld(true);
+          syncRendererToContainer(true);
           renderer.render(scene, camera);
 
           console.log('Captured ' + frames.length + ' widget idle frames for clipDur=' + clipDur.toFixed(2) + 's');
@@ -857,6 +904,7 @@
           return;
         }
         animFrameId = requestAnimationFrame(animate);
+        syncRendererToContainer(false);
         const dt = Math.min(clock.getDelta(), 0.1);
         const elapsed = clock.getElapsedTime();
 

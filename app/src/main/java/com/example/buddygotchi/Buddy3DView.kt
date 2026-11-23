@@ -181,14 +181,21 @@ private fun interceptBuddy3DRequest(context: Context, request: WebResourceReques
 @Composable
 fun getBuddy3DViewportSize(size: WidgetSize): Pair<Dp, Dp> {
     return when {
-        size.cols == 1 && size.rows == 1 -> 58.dp to 42.dp
-        size.cols == 1 && size.rows == 2 -> 72.dp to 86.dp
-        size.cols == 1 -> 74.dp to 118.dp
-        size.cols == 2 && size.rows == 1 -> 98.dp to 48.dp
-        size.cols == 2 && size.rows == 2 -> 130.dp to 94.dp
-        size.rows == 1 -> 92.dp to 56.dp
-        size.rows == 2 -> 125.dp to 112.dp
-        else -> 220.dp to 118.dp
+        size.cols == 1 && size.rows == 1 -> 54.dp to 38.dp
+        size.cols == 1 && size.rows == 2 -> 60.dp to 68.dp
+        size.cols == 1 && size.rows == 3 -> 60.dp to 96.dp
+        size.cols == 1 -> 60.dp to 124.dp
+        size.cols == 2 && size.rows == 1 -> 64.dp to 44.dp
+        size.cols == 2 && size.rows == 2 -> 124.dp to 86.dp
+        size.cols == 2 && size.rows == 3 -> 136.dp to 118.dp
+        size.cols == 2 -> 136.dp to 156.dp
+        size.rows == 1 -> 76.dp to 44.dp
+        size.cols == 3 && size.rows == 2 -> 106.dp to 100.dp
+        size.rows == 2 -> 124.dp to 108.dp
+        size.cols == 3 && size.rows == 3 -> 180.dp to 118.dp
+        size.cols == 3 -> 188.dp to 160.dp
+        size.rows == 3 -> 220.dp to 118.dp
+        else -> 230.dp to 170.dp
     }
 }
 
@@ -196,6 +203,7 @@ fun getBuddy3DViewportSize(size: WidgetSize): Pair<Dp, Dp> {
 @Composable
 fun Buddy3DView(
     size: WidgetSize,
+    isEditMode: Boolean = false,
     getTouchPosition: () -> Offset? = { null },
     modifier: Modifier = Modifier
 ) {
@@ -293,6 +301,12 @@ fun Buddy3DView(
         }
     }
 
+    LaunchedEffect(isPageReady, viewportW, viewportH) {
+        val wv = webViewRef ?: return@LaunchedEffect
+        if (!isPageReady) return@LaunchedEffect
+        wv.evaluateJavascript("if(window.notifyViewportResize) window.notifyViewportResize();", null)
+    }
+
     Box(
         modifier = modifier
             .size(viewportW, viewportH)
@@ -305,55 +319,57 @@ fun Buddy3DView(
                     pos.y + coords.size.height / 2f
                 )
             }
-            // Capture and consume all pointer events in Compose so parent HorizontalPager,
-            // verticalScroll, and long-press edit mode never steal 3D orbit drags.
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    down.consume()
-                    Buddy3DManager.isInteractingWith3DState.value = true
+            // Capture and consume pointer events when not in edit mode so parent HorizontalPager
+            // and verticalScroll do not steal 3D orbit drags. Disabled in edit mode so widget resize/move works freely.
+            .pointerInput(isEditMode) {
+                if (!isEditMode) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        down.consume()
+                        Buddy3DManager.isInteractingWith3DState.value = true
 
-                    val downTime = SystemClock.uptimeMillis()
-                    var lastPos = down.position
-                    var totalDist = 0f
+                        val downTime = SystemClock.uptimeMillis()
+                        var lastPos = down.position
+                        var totalDist = 0f
 
-                    try {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id }
-                                ?: event.changes.firstOrNull()
-                                ?: break
+                        try {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id }
+                                    ?: event.changes.firstOrNull()
+                                    ?: break
 
-                            if (!change.pressed) {
+                                if (!change.pressed) {
+                                    change.consume()
+                                    break
+                                }
+
+                                val delta = change.position - lastPos
+                                lastPos = change.position
+                                totalDist += hypot(delta.x, delta.y)
                                 change.consume()
-                                break
-                            }
 
-                            val delta = change.position - lastPos
-                            lastPos = change.position
-                            totalDist += hypot(delta.x, delta.y)
-                            change.consume()
-
-                            if (delta.x != 0f || delta.y != 0f) {
-                                // Convert pixel delta to density-independent orbit units for consistent feel across screens
-                                val dxDp = delta.x / density.density
-                                val dyDp = delta.y / density.density
-                                webViewRef?.evaluateJavascript(
-                                    "if(window.onNativeDrag) window.onNativeDrag($dxDp, $dyDp);",
-                                    null
-                                )
+                                if (delta.x != 0f || delta.y != 0f) {
+                                    // Convert pixel delta to density-independent orbit units for consistent feel across screens
+                                    val dxDp = delta.x / density.density
+                                    val dyDp = delta.y / density.density
+                                    webViewRef?.evaluateJavascript(
+                                        "if(window.onNativeDrag) window.onNativeDrag($dxDp, $dyDp);",
+                                        null
+                                    )
+                                }
                             }
-                        }
-                    } finally {
-                        Buddy3DManager.isInteractingWith3DState.value = false
-                        webViewRef?.evaluateJavascript(
-                            "if(window.onNativeRelease) window.onNativeRelease();",
-                            null
-                        )
-                        val elapsed = SystemClock.uptimeMillis() - downTime
-                        if (totalDist < tapSlopPx && elapsed < 350L) {
-                            webViewRef?.evaluateJavascript("if(window.petBuddy) window.petBuddy();", null)
-                            TaskManager.petBuddy(context)
+                        } finally {
+                            Buddy3DManager.isInteractingWith3DState.value = false
+                            webViewRef?.evaluateJavascript(
+                                "if(window.onNativeRelease) window.onNativeRelease();",
+                                null
+                            )
+                            val elapsed = SystemClock.uptimeMillis() - downTime
+                            if (totalDist < tapSlopPx && elapsed < 350L) {
+                                webViewRef?.evaluateJavascript("if(window.petBuddy) window.petBuddy();", null)
+                                TaskManager.petBuddy(context)
+                            }
                         }
                     }
                 }
@@ -416,6 +432,13 @@ fun Buddy3DView(
                     )
 
                     loadUrl("https://buddy3d.local/assets/buddy3d/viewer.html")
+                }
+            },
+            update = { wv ->
+                if (isPageReady) {
+                    wv.post {
+                        wv.evaluateJavascript("if(window.notifyViewportResize) window.notifyViewportResize();", null)
+                    }
                 }
             }
         )

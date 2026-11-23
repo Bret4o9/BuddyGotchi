@@ -477,6 +477,7 @@ fun LeftDashboardPage(
                                         RenderDashboardWidgetContent(
                                             item = item,
                                             liveSize = liveSize,
+                                            isEditMode = isEditMode,
                                             tasks = tasks,
                                             onToggleTask = onToggleTask,
                                             onClearDoneTasks = onClearDoneTasks,
@@ -689,6 +690,7 @@ fun LeftDashboardPage(
                                                 RenderDashboardWidgetContent(
                                                     item = item,
                                                     liveSize = liveSize,
+                                                    isEditMode = isEditMode,
                                                     tasks = tasks,
                                                     onToggleTask = onToggleTask,
                                                     onClearDoneTasks = onClearDoneTasks,

@@ -29,9 +29,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -876,7 +878,7 @@ private data class EyeConfig(
 
 private fun getEyeConfig(size: WidgetSize): EyeConfig {
     return when {
-        size.cols == 1 || size.rows == 1 -> EyeConfig(
+        size.cols == 1 && size.rows == 1 -> EyeConfig(
             canvasWidth = 38.dp,
             canvasHeight = 18.dp,
             eyeRadius = 7.dp,
@@ -885,23 +887,32 @@ private fun getEyeConfig(size: WidgetSize): EyeConfig {
             pupilRadius = 3.dp,
             maxTravel = 2.4.dp
         )
-        size.cols == 2 && size.rows == 2 -> EyeConfig(
-            canvasWidth = 56.dp,
-            canvasHeight = 26.dp,
-            eyeRadius = 11.dp,
-            eyeSpacing = 28.dp,
-            strokeWidth = 2.2.dp,
-            pupilRadius = 4.5.dp,
-            maxTravel = 4.2.dp
+        size.cols == 1 || size.rows == 1 -> EyeConfig(
+            canvasWidth = 46.dp,
+            canvasHeight = 22.dp,
+            eyeRadius = 9.dp,
+            eyeSpacing = 22.dp,
+            strokeWidth = 2.0.dp,
+            pupilRadius = 3.8.dp,
+            maxTravel = 3.2.dp
         )
-        size.rows == 2 -> EyeConfig(
-            canvasWidth = 72.dp,
-            canvasHeight = 34.dp,
-            eyeRadius = 14.dp,
-            eyeSpacing = 36.dp,
+        size.cols == 2 && size.rows == 2 -> EyeConfig(
+            canvasWidth = 64.dp,
+            canvasHeight = 30.dp,
+            eyeRadius = 12.dp,
+            eyeSpacing = 32.dp,
+            strokeWidth = 2.4.dp,
+            pupilRadius = 5.dp,
+            maxTravel = 4.6.dp
+        )
+        size.cols == 2 || size.rows == 2 -> EyeConfig(
+            canvasWidth = 76.dp,
+            canvasHeight = 36.dp,
+            eyeRadius = 15.dp,
+            eyeSpacing = 38.dp,
             strokeWidth = 2.8.dp,
-            pupilRadius = 6.dp,
-            maxTravel = 5.5.dp
+            pupilRadius = 6.2.dp,
+            maxTravel = 5.8.dp
         )
         else -> EyeConfig(
             canvasWidth = 110.dp,
@@ -918,6 +929,7 @@ private fun getEyeConfig(size: WidgetSize): EyeConfig {
 @Composable
 fun BuddyEyes(
     size: WidgetSize,
+    isEditMode: Boolean = false,
     getTouchPosition: () -> Offset? = { null },
     modifier: Modifier = Modifier
 ) {
@@ -1066,17 +1078,23 @@ fun BuddyEyes(
         modifier = modifier
             .size(config.canvasWidth, config.canvasHeight)
             .semantics { contentDescription = "Interactive 2D Buddy Eyes Companion. Tap to blink." }
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                TaskManager.petBuddy(context)
-                coroutineScope.launch {
-                    isBlinking = true
-                    delay(130)
-                    isBlinking = false
+            .then(
+                if (!isEditMode) {
+                    Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        TaskManager.petBuddy(context)
+                        coroutineScope.launch {
+                            isBlinking = true
+                            delay(130)
+                            isBlinking = false
+                        }
+                    }
+                } else {
+                    Modifier
                 }
-            }
+            )
             .onGloballyPositioned { coordinates ->
                 val pos = coordinates.positionInRoot()
                 eyesCenterInRoot = Offset(
@@ -1135,18 +1153,21 @@ fun BuddyEyes(
 private fun BuddyCompanionVisual(
     size: WidgetSize,
     displayMode: BuddyDisplayMode,
+    isEditMode: Boolean = false,
     getTouchPosition: () -> Offset? = { null },
     modifier: Modifier = Modifier
 ) {
     if (displayMode == BuddyDisplayMode.CLASSIC_2D) {
         BuddyEyes(
             size = size,
+            isEditMode = isEditMode,
             getTouchPosition = getTouchPosition,
             modifier = modifier
         )
     } else {
         Buddy3DView(
             size = size,
+            isEditMode = isEditMode,
             getTouchPosition = getTouchPosition,
             modifier = modifier
         )
@@ -1159,6 +1180,7 @@ fun BuddyWidget(
     level: Int = 1,
     size: WidgetSize = WidgetSize.HALF,
     height: Dp = getWidgetHeight(size),
+    isEditMode: Boolean = false,
     getTouchPosition: () -> Offset? = { null },
     modifier: Modifier = Modifier
 ) {
@@ -1173,6 +1195,18 @@ fun BuddyWidget(
     val buddyNickname = petNicknames[equippedPetId]?.takeIf { it.isNotBlank() } ?: "Companion"
     var show3DStudioDialog by remember { mutableStateOf(false) }
     var showNicknameEditDialog by remember { mutableStateOf(false) }
+
+    val currentGetTouch by rememberUpdatedState(getTouchPosition)
+    val buddyVisual = remember {
+        movableContentOf<WidgetSize, BuddyDisplayMode, Boolean> { currentSize, currentMode, editMode ->
+            BuddyCompanionVisual(
+                size = currentSize,
+                displayMode = currentMode,
+                isEditMode = editMode,
+                getTouchPosition = { currentGetTouch() }
+            )
+        }
+    }
 
     if (show3DStudioDialog) {
         Buddy3DStudioDialog(onDismiss = { show3DStudioDialog = false })
@@ -1193,26 +1227,29 @@ fun BuddyWidget(
         height = height,
         size = size,
         modifier = modifier,
-        headerAction = {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFF1F1F1F))
-                    .border(0.8.dp, Color(0xFF3A3A3A), RoundedCornerShape(6.dp))
-                    .clickable { show3DStudioDialog = true }
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                    .semantics { contentDescription = "Open Buddy Studio" }
-            ) {
-                Text(
-                    text = "Buddy Studio",
-                    fontSize = 8.5.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.secondary
-                )
+        headerAction = if (!isEditMode && (size.cols >= 2 || size.rows >= 2)) {
+            {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFF1F1F1F))
+                        .border(0.8.dp, Color(0xFF3A3A3A), RoundedCornerShape(6.dp))
+                        .clickable { show3DStudioDialog = true }
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .semantics { contentDescription = "Open Buddy Studio" }
+                ) {
+                    Text(
+                        text = "Buddy Studio",
+                        fontSize = 8.5.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
             }
-        }
+        } else null
     ) {
+        val progress = ((xp % 50) / 50f).coerceIn(0f, 1f)
         when {
             size.cols == 1 && size.rows == 1 -> {
                 // 1x1 Cube Layout
@@ -1221,11 +1258,7 @@ fun BuddyWidget(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    BuddyCompanionVisual(
-                        size = size,
-                        displayMode = displayMode,
-                        getTouchPosition = getTouchPosition
-                    )
+                    buddyVisual(size, displayMode, isEditMode)
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Lv $level",
@@ -1241,23 +1274,19 @@ fun BuddyWidget(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(vertical = if (size.rows == 2) 4.dp else 8.dp),
+                        .padding(vertical = if (size.rows == 2) 2.dp else 6.dp),
                     verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    BuddyCompanionVisual(
-                        size = size,
-                        displayMode = displayMode,
-                        getTouchPosition = getTouchPosition
-                    )
+                    buddyVisual(size, displayMode, isEditMode)
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         Text(
                             text = "LVL $level",
                             fontWeight = FontWeight.Bold,
-                            fontSize = if (size.rows == 2) 11.sp else 13.sp,
+                            fontSize = if (size.rows == 2) 11.sp else 12.5.sp,
                             color = NothingRed
                         )
                         Text(
@@ -1266,7 +1295,6 @@ fun BuddyWidget(
                             color = MaterialTheme.colorScheme.secondary
                         )
                         if (size.rows >= 3) {
-                            val progress = ((xp % 50) / 50f).coerceIn(0f, 1f)
                             LinearProgressIndicator(
                                 progress = { progress },
                                 modifier = Modifier
@@ -1290,33 +1318,173 @@ fun BuddyWidget(
                 }
             }
 
-            size.cols == 2 -> {
-                // 2x1 or 2x2 Half-width Layout
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+            size.cols == 2 && size.rows == 1 -> {
+                // 2x1 Half-row Compact Horizontal Layout (fits comfortably in 88.dp height)
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    BuddyCompanionVisual(
-                        size = size,
-                        displayMode = displayMode,
-                        getTouchPosition = getTouchPosition
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    buddyVisual(size, displayMode, isEditMode)
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "Level $level",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp
+                            text = "LVL $level",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = NothingRed
                         )
                         Text(
-                            text = "\u2022 $xp XP",
-                            fontSize = 11.sp,
+                            text = "$xp XP",
+                            fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.secondary
                         )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .width(54.dp)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
+                            color = NothingRed,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    }
+                }
+            }
+
+            size.cols == 2 && size.rows == 2 -> {
+                // 2x2 Half-block Square Layout
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    buddyVisual(size, displayMode, isEditMode)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable(enabled = !isEditMode) { showNicknameEditDialog = true }
+                                .semantics { contentDescription = "Edit Buddy Nickname" }
+                        ) {
+                            Text(
+                                text = "Lv $level $buddyNickname",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            PenEditIcon(
+                                modifier = Modifier.size(11.dp),
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .width(100.dp)
+                                .height(5.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = NothingRed,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        Text(
+                            text = "$xp XP \u2022 ${(progress * 100).toInt()}%",
+                            fontSize = 9.5.sp,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
+            }
+
+            size.cols == 2 -> {
+                // 2x3, 2x4 Half-width Tall Layout
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceAround
+                ) {
+                    buddyVisual(size, displayMode, isEditMode)
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable(enabled = !isEditMode) { showNicknameEditDialog = true }
+                                .semantics { contentDescription = "Edit Buddy Nickname" }
+                        ) {
+                            Text(
+                                text = "Level $level $buddyNickname",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            PenEditIcon(
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .width(116.dp)
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = NothingRed,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "${xp % 50} / 50 XP to Lv ${level + 1}",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = "XP", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            Text(text = "$xp", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = "BUDDY", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            Text(
+                                text = if (displayMode == BuddyDisplayMode.THREE_D) Buddy3DManager.getActiveCharacterLabel() else "2D",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingRed,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = "MOOD", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            Text(text = "HAPPY \uD83D\uDE0A", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -1326,19 +1494,15 @@ fun BuddyWidget(
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 6.dp),
+                        .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        BuddyCompanionVisual(
-                            size = size,
-                            displayMode = displayMode,
-                            getTouchPosition = getTouchPosition
-                        )
+                        buddyVisual(size, displayMode, isEditMode)
                         Column {
                             Text(
                                 text = "BUDDY \u2022 LVL $level",
@@ -1359,7 +1523,6 @@ fun BuddyWidget(
                         horizontalAlignment = Alignment.End,
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        val progress = ((xp % 50) / 50f).coerceIn(0f, 1f)
                         Text(
                             text = "${(progress * 100).toInt()}% to Lv ${level + 1}",
                             fontSize = 9.sp,
@@ -1368,7 +1531,7 @@ fun BuddyWidget(
                         LinearProgressIndicator(
                             progress = { progress },
                             modifier = Modifier
-                                .width(70.dp)
+                                .width(64.dp)
                                 .height(5.dp)
                                 .clip(RoundedCornerShape(3.dp)),
                             color = NothingRed,
@@ -1379,71 +1542,58 @@ fun BuddyWidget(
             }
 
             size.rows == 2 -> {
-                // 3x2, 4x2 Wide Layout (180.dp)
+                // 3x2, 4x2 Wide Layout (190.dp)
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 8.dp),
+                        .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    buddyVisual(size, displayMode, isEditMode)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        BuddyCompanionVisual(
-                            size = size,
-                            displayMode = displayMode,
-                            getTouchPosition = getTouchPosition
+                        Text(
+                            text = if (displayMode == BuddyDisplayMode.THREE_D) Buddy3DManager.getActiveCharacterLabel() else "BUDDYGOTCHI",
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = NothingRed
                         )
-                        Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable(enabled = !isEditMode) { showNicknameEditDialog = true }
+                                .semantics { contentDescription = "Edit Buddy Nickname" }
+                        ) {
                             Text(
-                                text = if (displayMode == BuddyDisplayMode.THREE_D) Buddy3DManager.getActiveCharacterLabel() else "BUDDYGOTCHI",
-                                fontSize = 11.sp,
+                                text = "Level $level $buddyNickname",
+                                fontSize = if (size.cols == 3) 13.5.sp else 15.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                color = NothingRed
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .clickable { showNicknameEditDialog = true }
-                                    .semantics { contentDescription = "Edit Buddy Nickname" }
-                            ) {
-                                Text(
-                                    text = "Level $level $buddyNickname",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                PenEditIcon(
-                                    modifier = Modifier.size(13.dp),
-                                    tint = MaterialTheme.colorScheme.secondary
-                                )
-                            }
-                            Text(
-                                text = "$xp Total XP",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.secondary
+                            PenEditIcon(
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.secondary
                             )
                         }
-                    }
-
-                    Column(
-                        horizontalAlignment = Alignment.End,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        val progress = ((xp % 50) / 50f).coerceIn(0f, 1f)
                         Text(
-                            text = "${(progress * 100).toInt()}% to Lv ${level + 1}",
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.secondary
+                            text = "$xp Total XP \u2022 ${(progress * 100).toInt()}% to Lv ${level + 1}",
+                            fontSize = 10.5.sp,
+                            color = MaterialTheme.colorScheme.secondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         LinearProgressIndicator(
                             progress = { progress },
                             modifier = Modifier
-                                .width(80.dp)
+                                .fillMaxWidth()
                                 .height(6.dp)
                                 .clip(RoundedCornerShape(3.dp)),
                             color = NothingRed,
@@ -1454,7 +1604,7 @@ fun BuddyWidget(
             }
 
             else -> {
-                // 4x3 MAX Layout (276.dp, matching Clock)
+                // 3x3, 4x3, 3x4, 4x4 MAX Layout
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1462,11 +1612,7 @@ fun BuddyWidget(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.SpaceAround
                 ) {
-                    BuddyCompanionVisual(
-                        size = size,
-                        displayMode = displayMode,
-                        getTouchPosition = getTouchPosition
-                    )
+                    buddyVisual(size, displayMode, isEditMode)
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Row(
@@ -1474,13 +1620,15 @@ fun BuddyWidget(
                             horizontalArrangement = Arrangement.Center,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .clickable { showNicknameEditDialog = true }
+                                .clickable(enabled = !isEditMode) { showNicknameEditDialog = true }
                                 .semantics { contentDescription = "Edit Buddy Nickname" }
                         ) {
                             Text(
                                 text = "Level $level $buddyNickname",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
+                                fontSize = if (size.cols == 3) 16.sp else 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Spacer(modifier = Modifier.width(5.dp))
                             PenEditIcon(
@@ -1488,12 +1636,11 @@ fun BuddyWidget(
                                 tint = MaterialTheme.colorScheme.secondary
                             )
                         }
-                        val progress = ((xp % 50) / 50f).coerceIn(0f, 1f)
                         Spacer(modifier = Modifier.height(4.dp))
                         LinearProgressIndicator(
                             progress = { progress },
                             modifier = Modifier
-                                .width(160.dp)
+                                .width(if (size.cols == 3) 140.dp else 160.dp)
                                 .height(8.dp)
                                 .clip(RoundedCornerShape(4.dp)),
                             color = NothingRed,
@@ -1510,7 +1657,7 @@ fun BuddyWidget(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp),
+                            .padding(horizontal = if (size.cols == 3) 8.dp else 24.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
