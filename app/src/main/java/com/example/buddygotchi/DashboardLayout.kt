@@ -41,7 +41,7 @@ enum class DashboardWidgetId(
     CLOCK("Clock", canRemove = false),
     TODAY("Today", canRemove = true),
     NEXT("Next", canRemove = true),
-    BUDDY("Buddy", canRemove = true),
+    BUDDY("Buddy", canRemove = false),
     WATER("Water", canRemove = true),
     NOTES("Notes", canRemove = true),
     PASSWORDS("Passwords", canRemove = true),
@@ -189,6 +189,19 @@ object DashboardLayoutManager {
             if (list.isEmpty()) {
                 getDefaultLayout()
             } else {
+                var modified = false
+                // Ensure BUDDY widget is always deployed on the Main page
+                if (list.none { it.widgetId == DashboardWidgetId.BUDDY }) {
+                    list.add(0, DashboardWidgetItem(DashboardWidgetId.BUDDY, WidgetSize.MAX))
+                    modified = true
+                }
+                // Ensure CLOCK widget is always deployed on the Main page
+                if (list.none { it.widgetId == DashboardWidgetId.CLOCK }) {
+                    val buddyIndex = list.indexOfFirst { it.widgetId == DashboardWidgetId.BUDDY }
+                    val insertIdx = if (buddyIndex != -1) buddyIndex + 1 else 0
+                    list.add(insertIdx, DashboardWidgetItem(DashboardWidgetId.CLOCK, WidgetSize.MAX))
+                    modified = true
+                }
                 // Ensure TEST_ALERT widget is present for testing
                 if (list.none { it.widgetId == DashboardWidgetId.TEST_ALERT }) {
                     val clockIndex = list.indexOfFirst { it.widgetId == DashboardWidgetId.CLOCK }
@@ -197,6 +210,10 @@ object DashboardLayoutManager {
                     } else {
                         list.add(0, DashboardWidgetItem(DashboardWidgetId.TEST_ALERT, WidgetSize.WIDE))
                     }
+                    modified = true
+                }
+                if (modified) {
+                    saveLayout(context, list)
                 }
                 list
             }
@@ -239,6 +256,7 @@ object DashboardLayoutManager {
     }
 
     fun removeWidget(layout: List<DashboardWidgetItem>, widgetId: DashboardWidgetId): List<DashboardWidgetItem> {
+        if (!widgetId.canRemove) return layout
         return layout.filter { it.widgetId != widgetId }
     }
 
@@ -269,7 +287,7 @@ object DashboardLayoutManager {
 
     fun getShelfWidgets(mainLayout: List<DashboardWidgetItem>, leftLayout: List<DashboardWidgetItem>): List<DashboardWidgetId> {
         val deployed = (mainLayout.map { it.widgetId } + leftLayout.map { it.widgetId }).toSet()
-        return DashboardWidgetId.entries.filter { it !in deployed }
+        return DashboardWidgetId.entries.filter { it.canRemove && it !in deployed }
     }
 
     /**
@@ -321,7 +339,7 @@ object LeftDashboardLayoutManager {
                 val sizeStr = obj.optString("size", "WIDE")
                 val id = try { DashboardWidgetId.valueOf(idStr) } catch (_: Exception) { null }
                 val size = if (id == DashboardWidgetId.CLOCK) WidgetSize.MAX else WidgetSize.parse(sizeStr)
-                if (id != null) {
+                if (id != null && id.canRemove) {
                     list.add(DashboardWidgetItem(id, size))
                 }
             }
@@ -370,6 +388,7 @@ object LeftDashboardLayoutManager {
     }
 
     fun removeWidget(layout: List<DashboardWidgetItem>, widgetId: DashboardWidgetId): List<DashboardWidgetItem> {
+        if (!widgetId.canRemove) return layout
         return layout.filter { it.widgetId != widgetId }
     }
 

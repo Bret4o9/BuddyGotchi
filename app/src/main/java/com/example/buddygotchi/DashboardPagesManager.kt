@@ -40,11 +40,10 @@ object DashboardPageTemplates {
     val WELLNESS = DashboardPageTemplate(
         id = "wellness",
         name = "WELLNESS",
-        description = "Water tracker & Buddy Gotchi",
+        description = "Water tracker & daily hydration",
         iconEmoji = "💧",
         defaultLayout = listOf(
-            DashboardWidgetItem(DashboardWidgetId.WATER, WidgetSize.MAX),
-            DashboardWidgetItem(DashboardWidgetId.BUDDY, WidgetSize.HALF)
+            DashboardWidgetItem(DashboardWidgetId.WATER, WidgetSize.MAX)
         )
     )
 
@@ -55,8 +54,7 @@ object DashboardPageTemplates {
         iconEmoji = "⚡",
         defaultLayout = listOf(
             DashboardWidgetItem(DashboardWidgetId.TODAY, WidgetSize.WIDE),
-            DashboardWidgetItem(DashboardWidgetId.NEXT, WidgetSize.HALF),
-            DashboardWidgetItem(DashboardWidgetId.BUDDY, WidgetSize.HALF)
+            DashboardWidgetItem(DashboardWidgetId.NEXT, WidgetSize.WIDE)
         )
     )
 
@@ -215,7 +213,7 @@ object DashboardPagesManager {
                 val sizeStr = obj.optString("size", "WIDE")
                 val id = try { DashboardWidgetId.valueOf(idStr) } catch (_: Exception) { null }
                 val size = if (id == DashboardWidgetId.CLOCK) WidgetSize.MAX else WidgetSize.parse(sizeStr)
-                if (id != null) {
+                if (id != null && id.canRemove) {
                     list.add(DashboardWidgetItem(id, size))
                 }
             }

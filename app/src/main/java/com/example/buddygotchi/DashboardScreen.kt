@@ -329,7 +329,7 @@ fun DashboardScreen(
 
     val shelfWidgets = remember(layout, leftLayout, customPageLayouts) {
         val deployed = (layout.map { it.widgetId } + leftLayout.map { it.widgetId } + customPageLayouts.values.flatMap { it.map { w -> w.widgetId } }).toSet()
-        DashboardWidgetId.entries.filter { it !in deployed }
+        DashboardWidgetId.entries.filter { it.canRemove && it !in deployed }
     }
 
     fun deployWidget(widgetId: DashboardWidgetId, targetPage: Int) {
